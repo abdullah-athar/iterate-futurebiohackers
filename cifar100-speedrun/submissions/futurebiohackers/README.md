@@ -3,12 +3,13 @@
 A convolutional image classifier based on Keller Jordan's
 [airbench](https://github.com/KellerJordan/cifar10-airbench), trained from scratch.
 Three convolution groups of 64, 256 and 768 channels, three convolutions each with a
-residual connection over the last two. The first group is deliberately narrow: it
+residual connection over the last two; in the last group that residual pair runs through 512
+channels (3x3 768 -> 512 -> 768) while its input, residual and output stay at 768. The first group is deliberately narrow: it
 runs at 31x31 and 15x15, where each channel costs 4-16x more than in the later
 groups and cuDNN reaches only 23-34% of A100 peak; the capacity sits in the last
 group, which runs at 3x3 at 78-89% of peak.
 
-Training: 9.5 epochs at batch 1024, Nesterov SGD (lr 11.5, weight decay 0.017 per 1024
+Training: 10 epochs at batch 1024, Nesterov SGD (lr 11.5, weight decay 0.017 per 1024
 examples, momentum 0.85, BatchNorm-bias lr 32x), label smoothing 0.25, logit scale
 1.25/9, BatchNorm momentum 0.5, lookahead weight average. The first quarter of the
 examples trains on 24x24 bilinear downsamples of the images (0.56x the FLOPs), the
@@ -34,27 +35,37 @@ Implementation details that change the time but not the model:
 
 ## Development results
 
-Confirmation runs for the submitted defaults (24 px first quarter, 28 px second quarter, 9.5
-epochs), 3 October: 40 trials per seed set, the 75% target enforced, cold `build`, Modal NVIDIA
+Confirmation runs for the submitted defaults (512-channel residual pair in the last group, 24 px
+first quarter, 28 px second quarter, 10 epochs), 4 October: 40 trials per seed set, the 75% target enforced, cold `build`, Modal NVIDIA
 A100-SXM4-80GB at the 400 W power limit ("A100 SXM 400 W"). Official judging runs on an A100 80GB
 PCIe, where times are higher (about 8% on the earlier recipe); the ranking between recipes carries
 over.
 
 | Seeds | Recipe | Mean accuracy | Min / max trial | Mean preparation + training | Cold build | Qualified |
 | --- | --- | ---: | ---: | ---: | ---: | --- |
-| 0-39 | **submitted defaults** | **75.18% (sd 0.25)** | 74.68% / 75.65% | **4.51 s** (sd 0.01) | 275 s | yes |
-| 40-79 | **submitted defaults** | **75.25% (sd 0.25)** | 74.54% / 75.71% | **4.55 s** (sd 0.02) | 287 s | yes |
+| 0-39 | **submitted defaults** | **75.19% (sd 0.25)** | 74.53% / 75.66% | **4.56 s** (sd 0.02) | 381 s | yes |
+| 40-79 | **submitted defaults** | **75.25% (sd 0.25)** | 74.64% / 75.80% | **4.49 s** (sd 0.02) | 278 s | yes |
+| 0-39 / 40-79 | 768-wide pair, 9.5 epochs (PR #22) | 75.18% / 75.25% | | 4.51 / 4.55 s | 275 / 287 s | yes |
+
+Cards at the same power limit differ by one to two percent in speed, so the time difference was
+also measured with both recipes back to back in one container per seed set (40 trials each):
+seeds 0-39, this recipe 75.20% in 4.51 s against 75.21% in 4.60 s for the 768-wide pair; seeds
+40-79, 75.18% in 4.50 s against 75.18% in 4.61 s. Equal accuracy within 0.01 points, 0.09 to
+0.11 s faster.
 | 0-39 | 9.0 epochs, 28 px first half (PR #14 defaults) | 75.12% (sd 0.26) | | 4.72 s (sd 0.01) | 193 s | yes |
 | 0-39 / 40-79 | 9.5 epochs, 28 px first half (PR #21) | 75.28% / 75.32% | | 4.96 / 4.94 s | 196 / 259 s | yes |
 
-Why this schedule: on this network a 24x24 first quarter in front of the 28x28 phase saves 0.38 s
-at equal accuracy (paired 8-trial screens at 400 W), and half an epoch more buys back about 0.2
-points (the paired epoch ladder is linear at about 1.05 points per second). Every optimizer and
+Why this recipe: the residual pair of the last group is about a third of the network's FLOPs,
+and running it through 512 channels saves 0.31 s for 0.35 points (paired 8-trial screens at
+400 W); half an epoch more buys the points back at a net gain of about 0.1 s (16 paired trials:
++0.02 points, -0.11 s against the 768-wide pair). The 24x24 first quarter in front of the 28x28
+phase saves 0.38 s at equal accuracy, and the epoch ladder is linear at about 1.05 points per
+second. Every optimizer and
 augmentation knob was re-screened on this schedule (learning rate, weight decay, BatchNorm-bias
 learning rate, momentum, BatchNorm momentum, label smoothing, warmup, final learning rate,
 lookahead period, translation, jitter, cutout, batch 512/768, batch schedules, logit scale): all
 flat or worse. Under an emulated four-CPU container quota (the official judging limit) the cold
-build of these three resolution graphs took 339 s (limit 600 s). No trial produced a non-finite
+build of exactly this configuration took 268 s (limit 600 s). No trial produced a non-finite
 loss (counted on the device in every run).
 
 Earlier results for the 9-epoch recipe:
