@@ -1,0 +1,17 @@
+{
+  "round": "r9",
+  "n": 8,
+  "seed": 0,
+  "control": {"widths": [64, 256, 768]},
+  "jobs": [
+    {
+      "name": "stack-c",
+      "control_index": 1,
+      "variants": [
+        {"label": "S2-e8.75", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168}, "hypothesis": "w64 base + bias 16 (+0.14) + lr 12 (+0.16) + wd x1.4 (+0.19): additivity at 8.75 epochs"},
+        {"label": "S2-e9.0", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "epochs": 9.0}, "hypothesis": "three-gainer stack at 9.0 epochs (~5.0 s)"},
+        {"label": "S2-e9.25", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "epochs": 9.25}, "hypothesis": "three-gainer stack at 9.25 epochs (~5.1 s, accuracy headroom)"}
+      ]
+    }
+  ]
+}
