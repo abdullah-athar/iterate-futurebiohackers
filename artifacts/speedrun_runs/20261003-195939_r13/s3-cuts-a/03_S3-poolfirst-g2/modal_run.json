@@ -1,0 +1,47 @@
+{
+  "returncode": 1,
+  "wall_seconds": 122.9,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T190610Z-07aede71",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"bias_scaler\": 16.0, \"compile_loss\": true, \"count_nonfinite\": true, \"epochs\": 9.5, \"fused_sgd\": true, \"lr\": 12.0, \"pool_first\": [false, true, false], \"weight_decay\": 0.0168, \"widths\": [64, 256, 768]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "S3-poolfirst-g2",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"bias_scaler\": 16.0, \"compile_loss\": true, \"count_nonfinite\": true, \"epochs\": 9.5, \"fused_sgd\": true, \"lr\": 12.0, \"pool_first\": [false, true, false], \"weight_decay\": 0.0168, \"widths\": [64, 256, 768]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"bias_scaler\": 16.0, \"compile_loss\": true, \"count_nonfinite\": true, \"epochs\": 9.5, \"fused_sgd\": true, \"lr\": 12.0, \"pool_first\": [false, true, false], \"weight_decay\": 0.0168, \"widths\": [64, 256, 768]}",
+    "delta": {
+      "widths": [
+        64,
+        256,
+        768
+      ],
+      "bias_scaler": 16.0,
+      "lr": 12.0,
+      "weight_decay": 0.0168,
+      "compile_loss": true,
+      "fused_sgd": true,
+      "epochs": 9.5,
+      "pool_first": [
+        false,
+        true,
+        false
+      ]
+    },
+    "hypothesis": "PR #5's pool-before-conv1 in group 2: its conv1 runs at 7x7 instead of 15x15",
+    "env": {},
+    "config": "futurebiohackers {\"bias_scaler\": 16.0, \"compile_loss\": true, \"epochs\": 9.5, \"fused_sgd\": true, \"lr\": 12.0, \"pool_first\": [false, true, false], \"weight_decay\": 0.0168, \"widths\": [64, 256, 768]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

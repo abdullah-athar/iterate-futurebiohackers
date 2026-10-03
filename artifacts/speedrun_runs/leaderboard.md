@@ -1,8 +1,8 @@
 # CIFAR-100 speedrun leaderboard
 
-- Generated 2026-10-03 20:01 from `artifacts/speedrun_runs/registry.jsonl`: 165 variant rows, 60 control rows.
+- Generated 2026-10-03 20:08 from `artifacts/speedrun_runs/registry.jsonl`: 173 variant rows, 62 control rows.
 - k = 0.7 pp/s from `artifacts/speedrun_runs/k.json` (r6/k2 on the promoted recipe (8.75 ep, 24 px first quarter, stack), SXM 400 W, n=8 paired, control 75.37 pct / 5.67 s: e8.25 -0.23 pp / -0.37 s, e9.25 +0.17 pp / +0.24 s; least squares 0.65 pp/s, rounded to 0.7. Earlier bases: 128/384/576 (rounds calib, r1) 0.445; 96/256/768 at 8.5 ep (rounds r3, r4, r5) 1.0., 2026-10-03T19:30:00)
-- GPU used: 859.8/1263 min (ledger `artifacts/speedrun_runs/gpu_ledger.jsonl`: 172 containers, 92 guard misses, 23.3 min lost).
+- GPU used: 893.4/1263 min (ledger `artifacts/speedrun_runs/gpu_ledger.jsonl`: 182 containers, 98 guard misses, 24.8 min lost).
 
 Score: `dtime_adj = dtime - dacc_pp / k` (seconds; dtime = variant minus control mean prepare+train time, dacc in accuracy percentage points, both from paired trials); lower is better. dtime_adj is recomputed from the current k for every row with paired data; rows without paired data sit at the bottom sorted by dtime. `!` marks nonfinite > 0 or a verdict that is not qualified/complete; `*` marks a dtime_adj computed from the row's own k_used (no k.json).
 
@@ -144,39 +144,47 @@ Score: `dtime_adj = dtime - dacc_pp / k` (seconds; dtime = variant minus control
 | 132 | ema10 | r1 | `{"ema_every":10}` | less frequent lookahead averaging: fewer EMA kernels, may... | 8/8 | 75.11 | 0.14 | -0.18 +- 0.14 | +0.01 | +0.42 | 7.33 | 15 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
 | 133 | ! mom0.9 | r8 | `{"widths":[64,256,768],"momentum":0.9}` | momentum 0.9 (lr decoupled) | 8/8 | 74.59 | 0.12 | -0.31 +- 0.09 | -0.01 | +0.43 | 4.84 | 92 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
 | 134 | ! filt5-0.75 | r7 | `{"filter_start":5,"filter_keep":0.75}` | filter from epoch 5 | 8/8 | 74.66 | 0.18 | -0.72 +- 0.10 | -0.59 | +0.44 | 5.09 | 23 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 135 | ! gelu-tanh | r8 | `{"widths":[64,256,768],"gelu_approximate":"tanh"}` | tanh GELU approximation (speed only; memory-bound kernels... | 8/8 | 74.79 | 0.27 | -0.18 +- 0.09 | +0.25 | +0.51 | 5.11 | 93 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 136 | ! w64-triton-s20x20-24x40-28x60-e9.5 | r7 | `{"widths":[64,256,768],"crop_mode":"triton","res_schedule":[[20,0.2],[24,0.4],[28,0.6]],"epochs":9.5}` | group 1 at 64 plus the three-stage ramp and the Triton cr... | 8/8 | 74.74 | 0.22 | -0.55 +- 0.09 | -0.26 | +0.53 | 5.56 | 236 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 137 | ! w64-384-576 | r1 | `{"widths":[64,384,576]}` | halve group 1; big time saving, accuracy risk | 8/8 | 74.37 | 0.22 | -0.94 +- 0.11 | -1.58 | +0.54 | 5.82 | 55 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 138 | ! final0.15 | r8 | `{"widths":[64,256,768],"final_lr":0.15}` | less final decay | 8/8 | 74.74 | 0.35 | -0.15 +- 0.13 | +0.53 | +0.75 | 5.37 | 58 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 139 | ! d222-skip-e9.5 | r11 | `{"depths":[2,2,2],"depth2_residual":true,"epochs":9.5}` | depth 2 + skip with 0.75 epoch bought back | 8/8 | 74.12 | 0.27 | -1.32 +- 0.15 | -1.09 | +0.79 | 4.56 | 28 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 140 | ! s16x15-20x30-24x45-28x60 | r7 | `{"res_schedule":[[16,0.15],[20,0.3],[24,0.45],[28,0.6]]}` | four-stage ramp from 16 px (exploratory; the cold build m... | 8/8 | 74.38 | 0.27 | -0.91 +- 0.14 | -0.49 | +0.81 | 5.09 | 171 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 141 | ! d222-e10.5 | r11 | `{"depths":[2,2,2],"epochs":10.5}` | k on the depth-2 network: +1.75 epochs | 8/8 | 74.28 | 0.23 | -1.02 +- 0.13 | -0.54 | +0.91 | 5.06 | 24 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 142 | ! filt6-0.5 | r7 | `{"filter_start":6,"filter_keep":0.5}` | from epoch 6 train on the hardest half only | 8/8 | 74.12 | 0.16 | -1.26 +- 0.07 | -0.86 | +0.93 | 4.82 | 23 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 143 | ! d222-w96-320-1024 | r11 | `{"depths":[2,2,2],"widths":[96,320,1024]}` | depth 2 everywhere, capacity moved to groups 2 and 3 | 8/8 | 74.82 | 0.19 | -0.47 +- 0.09 | +0.27 | +0.94 | 5.88 | 129 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 144 | ! cutout8 | r1 | `{"cutout":8}` | larger cutout; likely too strong for 8.5 epochs | 8/8 | 74.70 | 0.20 | -0.42 +- 0.11 | +0.01 | +0.96 | 6.96 | 10 warm | 0 | A100 SXM4 @ 500 W | BELOW 75% |
-| 145 | ! d222-skip-w128-320-896 | r11 | `{"depths":[2,2,2],"depth2_residual":true,"widths":[128,320,896]}` | depth 2 + skip, widened to recover capacity | 8/8 | 74.83 | 0.31 | -0.61 +- 0.17 | +0.09 | +0.96 | 5.75 | 166 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 146 | ! d222 | r11 | `{"depths":[2,2,2]}` | top priority: two convs per group (no residual pair) on t... | 8/8 | 73.64 | 0.17 | -1.65 +- 0.09 | -1.35 | +1.02 | 4.26 | 76 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 147 | ! d322 | r11 | `{"depths":[3,2,2]}` | mixed depths: residual pair only in group 1 | 8/8 | 73.86 | 0.29 | -1.43 +- 0.17 | -1.01 | +1.03 | 4.76 | 79 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 148 | ! d222-e10.0 | r11 | `{"depths":[2,2,2],"epochs":10.0}` | k on the depth-2 network: +1.25 epochs | 8/8 | 74.00 | 0.10 | -1.30 +- 0.07 | -0.77 | +1.08 | 4.83 | 23 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 149 | ! ema-off | r1 | `{"ema_every":0}` | no lookahead EMA: saves the EMA kernels (0.33 ms x 82) at... | 8/8 | 74.65 | 0.45 | -0.48 +- 0.19 | +0.01 | +1.09 | 7.47 | 21 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 150 | ! d222-skip | r11 | `{"depths":[2,2,2],"depth2_residual":true}` | depth 2 everywhere with a skip connection over the second... | 8/8 | 73.65 | 0.25 | -1.79 +- 0.15 | -1.45 | +1.11 | 4.21 | 90 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 151 | ! bs2048 | r6 | `{"batch_size":2048}` | batch 2048 (NaN watch) | 8/8 | 74.32 | 0.25 | -0.97 +- 0.12 | -0.26 | +1.13 | 5.41 | 149 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 152 | ! d222-e9.5 | r11 | `{"depths":[2,2,2],"epochs":9.5}` | k on the depth-2 network: +0.75 epoch | 8/8 | 73.79 | 0.25 | -1.50 +- 0.13 | -0.99 | +1.15 | 4.61 | 73 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 153 | ! d222-w128-320-896 | r11 | `{"depths":[2,2,2],"widths":[128,320,896]}` | depth 2 everywhere with wider channels to recover capacity | 8/8 | 74.60 | 0.26 | -0.69 +- 0.13 | +0.21 | +1.20 | 5.83 | 152 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 154 | ! d232 | r11 | `{"depths":[2,3,2]}` | mixed depths: residual pair only in group 2 | 8/8 | 73.71 | 0.23 | -1.58 +- 0.15 | -1.00 | +1.25 | 4.77 | 82 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 155 | ! hard0.75-online | r6 | `{"hard_fraction":0.75,"proxy_mode":"online"}` | same selection scored online by the proxy every batch | 8/8 | 73.91 | 0.24 | -1.38 +- 0.11 | -0.65 | +1.33 | 5.00 | 62 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 156 | ! hard0.75-offline | r6 | `{"hard_fraction":0.75}` | priority 3: PR #5's proxy hard-example selection (offline... | 8/8 | 73.75 | 0.17 | -1.55 +- 0.11 | -0.56 | +1.64 | 5.09 | 405 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 157 | ! d3-3-2 | r1 | `{"depths":[3,3,2]}` | drop the residual pair in group 3 (cheapest group): small... | 8/8 | 74.19 | 0.13 | -0.94 +- 0.08 | -0.33 | +1.78 | 7.11 | 57 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 158 | ! wd0.0084 | r1 | `{"weight_decay":0.0084}` | wd x0.7: less regularisation for a short schedule | 8/8 | 74.50 | 0.20 | -0.80 +- 0.14 | +0.02 | +1.82 | 7.31 | 21 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 159 | ! hard0.5-offline | r6 | `{"hard_fraction":0.5}` | keep the hardest half of each batch | 8/8 | 67.81 | 0.53 | -7.49 +- 0.21 | -1.41 | +9.28 | 4.24 | 176 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 160 | final2-defaults-400W | final | `{"count_nonfinite":true}` |  | 40/40 | 75.30 | 0.25 |  |  |  | 5.72 | 187 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 161 | final-S7-res24q-e8.75-400W | final | `{"bias_scaler":32.0,"label_smoothing":0.25,"lr":10.8,"bn_momentum":0.7,"jitter":0.3,"scaling_factor":0.1388888888888889,"train_resolution":24,"resolution_switch":0.25,"epochs":8.75,"count_nonfinite":true}` |  | 40/40 | 75.34 | 0.28 |  |  |  | 5.76 | 187 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 162 | final-S7-res24q-e9.0-400W | final | `{"bias_scaler":32.0,"label_smoothing":0.25,"lr":10.8,"bn_momentum":0.7,"jitter":0.3,"scaling_factor":0.1388888888888889,"train_resolution":24,"resolution_switch":0.25,"epochs":9.0,"count_nonfinite":true}` |  | 40/40 | 75.40 | 0.27 |  |  |  | 5.87 | 157 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 163 | defaults-torchlogs | r6 | `{}` | priority 1: do the 24->32 resolution switch or the first... | 3/3 | 75.51 | 0.21 |  |  |  | 5.99 | 44 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 164 | ref-sxm500-n40 | reference | `{}` | reference: current main recipe, cold build, official target | 40/40 | 75.19 | 0.25 |  |  |  | 6.94 | 95 cold |  | A100 SXM4 @ 500 W | QUALIFIED (>= 75%) |
-| 165 | ref-sxm400-n40 | reference | `{}` | reference: current main recipe, cold build, official target | 40/40 | 75.20 | 0.28 |  |  |  | 7.41 | 133 cold |  | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 135 | ! S3-w64-192-768 | r13 | `{"widths":[64,192,768],"bias_scaler":16.0,"lr":12.0,"weight_decay":0.0168,"compile_loss":true,"fused_sgd":true,"epochs":9.5}` | group 2 at 192 channels on the S3 stack | 8/8 | 74.78 | 0.23 | -0.71 +- 0.12 | -0.54 | +0.48 | 4.58 | 92 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 136 | ! S3-w64-192-768-e10.0 | r13 | `{"widths":[64,192,768],"bias_scaler":16.0,"lr":12.0,"weight_decay":0.0168,"compile_loss":true,"fused_sgd":true,"epochs":10.0}` | narrower group 2 with half an epoch bought back | 8/8 | 74.99 | 0.37 | -0.54 +- 0.15 | -0.28 | +0.49 | 4.86 | 102 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 137 | ! gelu-tanh | r8 | `{"widths":[64,256,768],"gelu_approximate":"tanh"}` | tanh GELU approximation (speed only; memory-bound kernels... | 8/8 | 74.79 | 0.27 | -0.18 +- 0.09 | +0.25 | +0.51 | 5.11 | 93 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 138 | ! w64-triton-s20x20-24x40-28x60-e9.5 | r7 | `{"widths":[64,256,768],"crop_mode":"triton","res_schedule":[[20,0.2],[24,0.4],[28,0.6]],"epochs":9.5}` | group 1 at 64 plus the three-stage ramp and the Triton cr... | 8/8 | 74.74 | 0.22 | -0.55 +- 0.09 | -0.26 | +0.53 | 5.56 | 236 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 139 | ! w64-384-576 | r1 | `{"widths":[64,384,576]}` | halve group 1; big time saving, accuracy risk | 8/8 | 74.37 | 0.22 | -0.94 +- 0.11 | -1.58 | +0.54 | 5.82 | 55 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 140 | ! S3-d223 | r13 | `{"widths":[64,256,768],"bias_scaler":16.0,"lr":12.0,"weight_decay":0.0168,"compile_loss":true,"fused_sgd":true,"epochs":9.5,"depths":[2,2,3]}` | on the S3 stack: drop the residual pair in groups 1 and 2... | 8/8 | 74.57 | 0.22 | -0.92 +- 0.09 | -0.72 | +0.60 | 4.40 | 101 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 141 | ! final0.15 | r8 | `{"widths":[64,256,768],"final_lr":0.15}` | less final decay | 8/8 | 74.74 | 0.35 | -0.15 +- 0.13 | +0.53 | +0.75 | 5.37 | 58 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 142 | ! S3-d223-e10.5 | r13 | `{"widths":[64,256,768],"bias_scaler":16.0,"lr":12.0,"weight_decay":0.0168,"compile_loss":true,"fused_sgd":true,"epochs":10.5,"depths":[2,2,3]}` | depth cut with one more epoch to buy accuracy back | 8/8 | 74.83 | 0.28 | -0.71 +- 0.15 | -0.24 | +0.76 | 4.89 | 75 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 143 | ! d222-skip-e9.5 | r11 | `{"depths":[2,2,2],"depth2_residual":true,"epochs":9.5}` | depth 2 + skip with 0.75 epoch bought back | 8/8 | 74.12 | 0.27 | -1.32 +- 0.15 | -1.09 | +0.79 | 4.56 | 28 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 144 | ! s16x15-20x30-24x45-28x60 | r7 | `{"res_schedule":[[16,0.15],[20,0.3],[24,0.45],[28,0.6]]}` | four-stage ramp from 16 px (exploratory; the cold build m... | 8/8 | 74.38 | 0.27 | -0.91 +- 0.14 | -0.49 | +0.81 | 5.09 | 171 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 145 | ! d222-e10.5 | r11 | `{"depths":[2,2,2],"epochs":10.5}` | k on the depth-2 network: +1.75 epochs | 8/8 | 74.28 | 0.23 | -1.02 +- 0.13 | -0.54 | +0.91 | 5.06 | 24 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 146 | ! filt6-0.5 | r7 | `{"filter_start":6,"filter_keep":0.5}` | from epoch 6 train on the hardest half only | 8/8 | 74.12 | 0.16 | -1.26 +- 0.07 | -0.86 | +0.93 | 4.82 | 23 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 147 | ! d222-w96-320-1024 | r11 | `{"depths":[2,2,2],"widths":[96,320,1024]}` | depth 2 everywhere, capacity moved to groups 2 and 3 | 8/8 | 74.82 | 0.19 | -0.47 +- 0.09 | +0.27 | +0.94 | 5.88 | 129 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 148 | ! cutout8 | r1 | `{"cutout":8}` | larger cutout; likely too strong for 8.5 epochs | 8/8 | 74.70 | 0.20 | -0.42 +- 0.11 | +0.01 | +0.96 | 6.96 | 10 warm | 0 | A100 SXM4 @ 500 W | BELOW 75% |
+| 149 | ! d222-skip-w128-320-896 | r11 | `{"depths":[2,2,2],"depth2_residual":true,"widths":[128,320,896]}` | depth 2 + skip, widened to recover capacity | 8/8 | 74.83 | 0.31 | -0.61 +- 0.17 | +0.09 | +0.96 | 5.75 | 166 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 150 | ! d222 | r11 | `{"depths":[2,2,2]}` | top priority: two convs per group (no residual pair) on t... | 8/8 | 73.64 | 0.17 | -1.65 +- 0.09 | -1.35 | +1.02 | 4.26 | 76 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 151 | ! d322 | r11 | `{"depths":[3,2,2]}` | mixed depths: residual pair only in group 1 | 8/8 | 73.86 | 0.29 | -1.43 +- 0.17 | -1.01 | +1.03 | 4.76 | 79 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 152 | ! d222-e10.0 | r11 | `{"depths":[2,2,2],"epochs":10.0}` | k on the depth-2 network: +1.25 epochs | 8/8 | 74.00 | 0.10 | -1.30 +- 0.07 | -0.77 | +1.08 | 4.83 | 23 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 153 | ! ema-off | r1 | `{"ema_every":0}` | no lookahead EMA: saves the EMA kernels (0.33 ms x 82) at... | 8/8 | 74.65 | 0.45 | -0.48 +- 0.19 | +0.01 | +1.09 | 7.47 | 21 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 154 | ! d222-skip | r11 | `{"depths":[2,2,2],"depth2_residual":true}` | depth 2 everywhere with a skip connection over the second... | 8/8 | 73.65 | 0.25 | -1.79 +- 0.15 | -1.45 | +1.11 | 4.21 | 90 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 155 | ! bs2048 | r6 | `{"batch_size":2048}` | batch 2048 (NaN watch) | 8/8 | 74.32 | 0.25 | -0.97 +- 0.12 | -0.26 | +1.13 | 5.41 | 149 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 156 | ! d222-e9.5 | r11 | `{"depths":[2,2,2],"epochs":9.5}` | k on the depth-2 network: +0.75 epoch | 8/8 | 73.79 | 0.25 | -1.50 +- 0.13 | -0.99 | +1.15 | 4.61 | 73 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 157 | ! d222-w128-320-896 | r11 | `{"depths":[2,2,2],"widths":[128,320,896]}` | depth 2 everywhere with wider channels to recover capacity | 8/8 | 74.60 | 0.26 | -0.69 +- 0.13 | +0.21 | +1.20 | 5.83 | 152 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 158 | ! d232 | r11 | `{"depths":[2,3,2]}` | mixed depths: residual pair only in group 2 | 8/8 | 73.71 | 0.23 | -1.58 +- 0.15 | -1.00 | +1.25 | 4.77 | 82 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 159 | ! hard0.75-online | r6 | `{"hard_fraction":0.75,"proxy_mode":"online"}` | same selection scored online by the proxy every batch | 8/8 | 73.91 | 0.24 | -1.38 +- 0.11 | -0.65 | +1.33 | 5.00 | 62 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 160 | ! hard0.75-offline | r6 | `{"hard_fraction":0.75}` | priority 3: PR #5's proxy hard-example selection (offline... | 8/8 | 73.75 | 0.17 | -1.55 +- 0.11 | -0.56 | +1.64 | 5.09 | 405 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 161 | ! d3-3-2 | r1 | `{"depths":[3,3,2]}` | drop the residual pair in group 3 (cheapest group): small... | 8/8 | 74.19 | 0.13 | -0.94 +- 0.08 | -0.33 | +1.78 | 7.11 | 57 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 162 | ! wd0.0084 | r1 | `{"weight_decay":0.0084}` | wd x0.7: less regularisation for a short schedule | 8/8 | 74.50 | 0.20 | -0.80 +- 0.14 | +0.02 | +1.82 | 7.31 | 21 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 163 | ! S3-poolfirst-g3 | r13 | `{"widths":[64,256,768],"bias_scaler":16.0,"lr":12.0,"weight_decay":0.0168,"compile_loss":true,"fused_sgd":true,"epochs":9.5,"pool_first":[false,false,true]}` | pool-before-conv1 in group 3: its conv1 (256->768) runs a... | 8/8 | 73.50 | 0.41 | -2.02 +- 0.12 | -0.61 | +2.28 | 4.52 | 89 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 164 | ! S3-poolfirst-g2 | r13 | `{"widths":[64,256,768],"bias_scaler":16.0,"lr":12.0,"weight_decay":0.0168,"compile_loss":true,"fused_sgd":true,"epochs":9.5,"pool_first":[false,true,false]}` | PR #5's pool-before-conv1 in group 2: its conv1 runs at 7... | 8/8 | 73.21 | 0.17 | -2.28 +- 0.07 | -0.33 | +2.92 | 4.79 | 73 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 165 | ! hard0.5-offline | r6 | `{"hard_fraction":0.5}` | keep the hardest half of each batch | 8/8 | 67.81 | 0.53 | -7.49 +- 0.21 | -1.41 | +9.28 | 4.24 | 176 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 166 | final-S3-e9.5-seeds0-400W | final | `{"widths":[64,256,768],"bias_scaler":16.0,"lr":12.0,"weight_decay":0.0168,"compile_loss":true,"fused_sgd":true,"epochs":9.5,"count_nonfinite":true}` |  | 40/40 | 75.33 | 0.26 |  |  |  | 5.09 | 170 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 167 | final-S3-e9.5-seeds40-400W | final | `{"widths":[64,256,768],"bias_scaler":16.0,"lr":12.0,"weight_decay":0.0168,"compile_loss":true,"fused_sgd":true,"epochs":9.5,"count_nonfinite":true}` |  | 40/40 | 75.28 | 0.26 |  |  |  | 5.14 | 197 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 168 | final2-defaults-400W | final | `{"count_nonfinite":true}` |  | 40/40 | 75.30 | 0.25 |  |  |  | 5.72 | 187 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 169 | final-S7-res24q-e8.75-400W | final | `{"bias_scaler":32.0,"label_smoothing":0.25,"lr":10.8,"bn_momentum":0.7,"jitter":0.3,"scaling_factor":0.1388888888888889,"train_resolution":24,"resolution_switch":0.25,"epochs":8.75,"count_nonfinite":true}` |  | 40/40 | 75.34 | 0.28 |  |  |  | 5.76 | 187 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 170 | final-S7-res24q-e9.0-400W | final | `{"bias_scaler":32.0,"label_smoothing":0.25,"lr":10.8,"bn_momentum":0.7,"jitter":0.3,"scaling_factor":0.1388888888888889,"train_resolution":24,"resolution_switch":0.25,"epochs":9.0,"count_nonfinite":true}` |  | 40/40 | 75.40 | 0.27 |  |  |  | 5.87 | 157 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 171 | defaults-torchlogs | r6 | `{}` | priority 1: do the 24->32 resolution switch or the first... | 3/3 | 75.51 | 0.21 |  |  |  | 5.99 | 44 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 172 | ref-sxm500-n40 | reference | `{}` | reference: current main recipe, cold build, official target | 40/40 | 75.19 | 0.25 |  |  |  | 6.94 | 95 cold |  | A100 SXM4 @ 500 W | QUALIFIED (>= 75%) |
+| 173 | ref-sxm400-n40 | reference | `{}` | reference: current main recipe, cold build, official target | 40/40 | 75.20 | 0.28 |  |  |  | 7.41 | 133 cold |  | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
 
-## Controls (power limits seen: A100 SXM4 @ 400 W x57, A100 SXM4 @ 500 W x3)
+## Controls (power limits seen: A100 SXM4 @ 400 W x59, A100 SXM4 @ 500 W x3)
 
 | job | label | round | GPU @ power | n | mean acc % | acc std | mean time s | time std | build s | verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -240,13 +248,15 @@ Score: `dtime_adj = dtime - dacc_pp / k` (seconds; dtime = variant minus control
 | confirm16-S3 | control | r12 | A100 SXM4 @ 400 W | 16/16 | 75.24 | 0.23 | 5.58 | 0.01 | 23 warm | QUALIFIED (>= 75%) |
 | d2-a | control | r11 | A100 SXM4 @ 400 W | 8/8 | 75.29 | 0.24 | 5.61 | 0.04 | 33 warm | QUALIFIED (>= 75%) |
 | d2-c | control | r11 | A100 SXM4 @ 400 W | 8/8 | 75.43 | 0.30 | 5.66 | 0.08 | 35 warm | QUALIFIED (>= 75%) |
+| s3-cuts-a | control | r13 | A100 SXM4 @ 400 W | 8/8 | 75.49 | 0.19 | 5.12 | 0.04 | 25 warm | QUALIFIED (>= 75%) |
+| s3-cuts-b | control | r13 | A100 SXM4 @ 400 W | 8/8 | 75.53 | 0.22 | 5.13 | 0.01 | 29 warm | QUALIFIED (>= 75%) |
 
 ## GPU hit rates (from the ledger)
 
 | GPU @ power | containers | share | guard misses | GPU min |
 | --- | --- | --- | --- | --- |
-| A100 SXM4 @ 400 W | 83 | 48% | 19 | 716.8 |
-| A100 PCIe @ 300 W | 40 | 23% | 39 | 9.8 |
+| A100 SXM4 @ 400 W | 87 | 48% | 19 | 748.9 |
+| A100 PCIe @ 300 W | 46 | 25% | 45 | 11.2 |
 | A100 SXM4 @ ? | 23 | 13% | 22 | 15.7 |
 | A100 SXM4 @ 500 W | 16 | 9% | 12 | 36.4 |
 | A100 PCIe @ ? | 6 | 3% | 0 | 39.9 |
@@ -254,6 +264,6 @@ Score: `dtime_adj = dtime - dacc_pp / k` (seconds; dtime = variant minus control
 | ? @ ? | 1 | 1% | 0 | 3.4 |
 | A100 PCIe / SXM4 @ ? | 1 | 1% | 0 | 4.0 |
 
-Guard misses: 92/172 containers (53%), 23.3 GPU min lost; ledger total 859.8 min.
+Guard misses: 98/182 containers (54%), 24.8 GPU min lost; ledger total 893.4 min.
 
 Pareto plot: `pareto.svg` (x = mean prepare+train s, y = mean accuracy %).
