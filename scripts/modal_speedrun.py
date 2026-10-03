@@ -129,6 +129,10 @@ GRAPH_KEYS = {
     "widths",
     "depths",
     "depth",
+    "depth2_residual",
+    "pool_first",
+    "stem",
+    "gelu_approximate",
     "activation",
     "scaling_factor",
     "bn_momentum",
@@ -550,7 +554,7 @@ def _estimate_run_seconds(spec: dict, warm: bool, control_params: dict | None = 
         return 120.0
     params = json.loads(spec.get("params") or "{}")
     base = control_params or {}
-    epochs = float(params.get("epochs", 8.5))
+    epochs = float(params.get("epochs", base.get("epochs", 9.5)))
     width_scale = 1.0
     if "widths" in params:
         widths = params["widths"]

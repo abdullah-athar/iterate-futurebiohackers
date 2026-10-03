@@ -1,0 +1,124 @@
+{
+  "round": "r14",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "stems-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "stem-s2d",
+          "params": {
+            "stem": "space_to_depth"
+          },
+          "hypothesis": "stem A as specified: pixel_unshuffle(2), 2x2 whitening on 16x16x12 -> 15x15x96, group 1's 3x3 conv at 15x15 then its pool (7x7 group 1); whitening stats from the unshuffled training images in prepare"
+        },
+        {
+          "label": "stem-s2d-nopool",
+          "params": {
+            "stem": "space_to_depth_nopool"
+          },
+          "hypothesis": "stem A keeping group 1 at 15x15 (no pool after conv1): same conv1 FLOPs as the 31x31 conv (4x channels, 1/4 positions) but no 31x31 activations or pool traffic; lossless patchify instead of max-pooled whitening"
+        },
+        {
+          "label": "stem-conv1x1",
+          "params": {
+            "stem": "conv1x1"
+          },
+          "hypothesis": "stem D: group 1's first conv is 1x1 (24 -> 64) at 31x31 then the pool; saves 8/9 of conv1's FLOPs, keeps the 31x31 BN/GELU/pool"
+        }
+      ]
+    },
+    {
+      "name": "stems-b",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "stem-whiten4s2-w96",
+          "params": {
+            "stem": "whiten4s2",
+            "widths": [
+              96,
+              256,
+              768
+            ]
+          },
+          "hypothesis": "stem B: frozen 4x4 stride-2 whitening (3 -> 96 channels, 15x15) replaces group 1's first conv and pool; group 1 at 96 channels starts at conv2"
+        },
+        {
+          "label": "stem-whiten3s2",
+          "params": {
+            "stem": "whiten3s2"
+          },
+          "hypothesis": "stem B': frozen 3x3 stride-2 whitening (3 -> 54 channels, 15x15) then a 1x1 conv 54 -> 64 without pool; removes the 31x31 conv and its BN/GELU/pool"
+        },
+        {
+          "label": "stem-whiten3s2-e10.25",
+          "params": {
+            "stem": "whiten3s2",
+            "epochs": 10.25
+          },
+          "hypothesis": "stem B' at equal time: 0.75 extra epochs (~0.37 s) to buy back the expected ~0.35 s saving; direct equal-time accuracy read"
+        }
+      ]
+    },
+    {
+      "name": "k3",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "k-e9.0",
+          "params": {
+            "epochs": 9.0
+          },
+          "hypothesis": "k calibration on the promoted recipe (64/256/768, 9.5 ep): accuracy per second of epochs, lower point"
+        },
+        {
+          "label": "k-e10.0",
+          "params": {
+            "epochs": 10.0
+          },
+          "hypothesis": "k calibration: upper point 1"
+        },
+        {
+          "label": "k-e10.5",
+          "params": {
+            "epochs": 10.5
+          },
+          "hypothesis": "k calibration: upper point 2 (concavity check)"
+        }
+      ]
+    },
+    {
+      "name": "d332",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "d332",
+          "params": {
+            "depths": [
+              3,
+              3,
+              2
+            ]
+          },
+          "hypothesis": "depth 2 in group 3 only (drops the most expensive single conv, 768->768 at 3x3, 16% of the FLOPs); round 1 on the old network lost 0.94 pp for 0.33 s; d232/d322 on this base lost 1.4-1.6 pp"
+        },
+        {
+          "label": "d332-e10.5",
+          "params": {
+            "depths": [
+              3,
+              3,
+              2
+            ],
+            "epochs": 10.5
+          },
+          "hypothesis": "[3,3,2] at roughly equal time: one extra epoch buys back the expected ~0.5 s"
+        }
+      ]
+    }
+  ]
+}

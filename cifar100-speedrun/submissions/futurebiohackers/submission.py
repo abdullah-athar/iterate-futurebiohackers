@@ -2,9 +2,10 @@
 
 Adapted from Keller Jordan's airbench (https://github.com/KellerJordan/cifar10-airbench),
 Copyright (c) 2024 Keller Jordan, released under the MIT License. Changes: 100-class
-head, 96/256/768 blocks with global max pooling, label smoothing 0.25, an 8.75-epoch
+head, 64/256/768 blocks with global max pooling, label smoothing 0.25, a 9.5-epoch
 schedule whose first quarter trains on 24x24 crops, per-image brightness/contrast
-jitter, the harness build/prepare/train split, and no test-time augmentation.
+jitter, a compiled loss and fused SGD, the harness build/prepare/train split, and no
+test-time augmentation.
 
 Untimed build() compiles the network and warms up every kernel on synthetic data.
 Timed prepare() resets all learned state, moves the images to the GPU, normalizes
@@ -23,26 +24,26 @@ from benchmark.api import BuildContext, TrainingData
 
 # Override any value with --params, e.g. '{"epochs": 9, "widths": [128, 384, 768]}'.
 DEFAULTS = {
-    "epochs": 8.75,
+    "epochs": 9.5,
     "batch_size": 1024,
-    "lr": 10.8,  # per 1024 examples, decoupled from momentum (airbench convention)
+    "lr": 12.0,  # per 1024 examples, decoupled from momentum (airbench convention)
     "momentum": 0.85,
-    "weight_decay": 0.012,  # per 1024 examples, decoupled from the learning rate
-    "bias_scaler": 32.0,  # learning-rate multiplier for BatchNorm biases
+    "weight_decay": 0.0168,  # per 1024 examples, decoupled from the learning rate
+    "bias_scaler": 16.0,  # learning-rate multiplier for BatchNorm biases
     "label_smoothing": 0.25,
     "warmup": 0.23,  # fraction of steps spent ramping the learning rate up
     "final_lr": 0.07,  # learning-rate multiplier reached at the last step
     "whiten_bias_epochs": 3,
     "translate": 2,
     "cutout": 0,
-    "widths": [96, 256, 768],
+    "widths": [64, 256, 768],
     "depth": 3,  # convs per group; the third adds a residual connection
     "depths": None,  # optional per-group depths, e.g. [2, 3, 3]
     "train_resolution": 24,  # reduced resolution for the first training stage
     "resolution_switch": 0.25,  # fraction of steps before returning to 32 pixels
     "crop_mode": "masked",  # "indexed" preserves channels-last with one gather
-    "fused_sgd": False,
-    "compile_loss": False,
+    "fused_sgd": True,
+    "compile_loss": True,
     "hard_fraction": 1.0,  # <1 enables a freshly trained small proxy
     "proxy_widths": [32, 64, 128],
     "proxy_every": 4,  # proxy backward/update period; scores every batch
@@ -51,6 +52,7 @@ DEFAULTS = {
     "autotune_backends": "ATEN,TRITON",  # ATen/cuDNN and Inductor Triton candidates
     "pool_first": [False, False, False],  # move selected group pools before conv1
     "depth2_residual": False,  # depth-2 groups keep a skip connection over their second conv
+    "stem": "conv",  # how the frozen whitening feeds group 1; the alternatives are in STEMS
     "scaling_factor": 1.25 / 9,  # logit scale (airbench uses 1/9)
     "bn_momentum": 0.7,
     "ema_every": 5,  # lookahead EMA period in steps; 0 disables it
@@ -68,6 +70,45 @@ DEFAULTS = {
     "filter_start": 0,  # 0 disables filtering
     "filter_keep": 0.75,
 }
+
+# Stems: cheaper ways to reach many channels early than group 1's trainable 3x3 conv at 31x31.
+# Each entry is (space-to-depth factor applied to the input, whitening kernel, whitening
+# stride, group 1's first conv kernel or None to drop that conv, whether group 1 keeps its 2x2
+# pool). The frozen whitening conv maps every c*k*k patch to 2*c*k*k channels (the covariance
+# eigenvectors and their negatives), so the group widths downstream are unchanged.
+STEMS = {
+    "conv": (1, 2, 1, 3, True),  # airbench: 2x2 whitening, 3x3 conv at 31x31, pool
+    "space_to_depth": (2, 2, 1, 3, True),  # pixel_unshuffle(2): 16x16x12 -> 15x15x96, then as conv
+    "space_to_depth_nopool": (2, 2, 1, 3, False),  # as above, but group 1 keeps its 15x15 maps
+    "whiten4s2": (1, 4, 2, None, False),  # 4x4 stride-2 whitening to 15x15x96 straight into conv2
+    "whiten3s2": (1, 3, 2, 1, False),  # 3x3 stride-2 whitening to 15x15x54, then a 1x1 conv
+    "conv1x1": (1, 2, 1, 1, True),  # group 1's first conv is 1x1 (24 -> widths[0]), then pool
+}
+
+
+def _stem_channels(stem):
+    """Output channels of the whitening conv: twice the dimension of the patches it sees."""
+    unshuffle, kernel = STEMS[stem][:2]
+    return 2 * 3 * unshuffle**2 * kernel**2
+
+
+def _stem_sizes(stem, resolution):
+    """Spatial sizes after the stem and after each group for one input resolution. Raises
+    when a 2x2 pool would see a map smaller than 2x2, i.e. before any map reaches 0x0."""
+    unshuffle, kernel, stride, _, first_pool = STEMS[stem]
+    if resolution % unshuffle:
+        raise ValueError(f"stem {stem} needs even input sizes, not {resolution} px")
+    size = (resolution // unshuffle - kernel) // stride + 1
+    sizes = [size]
+    for pool in (first_pool, True, True):
+        if pool:
+            if size < 2:
+                raise ValueError(
+                    f"stem {stem}: a {size}x{size} map meets a 2x2 pool at {resolution} px"
+                )
+            size //= 2
+        sizes.append(size)
+    return sizes
 
 
 #############################################
@@ -88,8 +129,10 @@ class BatchNorm(nn.BatchNorm2d):
 
 
 class Conv(nn.Conv2d):
-    def __init__(self, channels_in, channels_out):
-        super().__init__(channels_in, channels_out, kernel_size=3, padding="same", bias=False)
+    def __init__(self, channels_in, channels_out, kernel_size=3):
+        super().__init__(
+            channels_in, channels_out, kernel_size=kernel_size, padding="same", bias=False
+        )
 
     def reset_parameters(self):
         super().reset_parameters()
@@ -114,12 +157,21 @@ class ConvGroup(nn.Module):
         gelu_approximate,
         pool_first,
         depth2_residual=False,
+        first_kernel=3,
+        first_pool=True,
     ):
         super().__init__()
-        self.conv1 = Conv(channels_in, channels_out)
-        self.pool = nn.MaxPool2d(2)
+        if first_kernel is None:
+            # The stem already delivers channels_out channels at this group's resolution: the
+            # group starts at conv2 and its residual is the group input (stem whiten4s2).
+            if channels_in != channels_out:
+                raise ValueError("a group without a first conv needs channels_in == channels_out")
+            self.conv1 = self.pool = self.norm1 = None
+        else:
+            self.conv1 = Conv(channels_in, channels_out, first_kernel)
+            self.pool = nn.MaxPool2d(2) if first_pool else nn.Identity()
+            self.norm1 = BatchNorm(channels_out, bn_momentum)
         self.pool_first = pool_first
-        self.norm1 = BatchNorm(channels_out, bn_momentum)
         self.conv2 = Conv(channels_out, channels_out)
         self.norm2 = BatchNorm(channels_out, bn_momentum)
         self.conv3 = Conv(channels_out, channels_out) if depth == 3 else None
@@ -128,8 +180,9 @@ class ConvGroup(nn.Module):
         self.depth2_residual = depth2_residual  # depth 2: skip connection over conv2
 
     def forward(self, x):
-        x = self.conv1(self.pool(x)) if self.pool_first else self.pool(self.conv1(x))
-        x = self.norm1.activate(x, self.approximate)
+        if self.conv1 is not None:
+            x = self.conv1(self.pool(x)) if self.pool_first else self.pool(self.conv1(x))
+            x = self.norm1.activate(x, self.approximate)
         if self.conv3 is None:
             residual = x if self.depth2_residual else None
             return self.norm2.activate(self.conv2(x), self.approximate, residual)
@@ -144,13 +197,26 @@ class Net(nn.Module):
         w1, w2, w3 = hyp["widths"]
         depths = hyp["depths"] or [hyp["depth"]] * 3
         bn_momentum = hyp["bn_momentum"]
-        self.whiten = nn.Conv2d(3, 24, kernel_size=2, padding=0, bias=True)
+        unshuffle, kernel, stride, first_kernel, first_pool = STEMS[hyp["stem"]]
+        self.unshuffle = unshuffle  # space-to-depth factor applied before whitening; 1 = none
+        channels = _stem_channels(hyp["stem"])
+        self.whiten = nn.Conv2d(
+            3 * unshuffle**2, channels, kernel_size=kernel, stride=stride, padding=0, bias=True
+        )
         self.whiten.weight.requires_grad = False
         skip = hyp["depth2_residual"]
         self.layers = nn.Sequential(
             nn.GELU(approximate=hyp["gelu_approximate"]),
             ConvGroup(
-                24, w1, depths[0], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][0], skip
+                channels,
+                w1,
+                depths[0],
+                bn_momentum,
+                hyp["gelu_approximate"],
+                hyp["pool_first"][0],
+                skip,
+                first_kernel=first_kernel,
+                first_pool=first_pool,
             ),
             ConvGroup(
                 w1, w2, depths[1], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][1], skip
@@ -169,10 +235,17 @@ class Net(nn.Module):
                 m.reset_parameters()
         self.whiten.bias.data.zero_()
 
+    def space_to_depth(self, x):
+        """The whitening conv's input: pixel_unshuffle folds each 2x2 block into the channels."""
+        return F.pixel_unshuffle(x, self.unshuffle) if self.unshuffle > 1 else x
+
     @torch.no_grad()
     def init_whiten(self, images, eps=5e-4):
+        """Whitening filters from the covariance of the patches the conv sees at its own stride;
+        `images` are space_to_depth(training images)."""
         c, (h, w) = images.shape[1], self.whiten.weight.shape[2:]
-        patches = images.unfold(2, h, 1).unfold(3, w, 1).transpose(1, 3).reshape(-1, c, h, w)
+        sh, sw = self.whiten.stride
+        patches = images.unfold(2, h, sh).unfold(3, w, sw).transpose(1, 3).reshape(-1, c, h, w)
         flat = patches.float().view(len(patches), -1)
         covariance = flat.T @ flat / len(flat)
         eigenvalues, eigenvectors = torch.linalg.eigh(covariance, UPLO="U")
@@ -181,10 +254,15 @@ class Net(nn.Module):
         )
         self.whiten.weight.copy_(torch.cat((scaled, -scaled)))
 
-    def forward(self, x, whiten_bias_grad: bool = True):
+    def stem(self, x, whiten_bias_grad: bool = True):
+        """Frozen whitening (after space-to-depth when the stem uses it); only the bias trains,
+        and only while whiten_bias_grad is set."""
         b = self.whiten.bias
-        x = F.conv2d(x, self.whiten.weight, b if whiten_bias_grad else b.detach())
-        x = self.layers(x).flatten(1)
+        bias = b if whiten_bias_grad else b.detach()
+        return F.conv2d(self.space_to_depth(x), self.whiten.weight, bias, self.whiten.stride)
+
+    def forward(self, x, whiten_bias_grad: bool = True):
+        x = self.layers(self.stem(x, whiten_bias_grad)).flatten(1)
         return self.head(x) * self.scaling_factor
 
 
@@ -371,6 +449,19 @@ def build(context: BuildContext):
     if hyp["jitter"] < 0:
         raise ValueError("jitter must be non-negative")
     _validate_schedule(hyp["res_schedule"])
+    stem = hyp["stem"]
+    if stem not in STEMS:
+        raise ValueError(f"stem must be one of {sorted(STEMS)}")
+    stem_widths = [hyp["widths"]] + ([hyp["proxy_widths"]] if hyp["hard_fraction"] < 1 else [])
+    if STEMS[stem][3] is None and any(w[0] != _stem_channels(stem) for w in stem_widths):
+        raise ValueError(
+            f"stem {stem} starts group 1 at its {_stem_channels(stem)} whitened channels:"
+            f" widths[0] (and proxy_widths[0] with a proxy) must be {_stem_channels(stem)}"
+        )
+    if not STEMS[stem][4] and hyp["pool_first"][0]:
+        raise ValueError(f"stem {stem} removes group 1's pool: pool_first[0] must be false")
+    for resolution in _resolutions(hyp):
+        _stem_sizes(stem, resolution)  # every resolution must keep a map >= 2x2 at each pool
     if type(hyp["filter_start"]) is not int or hyp["filter_start"] < 0:
         raise ValueError("filter_start must be a non-negative epoch index")
     if not 0 < hyp["filter_keep"] <= 1:
@@ -501,7 +592,7 @@ def prepare(state, data: TrainingData, seed: int) -> None:
     state.classifier.std.copy_(std)
     images = ((raw - mean) / std).to(state.dtype, memory_format=torch.channels_last)
     del raw
-    net.init_whiten(images[:5000])
+    net.init_whiten(net.space_to_depth(images[:5000]))
     if state.proxy is not None:
         state.proxy.reset()
         state.proxy.zero_grad(set_to_none=True)

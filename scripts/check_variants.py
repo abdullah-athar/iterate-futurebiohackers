@@ -43,7 +43,13 @@ REFERENCE_REF = os.environ.get("CHECK_VARIANTS_REF", "origin/speedrun-accuracy-s
 # The synthetic split has 64 images: batch 8 gives 8 steps per epoch, 16 in two epochs.
 BASE = {"widths": [32, 64, 64], "epochs": 2.0, "batch_size": 8, "compile": ""}
 # Our switches with their "off" values; the control turns off those the reference file lacks.
-OFF = {"jitter": 0.0, "count_nonfinite": False, "res_schedule": None, "filter_start": 0}
+OFF = {
+    "jitter": 0.0,
+    "count_nonfinite": False,
+    "res_schedule": None,
+    "filter_start": 0,
+    "stem": "conv",
+}
 VARIANTS = {
     # ours: accuracy recovery and progressive resizing
     "jitter": {"jitter": 0.2},
@@ -67,13 +73,31 @@ VARIANTS = {
     "res_schedule_16_to_28": {"res_schedule": [[16, 0.2], [20, 0.4], [24, 0.6], [28, 0.8]]},
     "res_schedule_jitter": {"res_schedule": [[20, 0.3], [28, 0.6]], "jitter": 0.3},
     "res_schedule_indexed_crop": {"res_schedule": [[20, 0.5]], "crop_mode": "indexed"},
-    "filter": {"filter_start": 1, "filter_keep": 0.5},
-    "filter_nonfinite": {"filter_start": 1, "filter_keep": 0.5, "count_nonfinite": True},
+    # (the filter cannot run with the promoted compile_loss default, so it is turned off here)
+    "filter": {"filter_start": 1, "filter_keep": 0.5, "compile_loss": False},
+    "filter_nonfinite": {
+        "filter_start": 1,
+        "filter_keep": 0.5,
+        "count_nonfinite": True,
+        "compile_loss": False,
+    },
     "filter_res_schedule": {
         "filter_start": 1,
         "filter_keep": 0.5,
         "res_schedule": [[20, 0.25], [24, 0.5]],
+        "compile_loss": False,
     },
+    # ours: stems that avoid group 1's 3x3 conv at 31x31 (whiten4s2 needs widths[0] == 96)
+    "stem_space_to_depth": {"stem": "space_to_depth"},
+    "stem_space_to_depth_res_schedule": {
+        "stem": "space_to_depth",
+        "res_schedule": [[20, 0.3], [24, 0.6]],
+    },
+    "stem_space_to_depth_nopool": {"stem": "space_to_depth_nopool"},
+    "stem_whiten4s2": {"stem": "whiten4s2", "widths": [96, 64, 64]},
+    "stem_whiten3s2": {"stem": "whiten3s2"},
+    "stem_conv1x1": {"stem": "conv1x1"},
+    "stem_conv1x1_depths223": {"stem": "conv1x1", "depths": [2, 2, 3]},
     # his (must keep running after the port)
     "indexed_crop": {"crop_mode": "indexed"},
     "depths233": {"depths": [2, 3, 3]},
@@ -235,6 +259,102 @@ def main() -> int:
                 tuple(run.state.scores.shape) == (count,)
                 and bool(torch.isfinite(run.state.scores).all()),
             )
+
+    # Stems: the map after the whitening stem on a 32x32 input, group 1's entry, and the
+    # whitening filters (eigenvector filters followed by their negatives, frozen).
+    expected_side = {
+        "space_to_depth": 15,
+        "space_to_depth_nopool": 15,
+        "whiten4s2": 15,
+        "whiten3s2": 15,
+        "conv1x1": 31,
+    }
+    whiten_shape = {
+        "space_to_depth": (96, 12, 2, 2),
+        "space_to_depth_nopool": (96, 12, 2, 2),
+        "whiten4s2": (96, 3, 4, 4),
+        "whiten3s2": (54, 3, 3, 3),
+        "conv1x1": (24, 3, 2, 2),
+    }
+    for name, run in runs.items():
+        stem, net = run.state.hyp["stem"], run.state.net
+        if stem == "conv":
+            continue
+        with torch.inference_mode():
+            side = net.stem(torch.zeros(1, 3, 32, 32)).shape[-1]
+        check(
+            f"{name}: {side}x{side} map after the stem on a 32x32 input (expected "
+            f"{expected_side[stem]}; sizes after the stem and each group {new._stem_sizes(stem, 32)})",
+            side == expected_side[stem] == new._stem_sizes(stem, 32)[0],
+        )
+        group = net.layers[1]
+        if stem == "whiten4s2":
+            entry = group.conv1 is None and group.pool is None and group.norm1 is None
+        else:
+            kernel = (3, 3) if stem.startswith("space_to_depth") else (1, 1)
+            no_pool = stem in ("whiten3s2", "space_to_depth_nopool")
+            pool = torch.nn.Identity if no_pool else torch.nn.MaxPool2d
+            entry = group.conv1.kernel_size == kernel and isinstance(group.pool, pool)
+        w, half = net.whiten.weight, whiten_shape[stem][0] // 2
+        check(
+            f"{name}: group 1 entry matches the stem; frozen whitening weight "
+            f"{whiten_shape[stem]} whose filters 0-{half - 1} are the negatives of "
+            f"{half}-{2 * half - 1}",
+            entry
+            and tuple(w.shape) == whiten_shape[stem]
+            and torch.equal(w[:half], -w[half:])
+            and not w.requires_grad
+            and net.whiten.bias.requires_grad,
+        )
+
+    # Spatial sizes per stem and resolution (after the stem, then after each group), and the
+    # combinations build must reject: no 2x2 pool may see a map smaller than 2x2.
+    table = {}
+    for stem in new.STEMS:
+        table[stem] = {}
+        for resolution in (32, 28, 24, 20, 16):
+            try:
+                table[stem][resolution] = new._stem_sizes(stem, resolution)
+            except ValueError:
+                table[stem][resolution] = None
+        print(f"stem {stem}: sizes after the stem and each group {table[stem]}", flush=True)
+    expected_32 = {
+        "conv": [31, 15, 7, 3],
+        "space_to_depth": [15, 7, 3, 1],
+        "space_to_depth_nopool": [15, 15, 7, 3],
+        "whiten4s2": [15, 15, 7, 3],
+        "whiten3s2": [15, 15, 7, 3],
+        "conv1x1": [31, 15, 7, 3],
+    }
+    check(
+        f"32 px sizes after the stem and each group: {expected_32}",
+        {stem: sizes[32] for stem, sizes in table.items()} == expected_32,
+    )
+    check(
+        "every stem accepts 20, 24, 28 and 32 px; 16 px is rejected by space_to_depth only",
+        all(table[s][r] for s in table for r in (20, 24, 28, 32))
+        and [s for s in table if table[s][16] is None] == ["space_to_depth"],
+    )
+    rejected = {
+        "space_to_depth at 16 px (a 1x1 map before group 3's pool)": {
+            "stem": "space_to_depth",
+            "res_schedule": [[16, 0.5]],
+        },
+        "whiten4s2 with widths[0] != 96": {"stem": "whiten4s2"},
+        "whiten4s2 with pool_first[0]": {
+            "stem": "whiten4s2",
+            "widths": [96, 64, 64],
+            "pool_first": [True, False, False],
+        },
+        "an unknown stem": {"stem": "pool"},
+    }
+    for name, delta in rejected.items():
+        try:
+            new.build(BuildContext(torch.device("cpu"), {**BASE, **delta}))
+        except ValueError as exc:
+            check(f"build rejects {name}: {exc}", True)
+        else:
+            check(f"build rejects {name}", False)
     print(f"\n{sum(results)}/{len(results)} checks passed", flush=True)
     return 0 if all(results) else 1
 
