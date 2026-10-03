@@ -23,26 +23,26 @@ from benchmark.api import BuildContext, TrainingData
 
 # Override any value with --params, e.g. '{"epochs": 9, "widths": [128, 384, 768]}'.
 DEFAULTS = {
-    "epochs": 8.25,
+    "epochs": 9.0,
     "batch_size": 1024,
     "lr": 11.5,  # per 1024 examples, decoupled from momentum (airbench convention)
     "momentum": 0.85,
     "weight_decay": 0.017,  # per 1024 examples, decoupled from the learning rate
-    "bias_scaler": 64.0,  # learning-rate multiplier for BatchNorm biases
-    "label_smoothing": 0.3,
+    "bias_scaler": 32.0,  # learning-rate multiplier for BatchNorm biases
+    "label_smoothing": 0.25,
     "warmup": 0.23,  # fraction of steps spent ramping the learning rate up
     "final_lr": 0.07,  # learning-rate multiplier reached at the last step
     "whiten_bias_epochs": 3,
     "translate": 2,
     "cutout": 0,
-    "widths": [128, 256, 768],
+    "widths": [64, 256, 768],
     "depth": 3,  # convs per group; the third adds a residual connection
-    "depths": [2, 3, 3],  # per-group conv count; overrides depth
+    "depths": [3, 3, 3],  # per-group conv count; overrides depth
     "train_resolution": 32,  # reduced resolution for the first training stage
     "resolution_switch": 0.5,  # fraction of steps before returning to 32 pixels
     # Multi-stage schedule, e.g. [[24, 0.33], [28, 0.67]]: resolution until that
     # fraction of steps, then 32. Overrides train_resolution/resolution_switch.
-    "resolution_schedule": [],
+    "resolution_schedule": [[28, 0.5]],
     # Batch-size schedule, e.g. [[512, 0.5]]: batch size until that fraction of the
     # training examples, then batch_size. Chosen per epoch. Weight decay per step
     # scales with the batch so the per-example decay is unchanged.
@@ -57,14 +57,14 @@ DEFAULTS = {
     "gelu_approximate": "none",  # "tanh" uses a cheaper approximation
     "autotune_backends": "ATEN,TRITON",  # ATen/cuDNN and Inductor Triton candidates
     "pool_first": [False, False, False],  # move selected group pools before conv1
-    "scaling_factor": 1 / 9,
+    "scaling_factor": 1.25 / 9,
     "bn_momentum": 0.5,
     "ema_every": 5,  # lookahead EMA period in steps; 0 disables it
     "compile": "max-autotune",  # torch.compile mode; "" runs eagerly
     "compile_step": True,  # compile forward and loss as one graph
     "activation": "gelu",  # or "silu"
     "bn_dtype": "half",  # BatchNorm in the network dtype; "float" keeps fp32 BN
-    "color_jitter": [0.0, 0.0],  # per-image brightness and contrast ranges
+    "color_jitter": [0.2, 0.2],  # per-image brightness and contrast ranges
     "inductor_tuning": [],  # e.g. ["coordinate_descent_tuning", "aggressive_fusion"]
     "bn_recal_batches": 0,  # re-estimate BN statistics on center crops after training
     "stem": "patch2",  # "patch2": 2x2 whitening at 31x31; "patch4s2": 4x4 stride-2 at 15x15
