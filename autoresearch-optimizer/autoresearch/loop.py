@@ -118,10 +118,10 @@ class ResearchRun:
                 n += 1
         return n
 
-    def choose_mode(self, entries: list[Entry], archive: Archive, rng: random.Random) -> str:
+    def mode_scores(self, entries: list[Entry], archive: Archive) -> dict[str, float]:
+        """UCB1 score per eligible prompt mode (inf = untried). After a plateau `tune` is not eligible."""
         eligible = [m for m in MODES if m != "merge" or archive.complementary()]
-        plateau = self.steps_since_improvement(entries) >= self.config.patience
-        if plateau:
+        if self.steps_since_improvement(entries) >= self.config.patience:
             eligible = [m for m in eligible if m != "tune"] or eligible
         stats = {m: [0, 0.0] for m in MODES}
         for e in entries:
@@ -129,25 +129,39 @@ class ResearchRun:
                 stats[e.mode][0] += 1
                 stats[e.mode][1] += 1.0 if e.improved_global else (0.5 if e.improved_instances else 0.0)
         total = sum(n for n, _ in stats.values()) or 1
-        untried = [m for m in eligible if stats[m][0] == 0]
-        if untried:
-            return untried[0] if not plateau else rng.choice(untried)
-        return max(eligible, key=lambda m: stats[m][1] / stats[m][0] + self.config.ucb_c * math.sqrt(math.log(total) / stats[m][0]))
+        return {m: math.inf if stats[m][0] == 0 else
+                stats[m][1] / stats[m][0] + self.config.ucb_c * math.sqrt(math.log(total) / stats[m][0])
+                for m in eligible}
 
-    # ----- context for the proposer (shared by API mode and agent `status`) ------------------
-    def context(self, mode: str | None = None, rng: random.Random | None = None, rejection_note: str = "") -> Context:
+    def choose_mode(self, entries: list[Entry], archive: Archive, rng: random.Random) -> str:
+        scores = self.mode_scores(entries, archive)
+        untried = [m for m, v in scores.items() if v == math.inf]
+        if untried:
+            plateau = self.steps_since_improvement(entries) >= self.config.patience
+            return untried[0] if not plateau else rng.choice(untried)
+        return max(scores, key=scores.get)
+
+    def pick_parents(self, mode: str, archive: Archive, rng: random.Random) -> list[Entry]:
+        if mode == "merge":
+            return [archive.global_best, rng.choice(archive.complementary())[0]]
+        if mode == "fix_losers":
+            return [archive.global_best]
+        return [archive.select_parent(rng, self.config.exploit)]
+
+    # ----- context for the proposer (agent `status` and swarm workspaces) ---------------------
+    def context(self, mode: str | None = None, rng: random.Random | None = None, rejection_note: str = "",
+                parent_ids: list[int] | None = None) -> Context:
         rng = rng or random.Random()
         entries = self.entries()
         archive = self.archive(entries)
         if archive.global_best is None:
             raise RuntimeError("no scored candidate in the ledger; re-run `init`")
         mode = mode or self.choose_mode(entries, archive, rng)
-        parents = [archive.select_parent(rng, self.config.exploit)]
-        if mode == "merge":
-            comp = archive.complementary()
-            parents = [archive.global_best, rng.choice(comp)[0]]
-        elif mode == "fix_losers":
-            parents = [archive.global_best]
+        if parent_ids:
+            by_id = {e.id: e for e in entries}
+            parents = [by_id[i] for i in parent_ids]
+        else:
+            parents = self.pick_parents(mode, archive, rng)
         diag = "\n\n".join(
             format_diagnostics(p.eval_result(self.problem.objective_split), archive, label=f"Parent #{p.id}: ")
             for p in parents)

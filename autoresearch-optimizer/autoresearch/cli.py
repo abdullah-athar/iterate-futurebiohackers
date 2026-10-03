@@ -6,8 +6,10 @@ init -> (status -> write candidate.py -> submit) x N -> report --holdout
 from __future__ import annotations
 
 import argparse
+import os
 import random
 import sys
+import time
 from pathlib import Path
 
 from .ledger import RunStore
@@ -95,6 +97,32 @@ def cmd_try(args) -> None:
           + ", ".join(f"{i.name}={i.cpu_ms:g}" for i in res.instances) + ")")
 
 
+def cmd_swarm(args) -> None:
+    from . import swarm
+
+    if args.eval == "modal":
+        os.environ["AUTORESEARCH_EVAL"] = "modal"
+        if not args.no_deploy:
+            from .modal_eval import deploy
+            deploy()
+    store = RunStore(args.run)
+    if not store.exists:
+        run = ResearchRun.create(store, LoopConfig(problem=args.problem, time_budget_ms=args.budget_ms))
+        print(f"Initialised run at {store.root}\n" + ResearchRun.describe_entry(run.entries()[0]))
+    run = ResearchRun(store)
+    emit = swarm.Events(run, time.time())
+    propose = swarm.claude_proposer(args.model, args.turn_s, args.eval, args.max_budget_usd, emit)
+    budget_ms = run.config.time_budget_ms
+    evaluate = (swarm.modal_evaluator(run.problem_name, budget_ms) if args.eval == "modal"
+                else swarm.local_evaluator(run.problem_name, budget_ms))
+    swarm.run_swarm(run, args.agents, args.turn_s, args.budget_min * 60, propose, evaluate, emit,
+                    seed=args.seed, max_generations=args.generations, eval_name=args.eval)
+    from .report import render
+    text = render(run)
+    (store.root / "report.md").write_text(text)
+    print(f"\n[report written to {store.root / 'report.md'}]")
+
+
 def cmd_report(args) -> None:
     run = _run(args)
     from .report import render
@@ -151,6 +179,20 @@ def main(argv=None) -> None:
     s.add_argument("--split", default="validate", choices=["screen", "validate"])
     s.add_argument("--budget-ms", type=int, help="CPU budget per instance (default: the run's, else 1000)")
     s.set_defaults(fn=cmd_try)
+
+    s = sub.add_parser("swarm", help="run N local Claude Code agents per generation; evaluate on Modal")
+    s.add_argument("--agents", type=int, default=32)
+    s.add_argument("--budget-min", type=float, default=20, help="wall-clock budget for the whole run")
+    s.add_argument("--turn-s", type=int, default=180, help="wall-clock limit per agent session")
+    s.add_argument("--generations", type=int, help="stop after this many generations")
+    s.add_argument("--model", default="sonnet", help="Claude Code --model (alias or full id)")
+    s.add_argument("--eval", choices=["modal", "local"], default="modal")
+    s.add_argument("--no-deploy", action="store_true", help="skip `modal deploy` of the eval app")
+    s.add_argument("--max-budget-usd", type=float, help="per-session spend cap passed to claude")
+    s.add_argument("--problem", default="median_string", help="problem for a new run")
+    s.add_argument("--budget-ms", type=int, default=1000, help="CPU ms per instance for a new run")
+    s.add_argument("--seed", type=int, default=0)
+    s.set_defaults(fn=cmd_swarm)
 
     s = sub.add_parser("report", help="render report.md (optionally with held-out evaluation)")
     s.add_argument("--holdout", action="store_true")

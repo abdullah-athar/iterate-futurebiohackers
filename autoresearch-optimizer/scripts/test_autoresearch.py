@@ -1,5 +1,6 @@
 """Tests for the autoresearch loop: novelty gate, import guard, archive, agent-mode run."""
 
+import json
 import random
 import shutil
 import sys
@@ -86,9 +87,39 @@ def test_agent_run():
     print("  Agent-mode run test passed!")
 
 
+def test_swarm():
+    print("Testing swarm generations with a fake proposer (local evaluation)...")
+    from autoresearch import swarm
+
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-swarm-"))
+    try:
+        run = ResearchRun.create(RunStore(tmp / "run"), LoopConfig(problem="median_string"))
+        sources = [mp.FAST_DESCENT, mp.SEED_DUPLICATE, ""]
+
+        def propose_many(run, gen, assignments):
+            return [{"assignment": a, "source": sources[a.worker % 3], "hypothesis": f"w{a.worker}",
+                     "usage": {"model": "fake", "seconds": 1.0, "outcome": "ok", "cost_usd": 0.01}} for a in assignments]
+
+        lines = []
+        emit = swarm.Events(run, 0.0, log=lines.append)
+        swarm.run_swarm(run, 3, 1, 1e9, propose_many, swarm.local_evaluator("median_string", 1000), emit,
+                        max_generations=2)
+        entries = run.entries()
+        assert [e.id for e in entries] == list(range(len(entries))), [e.id for e in entries]
+        assert [e.status for e in entries if e.generation == 1] == [STATUS_KEPT, STATUS_REJECTED_DUPLICATE]
+        assert all(e.status == STATUS_REJECTED_DUPLICATE for e in entries if e.generation == 2)
+        kinds = [json.loads(l)["type"] for l in (run.store.root / "events.jsonl").read_text().splitlines()]
+        assert kinds.count("gen_end") == 2 and kinds[-1] == "run_end", kinds
+        assert (run.store.root / "holdout.json").exists()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Swarm test passed!")
+
+
 if __name__ == "__main__":
     random.seed(0)
     test_novelty_gate()
     test_import_guard()
     test_agent_run()
+    test_swarm()
     print("\nAll autoresearch tests passed!")
