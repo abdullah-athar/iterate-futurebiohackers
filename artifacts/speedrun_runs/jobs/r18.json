@@ -1,0 +1,48 @@
+{
+  "round": "r18",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "h24-a",
+      "control_index": 1,
+      "variants": [
+        {"label": "r24h-e9.75", "params": {"resolution_schedule": [[24, 0.5]], "epochs": 9.75},
+         "hypothesis": "24 px for the first half then 32 (3.89 s, -0.34 pp at 9 ep) with 0.75 epoch back: equal-accuracy read near 4.2 s"},
+        {"label": "r24h-e10.0", "params": {"resolution_schedule": [[24, 0.5]], "epochs": 10.0},
+         "hypothesis": "24 px first half with one epoch back: margin read near 4.3 s"}
+      ]
+    },
+    {
+      "name": "h24-b",
+      "control_index": 1,
+      "variants": [
+        {"label": "r24h-e10.25", "params": {"resolution_schedule": [[24, 0.5]], "epochs": 10.25},
+         "hypothesis": "24 px first half with 1.25 epochs back: upper point of the ladder"},
+        {"label": "r24h-28q75-e9.75", "params": {"resolution_schedule": [[24, 0.5], [28, 0.75]], "epochs": 9.75},
+         "hypothesis": "24 px first half, 28 px bridge to 75%, then 32, with 0.75 epoch back: smoother resolution ramp"}
+      ]
+    },
+    {
+      "name": "s3-a",
+      "control_index": 1,
+      "variants": [
+        {"label": "r20-24-28-e9.5", "params": {"resolution_schedule": [[20, 0.15], [24, 0.35], [28, 0.55]], "epochs": 9.5},
+         "hypothesis": "three-stage 20/24/28 (4.05 s, -0.20 pp at 9 ep) with half an epoch back (NB: four resolutions = 8 graphs, cold build under 4 CPUs likely > 400 s)"},
+        {"label": "r20-24-28-e9.75", "params": {"resolution_schedule": [[20, 0.15], [24, 0.35], [28, 0.55]], "epochs": 9.75},
+         "hypothesis": "three-stage 20/24/28 with 0.75 epoch back"}
+      ]
+    },
+    {
+      "name": "h24-c",
+      "control_index": 1,
+      "variants": [
+        {"label": "r20q25-24h-e9.75", "params": {"resolution_schedule": [[20, 0.25], [24, 0.5]], "epochs": 9.75},
+         "hypothesis": "20 px first quarter, 24 px to the half, then 32, with 0.75 epoch back (three resolutions, 339 s class cold build)"},
+        {"label": "r24h-e9.5", "params": {"resolution_schedule": [[24, 0.5]], "epochs": 9.5},
+         "hypothesis": "24 px first half with half an epoch back: lower point of the ladder"}
+      ]
+    }
+  ]
+}
