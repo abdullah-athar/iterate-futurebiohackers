@@ -1,0 +1,26 @@
+{
+  "round": "r21",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "g3pair-a",
+      "control_index": 1,
+      "variants": [
+        {"label": "g3-inner512", "params": {"g3_pair": "inner512"},
+         "hypothesis": "group 3 residual pair through 512 channels (3x3 768->512, 3x3 512->768); residual and output stay 768; new graphs, cold compile"},
+        {"label": "g3-inner640", "params": {"g3_pair": "inner640"},
+         "hypothesis": "group 3 residual pair through 640 channels"}
+      ]
+    },
+    {
+      "name": "g3pair-b",
+      "control_index": 1,
+      "variants": [
+        {"label": "g3-bottleneck384", "params": {"g3_pair": "bottleneck384"},
+         "hypothesis": "group 3 bottleneck pair: 1x1 768->384, 3x3 384->384, 1x1 384->768"}
+      ]
+    }
+  ]
+}
