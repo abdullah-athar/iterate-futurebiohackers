@@ -77,3 +77,9 @@ autoresearch *args:
 autoresearch-test:
     uv run python scripts/test_median_string.py
     uv run python scripts/test_autoresearch.py
+
+# Render the autoresearch dashboard: just autoresearch-viz render artifacts/runs -o artifacts/viz/dashboard.html
+[working-directory: justfile_directory() / "autoresearch-optimizer"]
+[positional-arguments]
+autoresearch-viz *args:
+    uv run python -m autoresearch_viz "$@"

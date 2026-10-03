@@ -76,13 +76,39 @@ autoresearch-optimizer/
   TASKS.md          # workstream ownership and next steps
   pyproject.toml    # workspace dependencies
   uv.lock           # reproducible dependency resolution
-  autoresearch/     # the research loop: problem adapter, novelty gate, archive, LLM backends, CLI, program.md
+  autoresearch/     # research loop: propose -> novelty gate -> cascade eval -> archive -> ledger
+  autoresearch_viz/ # dashboard that visualises runs and compares flavours (see below)
   median_string/    # benchmark, metrics, baseline solvers, evaluator
   scripts/          # runnable experiments and tests
   notebooks/        # exploration
   data/             # local inputs, ignored by Git
   artifacts/        # local results, ignored by Git
 ```
+
+## Visualise runs and compare flavours
+
+`autoresearch_viz` renders one self-contained HTML dashboard (no network access needed, so it
+works in the demo video) from one or more run directories (`artifacts/runs/<name>/ledger.jsonl`).
+Each run is a "flavour" of the research loop: a different proposer, prompt policy, archive or
+novelty setting on the same problem.
+
+```bash
+# compare every run under artifacts/runs
+uv run python -m autoresearch_viz render artifacts/runs -o artifacts/viz/dashboard.html --open
+
+# pick runs and give them display names
+uv run python -m autoresearch_viz render "claude=artifacts/runs/claude_a" "gemini=artifacts/runs/gemini_a"
+
+# synthetic runs (clearly labelled) to iterate on the dashboard before real runs exist
+uv run python -m autoresearch_viz demo --open
+```
+
+The dashboard shows: best objective vs evaluations / LLM tokens / wall-clock (with baseline and
+planted-optimum lines and the hypothesis behind every improvement), a flavour scoreboard (gain on
+the objective split, held-out gain, evaluations, tokens, tokens per 1% gained, duplicates skipped
+by the novelty gate), per-instance bars, the outcome mix of proposals, and the full research
+trajectory of each run as a lab notebook. Loading is schema-tolerant: missing ledger fields fall
+back to sensible defaults.
 
 ## Work together
 
