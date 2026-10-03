@@ -1,0 +1,44 @@
+{
+  "round": "r17",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "res-a",
+      "control_index": 1,
+      "variants": [
+        {"label": "r24q33-28h", "params": {"resolution_schedule": [[24, 0.33], [28, 0.5]]},
+         "hypothesis": "24 px for the first third of the examples, 28 px to the half, then 32: longer cheap phase than the -0.38 s quarter"},
+        {"label": "r24q40-28q60", "params": {"resolution_schedule": [[24, 0.4], [28, 0.6]]},
+         "hypothesis": "24 px for 40%, 28 px to 60%, then 32"},
+        {"label": "r24q25-28q60", "params": {"resolution_schedule": [[24, 0.25], [28, 0.6]]},
+         "hypothesis": "the -0.38 s quarter with a longer 28 px phase (to 60%)"}
+      ]
+    },
+    {
+      "name": "res-b",
+      "control_index": 1,
+      "variants": [
+        {"label": "r20-24-28", "params": {"resolution_schedule": [[20, 0.15], [24, 0.35], [28, 0.55]]},
+         "hypothesis": "three-stage 20 -> 24 -> 28 -> 32 (20 px was dead on our old network; cheap check on this one)"},
+        {"label": "r24h", "params": {"resolution_schedule": [[24, 0.5]]},
+         "hypothesis": "24 px for the first half then straight to 32 (replaces the 28 px half)"},
+        {"label": "r24q-28h-e9.25", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25},
+         "hypothesis": "the -0.38 s quarter with a quarter epoch back: candidate for the promotion margin"}
+      ]
+    },
+    {
+      "name": "res-c",
+      "control_index": 1,
+      "variants": [
+        {"label": "r24q-28h-e9.5", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.5},
+         "hypothesis": "the -0.38 s quarter with half an epoch back: safety-grade margin at ~4.5 s"},
+        {"label": "r24q-28h-bs512", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "batch_size": 512, "lr": 16.0, "epochs": 8.0},
+         "hypothesis": "the 24 px quarter stacked with the README's batch-512 lead"},
+        {"label": "r24q-28h-bsched512", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "batch_schedule": [[512, 0.25]], "lr": 16.0},
+         "hypothesis": "batch 512 only during the 24 px quarter (batch_schedule), then 1024; lr 16 as in the README lead"}
+      ]
+    }
+  ]
+}
