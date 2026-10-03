@@ -23,7 +23,7 @@ from benchmark.api import BuildContext, TrainingData
 
 # Override any value with --params, e.g. '{"epochs": 9, "widths": [128, 384, 768]}'.
 DEFAULTS = {
-    "epochs": 9.0,
+    "epochs": 9.5,
     "batch_size": 1024,
     "lr": 11.5,  # per 1024 examples, decoupled from momentum (airbench convention)
     "momentum": 0.85,
@@ -42,7 +42,7 @@ DEFAULTS = {
     "resolution_switch": 0.5,  # fraction of steps before returning to 32 pixels
     # Multi-stage schedule, e.g. [[24, 0.33], [28, 0.67]]: resolution until that
     # fraction of steps, then 32. Overrides train_resolution/resolution_switch.
-    "resolution_schedule": [[28, 0.5]],
+    "resolution_schedule": [[24, 0.25], [28, 0.5]],
     # Batch-size schedule, e.g. [[512, 0.5]]: batch size until that fraction of the
     # training examples, then batch_size. Chosen per epoch. Weight decay per step
     # scales with the batch so the per-example decay is unchanged.
