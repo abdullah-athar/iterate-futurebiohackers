@@ -19,6 +19,7 @@ class ProblemInstance:
         description: Human-readable context (e.g. biological source, motif model).
         known_best_score: Known optimal or best-known sum of distances, if available.
         planted_consensus: Planted ground-truth string if generated synthetically.
+        time_budget_ms: CPU budget for one solve() call, set by the evaluator when a budget applies.
     """
 
     name: str
@@ -30,6 +31,7 @@ class ProblemInstance:
     known_best_score: int | None = None
     planted_consensus: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    time_budget_ms: int | None = None
 
     def __post_init__(self) -> None:
         if not self.strings:

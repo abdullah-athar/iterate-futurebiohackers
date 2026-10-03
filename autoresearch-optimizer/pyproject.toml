@@ -4,4 +4,6 @@ version = "0.1.0"
 description = "Team workspace for the Iterate AI x Science autoresearch optimizer."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
-dependencies = []
+dependencies = [
+    "modal>=1.6.0",
+]
