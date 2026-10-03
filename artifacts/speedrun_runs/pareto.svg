@@ -2,19 +2,21 @@
 <title>CIFAR-100 speedrun: accuracy vs prepare+train time</title>
 <rect width="800" height="500" fill="#fcfcfb"/>
 <text x="62" y="24" font-size="14" font-weight="600" fill="#0b0b0b">CIFAR-100 speedrun: mean accuracy vs mean prepare+train time</text>
-<text x="776" y="24" text-anchor="end" font-size="10" fill="#898781">2026-10-03 17:42; k = 0.445 pp/s</text>
+<text x="776" y="24" text-anchor="end" font-size="10" fill="#898781">2026-10-03 17:56; k = 0.445 pp/s</text>
 <circle cx="68" cy="44" r="5" fill="#2a78d6"/>
 <text x="78" y="48" fill="#52514e">round calib</text>
 <circle cx="168.0" cy="44" r="5" fill="#eb6834"/>
 <text x="178.0" y="48" fill="#52514e">round r1</text>
 <circle cx="250.0" cy="44" r="5" fill="#1baf7a"/>
-<text x="260.0" y="48" fill="#52514e">round reference</text>
-<rect x="369.0" y="39" width="10" height="10" fill="#52514e"/>
-<text x="384.0" y="48" fill="#52514e">control</text>
-<line x1="444.0" y1="44" x2="456.0" y2="44" stroke="#52514e" stroke-width="2"/>
-<text x="460.0" y="48" fill="#52514e">Pareto frontier</text>
-<line x1="568.0" y1="44" x2="580.0" y2="44" stroke="#898781" stroke-width="1.5" stroke-dasharray="4 3"/>
-<text x="584.0" y="48" fill="#52514e">75 % target</text>
+<text x="260.0" y="48" fill="#52514e">round r3</text>
+<circle cx="332.0" cy="44" r="5" fill="#eda100"/>
+<text x="342.0" y="48" fill="#52514e">round reference</text>
+<rect x="451.0" y="39" width="10" height="10" fill="#52514e"/>
+<text x="466.0" y="48" fill="#52514e">control</text>
+<line x1="526.0" y1="44" x2="538.0" y2="44" stroke="#52514e" stroke-width="2"/>
+<text x="542.0" y="48" fill="#52514e">Pareto frontier</text>
+<line x1="650.0" y1="44" x2="662.0" y2="44" stroke="#898781" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text x="666.0" y="48" fill="#52514e">75 % target</text>
 <line x1="62.0" y1="66" x2="62.0" y2="448" stroke="#e1e0d9"/>
 <text x="62.0" y="464" text-anchor="middle" fill="#898781">5.5</text>
 <line x1="204.8" y1="66" x2="204.8" y2="448" stroke="#e1e0d9"/>
@@ -43,7 +45,7 @@
 <text transform="translate(16 257.0) rotate(-90)" text-anchor="middle" fill="#52514e">mean accuracy (%)</text>
 <line x1="62" y1="257.0" x2="776" y2="257.0" stroke="#898781" stroke-width="1.5" stroke-dasharray="5 4"/>
 <text x="772" y="252.0" text-anchor="end" font-size="10" fill="#898781">75.0 % target</text>
-<polyline points="153.8,377.1 250.4,304.3 256.1,212.4 464.0,149.8" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="115.1,327.9 203.6,260.8 256.1,212.4 304.1,191.1 464.0,149.8" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
 <g><title>control (control, round calib): 75.13 % acc, 7.35 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="590.6" cy="232.9" r="12" fill="#000" fill-opacity="0"/>
 <rect x="585.6" y="227.9" width="10" height="10" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
@@ -120,6 +122,10 @@
 <circle cx="614.4" cy="206.1" r="12" fill="#000" fill-opacity="0"/>
 <rect x="609.4" y="201.1" width="10" height="10" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>control (control, round r3): 74.98 % acc, 6.00 s; BELOW 75%; on the Pareto frontier</title>
+<circle cx="203.6" cy="260.8" r="12" fill="#000" fill-opacity="0"/>
+<rect x="198.6" y="255.8" width="10" height="10" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>w128-256-768 (variant, round r1): 75.23 % acc, 6.18 s; dacc +0.03 +- 0.15 pp; dtime -1.16 s; dtime_adj -1.24 s; QUALIFIED (&gt;= 75%); on the Pareto frontier</title>
 <circle cx="256.1" cy="212.4" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="256.1" cy="212.4" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
@@ -135,6 +141,10 @@
 <g><title>d3-2-3 (variant, round r1): 75.01 % acc, 6.53 s; dacc -0.11 +- 0.14 pp; dtime -0.87 s; dtime_adj -0.61 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="355.5" cy="254.6" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="355.5" cy="254.6" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>e9.0 (variant, round r3): 75.34 % acc, 6.35 s; dacc +0.36 +- 0.11 pp; dtime +0.35 s; dtime_adj -0.47 s; QUALIFIED (&gt;= 75%); on the Pareto frontier</title>
+<circle cx="304.1" cy="191.1" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="304.1" cy="191.1" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>ls0.25 (variant, round r1): 75.33 % acc, 7.44 s; dacc +0.21 +- 0.09 pp; dtime +0.00 s; dtime_adj -0.47 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="616.7" cy="193.0" r="12" fill="#000" fill-opacity="0"/>
@@ -236,9 +246,13 @@
 <circle cx="602.0" cy="232.9" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="602.0" cy="232.9" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
 </g>
-<g><title>w96-320-640 (variant, round r1): 74.75 % acc, 6.16 s; dacc -0.37 +- 0.08 pp; dtime -0.76 s; dtime_adj +0.08 s; BELOW 75%; on the Pareto frontier</title>
+<g><title>w96-320-640 (variant, round r1): 74.75 % acc, 6.16 s; dacc -0.37 +- 0.08 pp; dtime -0.76 s; dtime_adj +0.08 s; BELOW 75%</title>
 <circle cx="250.4" cy="304.3" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="250.4" cy="304.3" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>e9.5 (variant, round r3): 75.25 % acc, 6.68 s; dacc +0.27 +- 0.14 pp; dtime +0.68 s; dtime_adj +0.08 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="399.2" cy="209.2" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="399.2" cy="209.2" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>silu (variant, round r1): 75.00 % acc, 7.24 s; dacc -0.13 +- 0.18 pp; dtime -0.21 s; dtime_adj +0.09 s; BELOW 75%</title>
 <circle cx="557.7" cy="258.0" r="12" fill="#000" fill-opacity="0"/>
@@ -284,7 +298,11 @@
 <circle cx="584.5" cy="235.0" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="584.5" cy="235.0" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
 </g>
-<g><title>w64-384-576 (variant, round r1): 74.37 % acc, 5.82 s; dacc -0.94 +- 0.11 pp; dtime -1.58 s; dtime_adj +0.54 s; BELOW 75%; on the Pareto frontier</title>
+<g><title>e8.0 (variant, round r3): 74.63 % acc, 5.69 s; dacc -0.35 +- 0.13 pp; dtime -0.31 s; dtime_adj +0.48 s; BELOW 75%; on the Pareto frontier</title>
+<circle cx="115.1" cy="327.9" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="115.1" cy="327.9" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>w64-384-576 (variant, round r1): 74.37 % acc, 5.82 s; dacc -0.94 +- 0.11 pp; dtime -1.58 s; dtime_adj +0.54 s; BELOW 75%</title>
 <circle cx="153.8" cy="377.1" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="153.8" cy="377.1" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
 </g>
@@ -306,22 +324,26 @@
 </g>
 <g><title>ref-sxm500-n40 (variant, round reference): 75.19 % acc, 6.94 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="474.1" cy="220.3" r="12" fill="#000" fill-opacity="0"/>
-<circle cx="474.1" cy="220.3" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="474.1" cy="220.3" r="5" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>ref-sxm400-n40 (variant, round reference): 75.20 % acc, 7.41 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="606.5" cy="218.4" r="12" fill="#000" fill-opacity="0"/>
-<circle cx="606.5" cy="218.4" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="606.5" cy="218.4" r="5" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
 </g>
-<text x="161.8" y="372.1" text-anchor="start" font-size="10" fill="#52514e">w64-384-576</text>
+<text x="123.1" y="322.9" text-anchor="start" font-size="10" fill="#52514e">e8.0</text>
+<text x="161.8" y="390.1" text-anchor="start" font-size="10" fill="#52514e">w64-384-576</text>
+<text x="211.6" y="255.8" text-anchor="start" font-size="10" fill="#52514e">control</text>
 <text x="258.4" y="317.3" text-anchor="start" font-size="10" fill="#52514e">w96-320-640</text>
-<text x="264.1" y="207.4" text-anchor="start" font-size="10" fill="#52514e">w128-256-768</text>
-<text x="361.2" y="317.8" text-anchor="start" font-size="10" fill="#52514e">e7.5</text>
-<text x="363.5" y="249.6" text-anchor="start" font-size="10" fill="#52514e">d3-2-3</text>
-<text x="426.7" y="278.1" text-anchor="end" font-size="10" fill="#52514e">d2-3-3</text>
-<text x="444.9" y="241.7" text-anchor="start" font-size="10" fill="#52514e">w96-384-576</text>
+<text x="264.1" y="225.4" text-anchor="start" font-size="10" fill="#52514e">w128-256-768</text>
+<text x="312.1" y="204.1" text-anchor="start" font-size="10" fill="#52514e">e9.0</text>
+<text x="361.2" y="299.8" text-anchor="start" font-size="10" fill="#52514e">e7.5</text>
+<text x="363.5" y="267.6" text-anchor="start" font-size="10" fill="#52514e">d3-2-3</text>
+<text x="407.2" y="204.2" text-anchor="start" font-size="10" fill="#52514e">e9.5</text>
+<text x="442.7" y="278.1" text-anchor="start" font-size="10" fill="#52514e">d2-3-3</text>
+<text x="428.9" y="241.7" text-anchor="end" font-size="10" fill="#52514e">w96-384-576</text>
 <text x="472.0" y="162.8" text-anchor="start" font-size="10" fill="#52514e">w128-320-768</text>
 <text x="460.2" y="227.9" text-anchor="end" font-size="10" fill="#52514e">control</text>
-<text x="466.1" y="215.3" text-anchor="end" font-size="10" fill="#52514e">ref-sxm500-n40</text>
+<text x="482.1" y="233.3" text-anchor="start" font-size="10" fill="#52514e">ref-sxm500-n40</text>
 <text x="482.6" y="249.4" text-anchor="start" font-size="10" fill="#52514e">w128-384-512</text>
 <text x="482.7" y="276.0" text-anchor="start" font-size="10" fill="#52514e">e8.0</text>
 <text x="485.5" y="227.9" text-anchor="start" font-size="10" fill="#52514e">control</text>
