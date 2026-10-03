@@ -1,0 +1,36 @@
+{
+  "returncode": 1,
+  "wall_seconds": 173.3,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T194418Z-3544d39d",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"conv_kernels\": [3, 3, 1], \"count_nonfinite\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "k331",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"conv_kernels\": [3, 3, 1], \"count_nonfinite\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"conv_kernels\": [3, 3, 1], \"count_nonfinite\": true}",
+    "delta": {
+      "conv_kernels": [
+        3,
+        3,
+        1
+      ]
+    },
+    "hypothesis": "1x1 second and third conv in group 3 (3x3 maps, mostly padding for a 3x3 kernel): removes 28% of the FLOPs (ideas #7)",
+    "env": {},
+    "config": "futurebiohackers {\"conv_kernels\": [3, 3, 1]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

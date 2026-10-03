@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 162.9,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T194418Z-89f38476",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"conv1_stride\": 2, \"count_nonfinite\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "conv1-s2",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"conv1_stride\": 2, \"count_nonfinite\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"conv1_stride\": 2, \"count_nonfinite\": true}",
+    "delta": {
+      "conv1_stride": 2
+    },
+    "hypothesis": "group 1's first conv with stride 2 and padding 0 replaces the pool: learned downsampling instead of max-pool-after-conv at 31x31 (ideas #8)",
+    "env": {},
+    "config": "futurebiohackers {\"conv1_stride\": 2}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

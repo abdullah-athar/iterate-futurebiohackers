@@ -1,0 +1,36 @@
+{
+  "returncode": 1,
+  "wall_seconds": 179.4,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T194844Z-01fc77b3",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"conv_kernels\": [3, 1, 1], \"count_nonfinite\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "k311",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"conv_kernels\": [3, 1, 1], \"count_nonfinite\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"conv_kernels\": [3, 1, 1], \"count_nonfinite\": true}",
+    "delta": {
+      "conv_kernels": [
+        3,
+        1,
+        1
+      ]
+    },
+    "hypothesis": "1x1 inner convs in groups 2 and 3: removes ~45% of the FLOPs; accuracy risk from the 7x7 maps",
+    "env": {},
+    "config": "futurebiohackers {\"conv_kernels\": [3, 1, 1]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

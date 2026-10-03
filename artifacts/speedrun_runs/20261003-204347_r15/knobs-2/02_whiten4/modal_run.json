@@ -1,0 +1,32 @@
+{
+  "returncode": 0,
+  "wall_seconds": 93.9,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T194722Z-f61dfa7e",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"whiten_bias_epochs\": 4}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "whiten4",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"whiten_bias_epochs\": 4}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"whiten_bias_epochs\": 4}",
+    "delta": {
+      "whiten_bias_epochs": 4
+    },
+    "hypothesis": "whitening bias trained one epoch longer: -0.13 s adj on the old network (r1), untested here",
+    "env": {},
+    "config": "futurebiohackers {\"whiten_bias_epochs\": 4}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

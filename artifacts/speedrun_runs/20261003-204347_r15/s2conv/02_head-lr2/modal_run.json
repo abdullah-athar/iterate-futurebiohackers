@@ -1,0 +1,32 @@
+{
+  "returncode": 0,
+  "wall_seconds": 93.4,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T194831Z-adba9d10",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"head_lr\": 2.0}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "head-lr2",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"head_lr\": 2.0}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"head_lr\": 2.0}",
+    "delta": {
+      "head_lr": 2.0
+    },
+    "hypothesis": "own learning rate for the linear head: twice the base lr",
+    "env": {},
+    "config": "futurebiohackers {\"head_lr\": 2.0}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

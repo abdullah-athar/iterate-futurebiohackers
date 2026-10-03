@@ -1,0 +1,32 @@
+{
+  "returncode": 0,
+  "wall_seconds": 87.6,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T194811Z-50c7c062",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"whiten_eps\": 0.002}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "whiten-eps4x",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"whiten_eps\": 0.002}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"whiten_eps\": 0.002}",
+    "delta": {
+      "whiten_eps": 0.002
+    },
+    "hypothesis": "larger eigenvalue floor in the whitening: damps the noisiest high-frequency patch components (untested knob)",
+    "env": {},
+    "config": "futurebiohackers {\"whiten_eps\": 0.002}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

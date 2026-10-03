@@ -1,0 +1,32 @@
+{
+  "returncode": 0,
+  "wall_seconds": 142.3,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T194419Z-33c6ee0c",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"bn_momentum\": 0.6, \"count_nonfinite\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "bn0.6",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"bn_momentum\": 0.6, \"count_nonfinite\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"bn_momentum\": 0.6, \"count_nonfinite\": true}",
+    "delta": {
+      "bn_momentum": 0.6
+    },
+    "hypothesis": "BatchNorm momentum 0.8 lost 0.11 s adj; 0.6 (airbench's value) untested on this network",
+    "env": {},
+    "config": "futurebiohackers {\"bn_momentum\": 0.6}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

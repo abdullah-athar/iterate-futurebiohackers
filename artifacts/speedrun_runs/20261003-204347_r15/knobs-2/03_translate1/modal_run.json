@@ -1,0 +1,32 @@
+{
+  "returncode": 0,
+  "wall_seconds": 100.2,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T194858Z-0e79bbf4",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"translate\": 1}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "translate1",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"translate\": 1}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"translate\": 1}",
+    "delta": {
+      "translate": 1
+    },
+    "hypothesis": "weaker translation: -0.12 s adj on the old network (r1), untested here; the knee at 9.5 ep suggests less augmentation may fit the short schedule",
+    "env": {},
+    "config": "futurebiohackers {\"translate\": 1}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

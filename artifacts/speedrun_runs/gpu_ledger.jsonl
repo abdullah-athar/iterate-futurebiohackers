@@ -191,3 +191,8 @@
 {"time": "2026-10-03T20:35:22", "label": "r14/d332", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 340.2, "gpu_minutes": 5.92, "note": ""}
 {"time": "2026-10-03T20:37:07", "label": "r14/stems-b", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 434.0, "gpu_minutes": 7.48, "note": ""}
 {"time": "2026-10-03T20:37:54", "label": "r14/stems-a", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 474.7, "gpu_minutes": 8.16, "note": ""}
+{"time": "2026-10-03T20:50:47", "label": "r15/knobs-1", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 410.6, "gpu_minutes": 7.09, "note": ""}
+{"time": "2026-10-03T20:50:54", "label": "r15/knobs-2", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 418.4, "gpu_minutes": 7.22, "note": ""}
+{"time": "2026-10-03T20:51:27", "label": "r15/knobs-3", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 452.9, "gpu_minutes": 7.8, "note": ""}
+{"time": "2026-10-03T20:51:54", "label": "r15/s2conv", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 475.4, "gpu_minutes": 8.17, "note": ""}
+{"time": "2026-10-03T20:54:29", "label": "r15/g3k1", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 631.0, "gpu_minutes": 10.77, "note": ""}

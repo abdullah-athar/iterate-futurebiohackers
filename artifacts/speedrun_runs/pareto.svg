@@ -2,7 +2,7 @@
 <title>CIFAR-100 speedrun: accuracy vs prepare+train time</title>
 <rect width="800" height="500" fill="#fcfcfb"/>
 <text x="62" y="24" font-size="14" font-weight="600" fill="#0b0b0b">CIFAR-100 speedrun: mean accuracy vs mean prepare+train time</text>
-<text x="776" y="24" text-anchor="end" font-size="10" fill="#898781">2026-10-03 20:37; k = 0.7 pp/s</text>
+<text x="776" y="24" text-anchor="end" font-size="10" fill="#898781">2026-10-03 20:54; k = 0.7 pp/s</text>
 <circle cx="68" cy="44" r="5" fill="#2a78d6"/>
 <text x="78" y="48" fill="#52514e">round calib</text>
 <circle cx="168.0" cy="44" r="5" fill="#eb6834"/>
@@ -33,6 +33,8 @@
 <text x="506.0" y="64" fill="#52514e">round r13</text>
 <circle cx="584.0" cy="60" r="5" fill="#898781"/>
 <text x="594.0" y="64" fill="#52514e">round r14</text>
+<circle cx="672.0" cy="60" r="5" fill="#898781"/>
+<text x="682.0" y="64" fill="#52514e">round r15</text>
 <circle cx="68" cy="76" r="5" fill="#898781"/>
 <text x="78" y="80" fill="#52514e">round reference</text>
 <rect x="187.0" y="71" width="10" height="10" fill="#52514e"/>
@@ -71,7 +73,7 @@
 <text transform="translate(16 273.0) rotate(-90)" text-anchor="middle" fill="#52514e">mean accuracy (%)</text>
 <line x1="62" y1="168.0" x2="776" y2="168.0" stroke="#898781" stroke-width="1.5" stroke-dasharray="5 4"/>
 <text x="772" y="163.0" text-anchor="end" font-size="10" fill="#898781">75.0 % target</text>
-<polyline points="215.4,423.7 362.6,205.9 376.1,180.1 389.0,174.3 398.3,168.3 403.8,164.2 414.5,163.2 421.2,153.2 462.3,149.0" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="215.4,423.7 338.3,243.2 362.6,205.9 365.2,203.1 376.1,180.1 389.0,174.3 398.3,168.3 403.8,164.2 414.5,163.2 419.8,156.7 419.8,153.2 462.3,149.0" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
 <g><title>control (control, round calib): 75.13 % acc, 7.35 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="586.8" cy="164.5" r="12" fill="#000" fill-opacity="0"/>
 <rect x="581.8" y="159.5" width="10" height="10" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
@@ -336,9 +338,29 @@
 <circle cx="424.1" cy="153.2" r="12" fill="#000" fill-opacity="0"/>
 <rect x="419.1" y="148.2" width="10" height="10" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
-<g><title>control (control, round r14): 75.53 % acc, 5.03 s; QUALIFIED (&gt;= 75%); on the Pareto frontier</title>
+<g><title>control (control, round r14): 75.53 % acc, 5.03 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="421.2" cy="153.2" r="12" fill="#000" fill-opacity="0"/>
 <rect x="416.2" y="148.2" width="10" height="10" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>control (control, round r15): 75.53 % acc, 5.02 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="420.2" cy="153.2" r="12" fill="#000" fill-opacity="0"/>
+<rect x="415.2" y="148.2" width="10" height="10" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>control (control, round r15): 75.53 % acc, 5.06 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="423.2" cy="153.2" r="12" fill="#000" fill-opacity="0"/>
+<rect x="418.2" y="148.2" width="10" height="10" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>control (control, round r15): 75.53 % acc, 5.17 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="431.1" cy="153.2" r="12" fill="#000" fill-opacity="0"/>
+<rect x="426.1" y="148.2" width="10" height="10" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>control (control, round r15): 75.33 % acc, 5.10 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="425.9" cy="158.8" r="12" fill="#000" fill-opacity="0"/>
+<rect x="420.9" y="153.8" width="10" height="10" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>control (control, round r15): 75.53 % acc, 5.01 s; QUALIFIED (&gt;= 75%); on the Pareto frontier</title>
+<circle cx="419.8" cy="153.2" r="12" fill="#000" fill-opacity="0"/>
+<rect x="414.8" y="148.2" width="10" height="10" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>w128-256-768 (variant, round r1): 75.23 % acc, 6.18 s; dacc +0.03 +- 0.15 pp; dtime -1.16 s; dtime_adj -1.24 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="503.2" cy="161.5" r="12" fill="#000" fill-opacity="0"/>
@@ -724,6 +746,14 @@
 <circle cx="589.7" cy="164.5" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="589.7" cy="164.5" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>translate1 (variant, round r15): 75.47 % acc, 5.03 s; dacc -0.06 +- 0.10 pp; dtime -0.03 s; dtime_adj +0.05 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="420.8" cy="154.8" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="420.8" cy="154.8" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>switch0.35 (variant, round r15): 75.11 % acc, 4.84 s; dacc -0.22 +- 0.12 pp; dtime -0.25 s; dtime_adj +0.05 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="407.7" cy="164.9" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="407.7" cy="164.9" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>scale1.5 (variant, round r6): 75.32 % acc, 5.85 s; dacc +0.03 +- 0.13 pp; dtime +0.11 s; dtime_adj +0.06 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="480.0" cy="159.0" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="480.0" cy="159.0" r="5" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>
@@ -739,6 +769,10 @@
 <g><title>w96-320-640 (variant, round r1): 74.75 % acc, 6.16 s; dacc -0.37 +- 0.08 pp; dtime -0.76 s; dtime_adj +0.08 s; BELOW 75%</title>
 <circle cx="501.8" cy="174.9" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="501.8" cy="174.9" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>whiten-eps4x (variant, round r15): 75.44 % acc, 5.13 s; dacc -0.09 +- 0.16 pp; dtime -0.04 s; dtime_adj +0.08 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="427.9" cy="155.7" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="427.9" cy="155.7" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>w80-256-768 (variant, round r6): 75.10 % acc, 5.52 s; dacc -0.19 +- 0.12 pp; dtime -0.18 s; dtime_adj +0.09 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="455.8" cy="165.1" r="12" fill="#000" fill-opacity="0"/>
@@ -768,6 +802,10 @@
 <circle cx="426.3" cy="173.3" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="426.3" cy="173.3" r="5" fill="#e34948" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>whiten4 (variant, round r15): 75.46 % acc, 5.07 s; dacc -0.07 +- 0.12 pp; dtime +0.01 s; dtime_adj +0.12 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="424.2" cy="155.2" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="424.2" cy="155.2" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>scale1.4 (variant, round r8): 74.80 % acc, 4.83 s; dacc -0.13 +- 0.11 pp; dtime -0.06 s; dtime_adj +0.14 s; BELOW 75%</title>
 <circle cx="407.0" cy="173.7" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="407.0" cy="173.7" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
@@ -775,6 +813,10 @@
 <g><title>switch0.35 (variant, round r6): 75.05 % acc, 5.36 s; dacc -0.32 +- 0.12 pp; dtime -0.31 s; dtime_adj +0.14 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="444.4" cy="166.6" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="444.4" cy="166.6" r="5" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>bn0.6 (variant, round r15): 75.32 % acc, 5.02 s; dacc -0.21 +- 0.10 pp; dtime -0.14 s; dtime_adj +0.15 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="420.7" cy="158.9" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="420.7" cy="158.9" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>jitter0.45 (variant, round r6): 75.22 % acc, 5.80 s; dacc -0.07 +- 0.14 pp; dtime +0.06 s; dtime_adj +0.16 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="476.3" cy="161.9" r="12" fill="#000" fill-opacity="0"/>
@@ -796,6 +838,10 @@
 <circle cx="579.6" cy="164.9" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="579.6" cy="164.9" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>lr13.2 (variant, round r15): 75.40 % acc, 5.01 s; dacc -0.13 +- 0.12 pp; dtime -0.01 s; dtime_adj +0.18 s; QUALIFIED (&gt;= 75%); on the Pareto frontier</title>
+<circle cx="419.8" cy="156.7" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="419.8" cy="156.7" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>w96-256-896 (variant, round r6): 75.63 % acc, 6.30 s; dacc +0.34 +- 0.12 pp; dtime +0.67 s; dtime_adj +0.18 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="511.7" cy="150.3" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="511.7" cy="150.3" r="5" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>
@@ -812,6 +858,14 @@
 <circle cx="595.6" cy="167.1" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="595.6" cy="167.1" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>head-lr2 (variant, round r15): 75.30 % acc, 5.28 s; dacc -0.03 +- 0.10 pp; dtime +0.18 s; dtime_adj +0.23 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="439.1" cy="159.7" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="439.1" cy="159.7" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>ls0.3 (variant, round r15): 75.33 % acc, 5.01 s; dacc -0.19 +- 0.07 pp; dtime -0.05 s; dtime_adj +0.23 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="419.8" cy="158.6" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="419.8" cy="158.6" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>s20x20-24x40-28x60-e9.5 (variant, round r7): 74.99 % acc, 5.52 s; dacc -0.30 +- 0.11 pp; dtime -0.19 s; dtime_adj +0.24 s; BELOW 75%</title>
 <circle cx="455.9" cy="168.3" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="455.9" cy="168.3" r="5" fill="#e34948" stroke="#fcfcfb" stroke-width="2"/>
@@ -819,6 +873,10 @@
 <g><title>mom0.9 (variant, round r1): 75.19 % acc, 7.30 s; dacc -0.11 +- 0.16 pp; dtime +0.01 s; dtime_adj +0.24 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="583.3" cy="162.6" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="583.3" cy="162.6" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>bias12 (variant, round r15): 75.42 % acc, 5.13 s; dacc -0.10 +- 0.07 pp; dtime +0.11 s; dtime_adj +0.26 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="427.9" cy="156.1" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="427.9" cy="156.1" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>res24-s0.75 (variant, round r3): 73.18 % acc, 4.49 s; dacc -1.80 +- 0.11 pp; dtime -1.54 s; dtime_adj +0.26 s; BELOW 75%</title>
 <circle cx="382.5" cy="218.9" r="12" fill="#000" fill-opacity="0"/>
@@ -860,6 +918,10 @@
 <circle cx="587.1" cy="163.5" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="587.1" cy="163.5" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>res24-28 (variant, round r15): 75.31 % acc, 5.05 s; dacc -0.22 +- 0.13 pp; dtime +0.04 s; dtime_adj +0.36 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="422.9" cy="159.3" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="422.9" cy="159.3" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>warmup0.3 (variant, round r8): 74.85 % acc, 5.17 s; dacc -0.04 +- 0.14 pp; dtime +0.33 s; dtime_adj +0.39 s; BELOW 75%</title>
 <circle cx="431.2" cy="172.1" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="431.2" cy="172.1" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
@@ -871,6 +933,10 @@
 <g><title>k-e9.0 (variant, round r14): 75.06 % acc, 4.81 s; dacc -0.47 +- 0.13 pp; dtime -0.26 s; dtime_adj +0.41 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="405.7" cy="166.4" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="405.7" cy="166.4" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>wd0.0202 (variant, round r15): 75.27 % acc, 5.06 s; dacc -0.26 +- 0.11 pp; dtime +0.04 s; dtime_adj +0.41 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="423.1" cy="160.4" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="423.1" cy="160.4" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>e9.5 (variant, round r3): 75.25 % acc, 6.68 s; dacc +0.27 +- 0.14 pp; dtime +0.68 s; dtime_adj +0.41 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="539.0" cy="161.0" r="12" fill="#000" fill-opacity="0"/>
@@ -911,6 +977,10 @@
 <g><title>S3-d223 (variant, round r13): 74.57 % acc, 4.40 s; dacc -0.92 +- 0.09 pp; dtime -0.72 s; dtime_adj +0.60 s; BELOW 75%; on the Pareto frontier</title>
 <circle cx="376.1" cy="180.1" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="376.1" cy="180.1" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>head-lr0.5 (variant, round r15): 74.96 % acc, 5.09 s; dacc -0.57 +- 0.09 pp; dtime -0.08 s; dtime_adj +0.73 s; BELOW 75%</title>
+<circle cx="425.4" cy="169.1" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="425.4" cy="169.1" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>final0.15 (variant, round r8): 74.74 % acc, 5.37 s; dacc -0.15 +- 0.13 pp; dtime +0.53 s; dtime_adj +0.75 s; BELOW 75%</title>
 <circle cx="445.6" cy="175.2" r="12" fill="#000" fill-opacity="0"/>
@@ -984,6 +1054,10 @@
 <circle cx="402.5" cy="204.0" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="402.5" cy="204.0" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>conv1-s2 (variant, round r15): 74.16 % acc, 4.74 s; dacc -1.17 +- 0.12 pp; dtime -0.36 s; dtime_adj +1.31 s; BELOW 75%</title>
+<circle cx="400.4" cy="191.6" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="400.4" cy="191.6" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>d332-e10.5 (variant, round r14): 74.55 % acc, 4.98 s; dacc -0.98 +- 0.09 pp; dtime -0.07 s; dtime_adj +1.33 s; BELOW 75%</title>
 <circle cx="417.4" cy="180.6" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="417.4" cy="180.6" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
@@ -1016,6 +1090,10 @@
 <circle cx="570.0" cy="190.7" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="570.0" cy="190.7" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>k331 (variant, round r15): 73.75 % acc, 4.25 s; dacc -1.78 +- 0.15 pp; dtime -0.76 s; dtime_adj +1.78 s; BELOW 75%; on the Pareto frontier</title>
+<circle cx="365.2" cy="203.1" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="365.2" cy="203.1" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>wd0.0084 (variant, round r1): 74.50 % acc, 7.31 s; dacc -0.80 +- 0.14 pp; dtime +0.02 s; dtime_adj +1.82 s; BELOW 75%</title>
 <circle cx="584.3" cy="182.1" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="584.3" cy="182.1" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
@@ -1035,6 +1113,10 @@
 <g><title>stem-s2d-nopool (variant, round r14): 73.10 % acc, 4.84 s; dacc -2.43 +- 0.09 pp; dtime -0.19 s; dtime_adj +3.28 s; BELOW 75%</title>
 <circle cx="407.4" cy="221.3" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="407.4" cy="221.3" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>k311 (variant, round r15): 72.31 % acc, 3.87 s; dacc -3.22 +- 0.13 pp; dtime -1.14 s; dtime_adj +3.45 s; BELOW 75%; on the Pareto frontier</title>
+<circle cx="338.3" cy="243.2" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="338.3" cy="243.2" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>S3-poolfirst-g1 (variant, round r14): 72.59 % acc, 4.93 s; dacc -2.73 +- 0.12 pp; dtime -0.25 s; dtime_adj +3.66 s; BELOW 75%</title>
 <circle cx="414.0" cy="235.4" r="12" fill="#000" fill-opacity="0"/>
@@ -1089,8 +1171,10 @@
 <circle cx="590.8" cy="162.3" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <text x="223.4" y="418.7" text-anchor="start" font-size="10" fill="#52514e">stem-s2d</text>
+<text x="346.3" y="256.2" text-anchor="start" font-size="10" fill="#52514e">k311</text>
 <text x="354.6" y="200.9" text-anchor="end" font-size="10" fill="#52514e">d222-skip</text>
-<text x="372.5" y="364.4" text-anchor="start" font-size="10" fill="#52514e">hard0.5-offline</text>
+<text x="372.5" y="382.4" text-anchor="start" font-size="10" fill="#52514e">hard0.5-offline</text>
+<text x="373.2" y="198.1" text-anchor="start" font-size="10" fill="#52514e">k331</text>
 <text x="374.5" y="219.1" text-anchor="start" font-size="10" fill="#52514e">d222</text>
 <text x="368.1" y="175.1" text-anchor="end" font-size="10" fill="#52514e">S3-d223</text>
 <text x="374.5" y="231.9" text-anchor="end" font-size="10" fill="#52514e">res24-s0.75</text>
@@ -1100,26 +1184,28 @@
 <text x="397.0" y="187.3" text-anchor="start" font-size="10" fill="#52514e">S3-w64-192-768</text>
 <text x="399.2" y="196.8" text-anchor="start" font-size="10" fill="#52514e">d222-e9.5</text>
 <text x="406.3" y="181.3" text-anchor="start" font-size="10" fill="#52514e">compile-loss-fused</text>
-<text x="409.5" y="183.5" text-anchor="start" font-size="10" fill="#52514e">stem-whiten3s2</text>
-<text x="409.9" y="212.8" text-anchor="start" font-size="10" fill="#52514e">d322</text>
-<text x="410.5" y="199.0" text-anchor="start" font-size="10" fill="#52514e">d232</text>
+<text x="408.4" y="186.6" text-anchor="start" font-size="10" fill="#52514e">conv1-s2</text>
+<text x="409.5" y="201.5" text-anchor="start" font-size="10" fill="#52514e">stem-whiten3s2</text>
+<text x="409.9" y="194.8" text-anchor="start" font-size="10" fill="#52514e">d322</text>
+<text x="410.5" y="217.0" text-anchor="start" font-size="10" fill="#52514e">d232</text>
 <text x="395.8" y="159.2" text-anchor="end" font-size="10" fill="#52514e">S-fused-compiled-e9.0</text>
-<text x="411.9" y="213.0" text-anchor="start" font-size="10" fill="#52514e">S3-poolfirst-g2</text>
-<text x="413.3" y="185.7" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="413.7" y="161.4" text-anchor="start" font-size="10" fill="#52514e">k-e9.0</text>
-<text x="414.0" y="185.7" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="414.1" y="187.5" text-anchor="start" font-size="10" fill="#52514e">filt6-0.5</text>
-<text x="414.8" y="178.9" text-anchor="start" font-size="10" fill="#52514e">S2-e8.75</text>
-<text x="414.9" y="163.1" text-anchor="start" font-size="10" fill="#52514e">lr12</text>
-<text x="415.0" y="186.7" text-anchor="start" font-size="10" fill="#52514e">scale1.4</text>
-<text x="415.1" y="168.2" text-anchor="start" font-size="10" fill="#52514e">bn0.8</text>
-<text x="415.1" y="296.5" text-anchor="start" font-size="10" fill="#52514e">S3-poolfirst-g1g2</text>
-<text x="415.2" y="191.1" text-anchor="start" font-size="10" fill="#52514e">d222-e10.0</text>
-<text x="415.4" y="234.3" text-anchor="start" font-size="10" fill="#52514e">stem-s2d-nopool</text>
-<text x="415.4" y="167.7" text-anchor="start" font-size="10" fill="#52514e">ls0.2</text>
-<text x="415.4" y="192.5" text-anchor="start" font-size="10" fill="#52514e">mom0.9</text>
-<text x="415.6" y="163.7" text-anchor="start" font-size="10" fill="#52514e">bias16</text>
-<text x="415.6" y="183.0" text-anchor="start" font-size="10" fill="#52514e">jitter0.2</text>
+<text x="411.9" y="231.0" text-anchor="start" font-size="10" fill="#52514e">S3-poolfirst-g2</text>
+<text x="413.3" y="167.7" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="413.7" y="179.4" text-anchor="start" font-size="10" fill="#52514e">k-e9.0</text>
+<text x="414.0" y="167.7" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="414.1" y="205.5" text-anchor="start" font-size="10" fill="#52514e">filt6-0.5</text>
+<text x="414.8" y="160.9" text-anchor="start" font-size="10" fill="#52514e">S2-e8.75</text>
+<text x="414.9" y="181.1" text-anchor="start" font-size="10" fill="#52514e">lr12</text>
+<text x="415.0" y="168.7" text-anchor="start" font-size="10" fill="#52514e">scale1.4</text>
+<text x="415.1" y="186.2" text-anchor="start" font-size="10" fill="#52514e">bn0.8</text>
+<text x="415.1" y="278.5" text-anchor="start" font-size="10" fill="#52514e">S3-poolfirst-g1g2</text>
+<text x="415.2" y="209.1" text-anchor="start" font-size="10" fill="#52514e">d222-e10.0</text>
+<text x="415.4" y="216.3" text-anchor="start" font-size="10" fill="#52514e">stem-s2d-nopool</text>
+<text x="415.4" y="185.7" text-anchor="start" font-size="10" fill="#52514e">ls0.2</text>
+<text x="415.4" y="174.5" text-anchor="start" font-size="10" fill="#52514e">mom0.9</text>
+<text x="415.6" y="181.7" text-anchor="start" font-size="10" fill="#52514e">bias16</text>
+<text x="415.6" y="165.0" text-anchor="start" font-size="10" fill="#52514e">jitter0.2</text>
+<text x="415.7" y="177.9" text-anchor="start" font-size="10" fill="#52514e">switch0.35</text>
 <text x="415.7" y="165.9" text-anchor="start" font-size="10" fill="#52514e">control</text>
 <text x="416.0" y="183.9" text-anchor="start" font-size="10" fill="#52514e">control</text>
 <text x="416.0" y="160.6" text-anchor="start" font-size="10" fill="#52514e">wd0.0168</text>
@@ -1149,16 +1235,28 @@
 <text x="426.1" y="165.9" text-anchor="start" font-size="10" fill="#52514e">w64-256-768</text>
 <text x="427.3" y="193.3" text-anchor="start" font-size="10" fill="#52514e">stack6-res24-s0.5</text>
 <text x="427.3" y="193.5" text-anchor="start" font-size="10" fill="#52514e">hard0.75-online</text>
+<text x="427.8" y="169.7" text-anchor="start" font-size="10" fill="#52514e">lr13.2</text>
+<text x="427.8" y="148.2" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="427.8" y="171.6" text-anchor="start" font-size="10" fill="#52514e">ls0.3</text>
+<text x="428.2" y="148.2" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="428.7" y="171.9" text-anchor="start" font-size="10" fill="#52514e">bn0.6</text>
+<text x="428.8" y="149.8" text-anchor="start" font-size="10" fill="#52514e">translate1</text>
 <text x="429.2" y="166.2" text-anchor="start" font-size="10" fill="#52514e">control</text>
 <text x="430.2" y="152.8" text-anchor="start" font-size="10" fill="#52514e">S3-e9.5</text>
 <text x="430.6" y="166.2" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="431.6" y="183.3" text-anchor="start" font-size="10" fill="#52514e">d222-e10.5</text>
-<text x="432.1" y="166.2" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="430.9" y="154.3" text-anchor="start" font-size="10" fill="#52514e">res24-28</text>
+<text x="431.1" y="173.4" text-anchor="start" font-size="10" fill="#52514e">wd0.0202</text>
+<text x="431.2" y="148.2" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="431.6" y="201.3" text-anchor="start" font-size="10" fill="#52514e">d222-e10.5</text>
+<text x="432.1" y="148.2" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="432.2" y="168.2" text-anchor="start" font-size="10" fill="#52514e">whiten4</text>
 <text x="432.4" y="148.2" text-anchor="start" font-size="10" fill="#52514e">control</text>
 <text x="433.2" y="216.1" text-anchor="start" font-size="10" fill="#52514e">hard0.75-offline</text>
 <text x="433.3" y="180.4" text-anchor="start" font-size="10" fill="#52514e">s16x15-20x30-24x45-28x60</text>
 <text x="433.3" y="190.4" text-anchor="start" font-size="10" fill="#52514e">filt5-0.75</text>
-<text x="433.4" y="153.7" text-anchor="start" font-size="10" fill="#52514e">final-S3-e9.5-seeds0-400W</text>
+<text x="433.4" y="164.1" text-anchor="start" font-size="10" fill="#52514e">head-lr0.5</text>
+<text x="433.4" y="171.7" text-anchor="start" font-size="10" fill="#52514e">final-S3-e9.5-seeds0-400W</text>
+<text x="433.9" y="153.8" text-anchor="start" font-size="10" fill="#52514e">control</text>
 <text x="434.1" y="176.0" text-anchor="start" font-size="10" fill="#52514e">e9.25</text>
 <text x="434.3" y="168.3" text-anchor="start" font-size="10" fill="#52514e">s20x20-24x40-28x60</text>
 <text x="434.5" y="168.9" text-anchor="start" font-size="10" fill="#52514e">S2-e9.25</text>
@@ -1167,15 +1265,19 @@
 <text x="435.2" y="168.8" text-anchor="start" font-size="10" fill="#52514e">gelu-tanh</text>
 <text x="435.3" y="167.3" text-anchor="start" font-size="10" fill="#52514e">control</text>
 <text x="435.6" y="157.7" text-anchor="start" font-size="10" fill="#52514e">S-e9.25</text>
+<text x="435.9" y="169.1" text-anchor="start" font-size="10" fill="#52514e">bias12</text>
+<text x="435.9" y="150.7" text-anchor="start" font-size="10" fill="#52514e">whiten-eps4x</text>
 <text x="436.6" y="166.2" text-anchor="start" font-size="10" fill="#52514e">control</text>
 <text x="436.7" y="155.2" text-anchor="start" font-size="10" fill="#52514e">final-S3-e9.5-seeds40-400W</text>
 <text x="437.8" y="191.7" text-anchor="start" font-size="10" fill="#52514e">stem-whiten3s2-e10.25</text>
 <text x="438.6" y="193.4" text-anchor="start" font-size="10" fill="#52514e">stem-whiten4s2-w96</text>
 <text x="438.6" y="166.2" text-anchor="start" font-size="10" fill="#52514e">S3-e9.5</text>
-<text x="439.2" y="167.1" text-anchor="start" font-size="10" fill="#52514e">warmup0.3</text>
-<text x="439.7" y="171.8" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="442.3" y="165.4" text-anchor="start" font-size="10" fill="#52514e">filt6-0.75</text>
-<text x="443.5" y="179.7" text-anchor="start" font-size="10" fill="#52514e">d2-3-3</text>
+<text x="439.1" y="148.2" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="439.2" y="185.1" text-anchor="start" font-size="10" fill="#52514e">warmup0.3</text>
+<text x="439.7" y="153.8" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="442.3" y="183.4" text-anchor="start" font-size="10" fill="#52514e">filt6-0.75</text>
+<text x="443.5" y="161.7" text-anchor="start" font-size="10" fill="#52514e">d2-3-3</text>
+<text x="447.1" y="172.7" text-anchor="start" font-size="10" fill="#52514e">head-lr2</text>
 <text x="448.2" y="165.6" text-anchor="start" font-size="10" fill="#52514e">w64-d233-triton-e9.5</text>
 <text x="448.4" y="178.1" text-anchor="start" font-size="10" fill="#52514e">w96-256-640</text>
 <text x="448.4" y="159.3" text-anchor="start" font-size="10" fill="#52514e">e8.25</text>
