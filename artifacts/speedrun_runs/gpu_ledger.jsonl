@@ -312,3 +312,4 @@
 {"time": "2026-10-04T00:19:13", "label": "pcie-record-g3-512 (gpu-guard miss 5)", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: GPU 'NVIDIA A100-SXM4-80GB' is not 'NVIDIA A100 80GB PCIe'"}
 {"time": "2026-10-04T00:19:17", "label": "pcie-record-g3-512 (gpu-guard miss 6)", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 0.1, "gpu_minutes": 0.25, "note": "aborted before build: GPU 'NVIDIA A100-SXM4-80GB' is not 'NVIDIA A100 80GB PCIe'"}
 {"time": "2026-10-04T00:24:37", "label": "pcie-record-g3-512", "gpu": "NVIDIA A100 80GB PCIe", "power": "300.00 W", "container_seconds": 261.6, "gpu_minutes": 4.61, "note": ""}
+{"time": "2026-10-04T00:27:02", "label": "cold4cpu-cdt @4cpu", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 545.0, "gpu_minutes": 9.33, "note": ""}
