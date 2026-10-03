@@ -162,3 +162,4 @@
 {"time": "2026-10-03T19:51:40", "label": "r11/d2-c (gpu-guard miss 1)", "gpu": "NVIDIA A100 80GB PCIe", "power": "300.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: GPU 'NVIDIA A100 80GB PCIe' is not 'NVIDIA A100-SXM4-80GB'"}
 {"time": "2026-10-03T19:56:48", "label": "r11/d2-k", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 401.5, "gpu_minutes": 6.94, "note": ""}
 {"time": "2026-10-03T19:57:20", "label": "r11/d2-b", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 542.6, "gpu_minutes": 9.29, "note": ""}
+{"time": "2026-10-03T19:57:57", "label": "r12/confirm16-S3", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 380.5, "gpu_minutes": 6.59, "note": ""}
