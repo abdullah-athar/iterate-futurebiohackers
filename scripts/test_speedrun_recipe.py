@@ -89,7 +89,7 @@ def test_transition_reset_and_evaluation(recipe, resolution, hard_fraction):
     recipe.prepare(state, data, 5)
     for name, value in state.net.state_dict().items():
         torch.testing.assert_close(value, initialized[name], rtol=0, atol=0)
-    assert not state.optimizer.state
+    assert not any(optimizer.state for optimizer in state.optimizers)
     assert all(p.grad is None for p in state.net.parameters())
     if state.proxy is not None:
         assert not state.proxy_optimizer.state

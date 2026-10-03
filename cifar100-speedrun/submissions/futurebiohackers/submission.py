@@ -52,6 +52,17 @@ DEFAULTS = {
     "bn_momentum": 0.6,
     "ema_every": 5,  # lookahead EMA period in steps; 0 disables it
     "compile": "max-autotune",  # torch.compile mode; "" runs eagerly
+    "compile_step": False,  # compile forward and loss as one graph
+    "activation": "gelu",  # or "silu"
+    "bn_dtype": "float",  # or "half"
+    "color_jitter": [0.0, 0.0],  # per-image brightness and contrast ranges
+    # "muon" follows hiverge/cifar10-speedrun: Muon on conv filters, SGD on biases and head.
+    "optimizer": "sgd",
+    "muon_lr": 0.205,
+    "muon_momentum": 0.655,
+    "muon_wd": 1.04e-6,  # per example
+    "bias_lr": 0.0573,
+    "head_lr": 0.5415,
 }
 
 
@@ -60,16 +71,23 @@ DEFAULTS = {
 #############################################
 
 
+def make_activation(hyp):
+    if hyp["activation"] == "silu":
+        return F.silu
+    approximate = hyp["gelu_approximate"]
+    return lambda x: F.gelu(x, approximate=approximate)
+
+
 class BatchNorm(nn.BatchNorm2d):
     def __init__(self, num_features, momentum):
         super().__init__(num_features, eps=1e-12, momentum=1 - momentum)
         self.weight.requires_grad = False
 
-    def activate(self, x, approximate, residual=None):
+    def activate(self, x, act, residual=None):
         x = self(x)
         if residual is not None:
             x = x + residual
-        return F.gelu(x, approximate=approximate)
+        return act(x)
 
 
 class Conv(nn.Conv2d):
@@ -83,7 +101,7 @@ class Conv(nn.Conv2d):
 
 
 class ConvGroup(nn.Module):
-    def __init__(self, channels_in, channels_out, depth, bn_momentum, gelu_approximate, pool_first):
+    def __init__(self, channels_in, channels_out, depth, bn_momentum, act, pool_first):
         super().__init__()
         self.conv1 = Conv(channels_in, channels_out)
         self.pool = nn.MaxPool2d(2)
@@ -93,16 +111,16 @@ class ConvGroup(nn.Module):
         self.norm2 = BatchNorm(channels_out, bn_momentum)
         self.conv3 = Conv(channels_out, channels_out) if depth == 3 else None
         self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
-        self.approximate = gelu_approximate
+        self.act = act
 
     def forward(self, x):
         x = self.conv1(self.pool(x)) if self.pool_first else self.pool(self.conv1(x))
-        x = self.norm1.activate(x, self.approximate)
+        x = self.norm1.activate(x, self.act)
         if self.conv3 is None:
-            return self.norm2.activate(self.conv2(x), self.approximate)
+            return self.norm2.activate(self.conv2(x), self.act)
         x0 = x
-        x = self.norm2.activate(self.conv2(x), self.approximate)
-        return self.norm3.activate(self.conv3(x), self.approximate, x0)
+        x = self.norm2.activate(self.conv2(x), self.act)
+        return self.norm3.activate(self.conv3(x), self.act, x0)
 
 
 class Net(nn.Module):
@@ -111,29 +129,25 @@ class Net(nn.Module):
         w1, w2, w3 = hyp["widths"]
         depths = hyp["depths"] or [hyp["depth"]] * 3
         bn_momentum = hyp["bn_momentum"]
+        self.act = make_activation(hyp)
         self.whiten = nn.Conv2d(3, 24, kernel_size=2, padding=0, bias=True)
         self.whiten.weight.requires_grad = False
         self.layers = nn.Sequential(
-            nn.GELU(approximate=hyp["gelu_approximate"]),
-            ConvGroup(
-                24, w1, depths[0], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][0]
-            ),
-            ConvGroup(
-                w1, w2, depths[1], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][1]
-            ),
-            ConvGroup(
-                w2, w3, depths[2], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][2]
-            ),
-            nn.AdaptiveMaxPool2d(1),
+            ConvGroup(24, w1, depths[0], bn_momentum, self.act, hyp["pool_first"][0]),
+            ConvGroup(w1, w2, depths[1], bn_momentum, self.act, hyp["pool_first"][1]),
+            ConvGroup(w2, w3, depths[2], bn_momentum, self.act, hyp["pool_first"][2]),
         )
         self.head = nn.Linear(w3, num_classes, bias=False)
         self.scaling_factor = hyp["scaling_factor"]
+        self.muon_head = hyp["optimizer"] == "muon"
 
     def reset(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d | nn.BatchNorm2d | nn.Linear):
                 m.reset_parameters()
         self.whiten.bias.data.zero_()
+        if self.muon_head:
+            self.head.weight.data /= self.head.weight.data.std()
 
     @torch.no_grad()
     def init_whiten(self, images, eps=5e-4):
@@ -149,8 +163,11 @@ class Net(nn.Module):
 
     def forward(self, x, whiten_bias_grad: bool = True):
         b = self.whiten.bias
-        x = F.conv2d(x, self.whiten.weight, b if whiten_bias_grad else b.detach())
-        x = self.layers(x).flatten(1)
+        x = self.act(F.conv2d(x, self.whiten.weight, b if whiten_bias_grad else b.detach()))
+        # Global max over the final map; AdaptiveMaxPool2d's backward uses slow atomics.
+        x = self.layers(x).flatten(2).amax(2)
+        if self.muon_head:
+            return self.head(x) / x.size(-1)
         return self.head(x) * self.scaling_factor
 
 
@@ -170,8 +187,79 @@ class Classifier(nn.Module):
 
 
 #############################################
+#                   Muon                    #
+#############################################
+
+
+def newton_schulz(G):
+    """Approximately orthogonalize a stack of matrices [B, D, K] with D <= K."""
+    a, b, c = (3.4576, -4.7391, 2.0843)
+    X = G.bfloat16() if G.is_cuda else G.float()
+    X = X / (X.norm(dim=(1, 2), keepdim=True) + 1e-5)
+    for _ in range(3):
+        A = X @ X.mT
+        B = b * A + c * (A @ A)
+        X = a * X + B @ X
+    return X
+
+
+class Muon(torch.optim.Optimizer):
+    """Nesterov momentum and orthogonalized updates for conv filters.
+
+    Filters with the same shape are stacked so each shape needs one batched
+    Newton-Schulz call. Filter norms are reset to sqrt(out_channels) every few
+    steps, with the interval growing over training as in hiverge/cifar10-speedrun.
+    """
+
+    def __init__(self, params, lr, momentum, weight_decay, total_steps, zeropower):
+        super().__init__(params, dict(lr=lr, momentum=momentum, weight_decay=weight_decay))
+        buckets = {}
+        for p in self.param_groups[0]["params"]:
+            buckets.setdefault(tuple(p.shape), []).append(p)
+        self.buckets = list(buckets.values())
+        self.buffers = [[torch.zeros_like(p) for p in ps] for ps in self.buckets]
+        self.total_steps = total_steps
+        self.zeropower = zeropower
+        self.steps = 0
+        self.last_norm = 0
+
+    @torch.no_grad()
+    def step(self):
+        group = self.param_groups[0]
+        lr, momentum = group["lr"], group["momentum"]
+        self.steps += 1
+        renorm = self.steps - self.last_norm >= 2 + int(15 * self.steps / self.total_steps)
+        if renorm:
+            self.last_norm = self.steps
+        for params, buffers in zip(self.buckets, self.buffers):
+            grads = [p.grad for p in params]
+            torch._foreach_mul_(buffers, momentum)
+            torch._foreach_add_(buffers, grads)
+            updates = torch._foreach_add(grads, buffers, alpha=momentum)
+            G = torch.stack(updates).flatten(2)
+            transposed = G.size(1) > G.size(2)
+            U = self.zeropower(G.mT if transposed else G)
+            U = (U.mT if transposed else U).reshape(len(params), *params[0].shape)
+            if renorm:
+                norms = torch._foreach_norm(params)
+                torch._foreach_mul_(
+                    params, [len(p) ** 0.5 / (n + 1e-7) for p, n in zip(params, norms)]
+                )
+            torch._foreach_add_(params, list(U.to(params[0].dtype).unbind(0)), alpha=-lr)
+            if group["weight_decay"]:
+                torch._foreach_mul_(params, 1 - lr * group["weight_decay"])
+
+
+#############################################
 #               Augmentation                #
 #############################################
+
+
+def color_jitter(images, brightness, contrast):
+    n = len(images)
+    shift = (torch.rand(n, 1, 1, 1, device=images.device, dtype=images.dtype) * 2 - 1) * brightness
+    scale = (torch.rand(n, 1, 1, 1, device=images.device, dtype=images.dtype) * 2 - 1) * contrast
+    return (images + shift) * (scale + 1)
 
 
 def batch_flip_lr(images):
@@ -258,6 +346,10 @@ def build(context: BuildContext):
         raise ValueError("autotune_backends must be ATEN, TRITON, or ATEN,TRITON")
     if len(hyp["pool_first"]) != 3 or any(type(v) is not bool for v in hyp["pool_first"]):
         raise ValueError("pool_first must contain three booleans")
+    if hyp["activation"] not in ("gelu", "silu") or hyp["bn_dtype"] not in ("float", "half"):
+        raise ValueError("activation must be gelu or silu; bn_dtype must be float or half")
+    if hyp["optimizer"] not in ("sgd", "muon") or len(hyp["color_jitter"]) != 2:
+        raise ValueError("optimizer must be sgd or muon; color_jitter needs two ranges")
     device = context.device
     cuda = device.type == "cuda"
     dtype = torch.float16 if cuda else torch.float32
@@ -272,10 +364,14 @@ def build(context: BuildContext):
     inductor_config.max_autotune_gemm_backends = hyp["autotune_backends"]
 
     net = Net(hyp, context.num_classes).to(device, dtype, memory_format=torch.channels_last)
-    for m in net.modules():
-        if isinstance(m, nn.BatchNorm2d):
-            m.float()
-    train_net = torch.compile(net, mode=hyp["compile"]) if cuda and hyp["compile"] else net
+    if hyp["bn_dtype"] == "float":
+        for m in net.modules():
+            if isinstance(m, nn.BatchNorm2d):
+                m.float()
+    compiled = cuda and hyp["compile"]
+    train_net = (
+        torch.compile(net, mode=hyp["compile"]) if compiled and not hyp["compile_step"] else net
+    )
 
     def loss_fn(outputs, labels):
         return F.cross_entropy(
@@ -283,6 +379,12 @@ def build(context: BuildContext):
         )
 
     loss_fn = torch.compile(loss_fn) if cuda and hyp["compile_loss"] else loss_fn
+
+    def forward_loss(inputs, labels, whiten_bias_grad: bool):
+        return loss_fn(train_net(inputs, whiten_bias_grad), labels)
+
+    if compiled and hyp["compile_step"]:
+        forward_loss = torch.compile(forward_loss, mode=hyp["compile"])
     float_state = [t for t in net.state_dict().values() if t.is_floating_point()]
     state = SimpleNamespace(
         hyp=hyp,
@@ -291,6 +393,8 @@ def build(context: BuildContext):
         net=net,
         train_net=train_net,
         loss_fn=loss_fn,
+        forward_loss=forward_loss,
+        zeropower=torch.compile(newton_schulz, dynamic=False) if compiled else newton_schulz,
         classifier=Classifier(net, dtype).to(device),
         float_state=float_state,
         ema=[t.clone() for t in float_state],
@@ -383,15 +487,18 @@ def prepare(state, data: TrainingData, seed: int) -> None:
     lr = hyp["lr"] / kilostep_scale
     wd = hyp["weight_decay"] * batch_size / kilostep_scale
     lr_biases = lr * hyp["bias_scaler"]
-    state.optimizer = _make_optimizer(net, lr, lr_biases, wd * hyp["hard_fraction"], hyp, device)
-    if state.proxy is not None:
-        state.proxy_optimizer = _make_optimizer(state.proxy, lr, lr_biases, wd, hyp, device)
-
     state.batch_size = batch_size
     state.masks = []
     state.steps_per_epoch = len(data.labels) // batch_size
     state.total_steps = math.ceil(hyp["epochs"] * state.steps_per_epoch)
     state.whiten_bias_steps = math.ceil(hyp["whiten_bias_epochs"] * state.steps_per_epoch)
+    if hyp["optimizer"] == "muon":
+        state.optimizers = _make_muon(net, batch_size, state.total_steps, hyp, state)
+    else:
+        sgd_wd = wd * hyp["hard_fraction"]
+        state.optimizers = [_make_optimizer(net, lr, lr_biases, sgd_wd, hyp, device)]
+    if state.proxy is not None:
+        state.proxy_optimizer = _make_optimizer(state.proxy, lr, lr_biases, wd, hyp, device)
 
 
 def _make_optimizer(net, lr, lr_biases, wd, hyp, device):
@@ -411,6 +518,28 @@ def _make_optimizer(net, lr, lr_biases, wd, hyp, device):
     return optimizer
 
 
+def _make_muon(net, batch_size, total_steps, hyp, state):
+    wd = hyp["muon_wd"] * batch_size
+    bias_lr, head_lr = hyp["bias_lr"], hyp["head_lr"]
+    norm_biases = [p for name, p in net.named_parameters() if "norm" in name and p.requires_grad]
+    filters = [p for p in net.parameters() if p.ndim == 4 and p.requires_grad]
+    sgd = torch.optim.SGD(
+        [
+            dict(params=[net.whiten.bias], lr=bias_lr, weight_decay=wd / bias_lr, whiten=True),
+            dict(params=norm_biases, lr=bias_lr, weight_decay=wd / bias_lr),
+            dict(params=[net.head.weight], lr=head_lr, weight_decay=wd / head_lr),
+        ],
+        momentum=hyp["momentum"],
+        nesterov=True,
+        fused=hyp["fused_sgd"] and state.device.type == "cuda",
+    )
+    muon = Muon(filters, hyp["muon_lr"], hyp["muon_momentum"], wd, total_steps, state.zeropower)
+    for optimizer in (sgd, muon):
+        for group in optimizer.param_groups:
+            group["initial_lr"] = group["lr"]
+    return [sgd, muon]
+
+
 def train(state) -> nn.Module:
     if state.proxy is not None and state.hyp["proxy_mode"] == "offline":
         # Replay the same augmentation/order stream for the main net. Only masks
@@ -426,7 +555,7 @@ def train(state) -> nn.Module:
 
 
 def _fit(state, total_steps, proxy_only=False):
-    hyp, net, optimizer = state.hyp, state.net, state.optimizer
+    hyp, net, optimizers = state.hyp, state.net, state.optimizers
     labels, batch_size, steps_per_epoch = state.labels, state.batch_size, state.steps_per_epoch
     warmup_steps = int(total_steps * hyp["warmup"])
     ema_decay = (0.95**5 * (torch.arange(total_steps + 1) / total_steps) ** 3).tolist()
@@ -457,6 +586,8 @@ def _fit(state, total_steps, proxy_only=False):
                     images = images.flip(-1)
                 if hyp["cutout"]:
                     images = batch_cutout(images, hyp["cutout"])
+                if any(hyp["color_jitter"]):
+                    images = color_jitter(images, *hyp["color_jitter"])
                 current_resolution = resolution
             idx = order[i * batch_size : (i + 1) * batch_size]
             inputs, targets = images[idx], labels[idx]
@@ -494,9 +625,9 @@ def _fit(state, total_steps, proxy_only=False):
                     state.masks.append(chosen)
                     step += 1
                     continue
-            outputs = state.train_net(inputs, step < state.whiten_bias_steps)
-            loss = state.loss_fn(outputs, targets)
-            optimizer.zero_grad(set_to_none=True)
+            loss = state.forward_loss(inputs, targets, step < state.whiten_bias_steps)
+            for optimizer in optimizers:
+                optimizer.zero_grad(set_to_none=True)
             loss.backward()
             if step < warmup_steps:
                 frac = step / warmup_steps
@@ -504,9 +635,13 @@ def _fit(state, total_steps, proxy_only=False):
             else:
                 frac = (step - warmup_steps) / max(1, total_steps - warmup_steps)
                 scale = (1 - frac) + hyp["final_lr"] * frac
-            for group in optimizer.param_groups:
-                group["lr"] = group["initial_lr"] * scale
-            optimizer.step()
+            whiten_scale = max(0.0, 1 - step / max(1, state.whiten_bias_steps))
+            for optimizer in optimizers:
+                for group in optimizer.param_groups:
+                    group["lr"] = group["initial_lr"] * (
+                        whiten_scale if "whiten" in group else scale
+                    )
+                optimizer.step()
             step += 1
             if hyp["ema_every"] and step % hyp["ema_every"] == 0:
                 _lookahead(state, ema_decay[step])
