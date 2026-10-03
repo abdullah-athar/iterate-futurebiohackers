@@ -59,6 +59,7 @@ DEFAULTS = {
     "activation": "gelu",  # or "silu"
     "bn_dtype": "float",  # or "half"
     "color_jitter": [0.0, 0.0],  # per-image brightness and contrast ranges
+    "inner_kernels": [3, 3, 3],  # kernel size of conv2/conv3 in each group (1 or 3)
     "global_pool": "adaptive",  # "adaptive", "amax", or "max" over the final feature map
     # "muon" follows hiverge/cifar10-speedrun: Muon on conv filters, SGD on biases and head.
     "optimizer": "sgd",
@@ -95,8 +96,10 @@ class BatchNorm(nn.BatchNorm2d):
 
 
 class Conv(nn.Conv2d):
-    def __init__(self, channels_in, channels_out):
-        super().__init__(channels_in, channels_out, kernel_size=3, padding="same", bias=False)
+    def __init__(self, channels_in, channels_out, kernel_size=3):
+        super().__init__(
+            channels_in, channels_out, kernel_size=kernel_size, padding="same", bias=False
+        )
 
     def reset_parameters(self):
         super().reset_parameters()
@@ -105,15 +108,15 @@ class Conv(nn.Conv2d):
 
 
 class ConvGroup(nn.Module):
-    def __init__(self, channels_in, channels_out, depth, bn_momentum, act, pool_first):
+    def __init__(self, channels_in, channels_out, depth, bn_momentum, act, pool_first, kernel=3):
         super().__init__()
         self.conv1 = Conv(channels_in, channels_out)
         self.pool = nn.MaxPool2d(2)
         self.pool_first = pool_first
         self.norm1 = BatchNorm(channels_out, bn_momentum)
-        self.conv2 = Conv(channels_out, channels_out)
+        self.conv2 = Conv(channels_out, channels_out, kernel)
         self.norm2 = BatchNorm(channels_out, bn_momentum)
-        self.conv3 = Conv(channels_out, channels_out) if depth == 3 else None
+        self.conv3 = Conv(channels_out, channels_out, kernel) if depth == 3 else None
         self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
         self.act = act
 
@@ -137,9 +140,17 @@ class Net(nn.Module):
         self.whiten = nn.Conv2d(3, 24, kernel_size=2, padding=0, bias=True)
         self.whiten.weight.requires_grad = False
         self.layers = nn.Sequential(
-            ConvGroup(24, w1, depths[0], bn_momentum, self.act, hyp["pool_first"][0]),
-            ConvGroup(w1, w2, depths[1], bn_momentum, self.act, hyp["pool_first"][1]),
-            ConvGroup(w2, w3, depths[2], bn_momentum, self.act, hyp["pool_first"][2]),
+            *(
+                ConvGroup(c_in, c_out, depth, bn_momentum, self.act, pool_first, kernel)
+                for c_in, c_out, depth, pool_first, kernel in zip(
+                    (24, w1, w2),
+                    (w1, w2, w3),
+                    depths,
+                    hyp["pool_first"],
+                    hyp["inner_kernels"],
+                    strict=True,
+                )
+            )
         )
         self.head = nn.Linear(w3, num_classes, bias=False)
         self.scaling_factor = hyp["scaling_factor"]
@@ -362,6 +373,8 @@ def build(context: BuildContext):
         hyp["resolution_schedule"] = [[hyp["train_resolution"], hyp["resolution_switch"]]]
     if any(r not in (16, 20, 24, 28) or not 0 <= f <= 1 for r, f in hyp["resolution_schedule"]):
         raise ValueError("resolution_schedule entries must be [16|20|24|28, fraction]")
+    if len(hyp["inner_kernels"]) != 3 or any(k not in (1, 3) for k in hyp["inner_kernels"]):
+        raise ValueError("inner_kernels must contain three values of 1 or 3")
     if hyp["global_pool"] not in ("adaptive", "amax", "max"):
         raise ValueError("global_pool must be adaptive, amax, or max")
     if hyp["optimizer"] not in ("sgd", "muon") or len(hyp["color_jitter"]) != 2:
