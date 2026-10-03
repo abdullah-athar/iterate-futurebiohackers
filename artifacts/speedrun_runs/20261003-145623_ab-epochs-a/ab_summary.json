@@ -1,0 +1,134 @@
+{
+  "tag": "ab-epochs-a",
+  "environment": {
+    "task_id": "ta-01M410E0ABWQ217CHZTSX0CA8R",
+    "hostname": "modal",
+    "region": "us-west",
+    "cloud": "CLOUD_PROVIDER_AZURE",
+    "gpu_name": "NVIDIA A100 80GB PCIe",
+    "gpu_memory": "81920 MiB",
+    "gpu_power_limit": "300.00 W",
+    "driver": "580.95.05",
+    "mig": "Disabled",
+    "versions": "python 3.12.10 torch 2.4.0+cu124 torchvision 0.19.0+cu124 cuda_runtime 12.4 cudnn 90100 cuda_available True\ncuda_devices ['NVIDIA A100 80GB PCIe']",
+    "cpu_count": 20,
+    "cpu_affinity": 20
+  },
+  "pcie_attempts": [
+    "NVIDIA A100 80GB PCIe [task ta-01M410E0ABWQ217CHZTSX0CA8R]"
+  ],
+  "container_seconds": 402.3,
+  "rows": [
+    {
+      "label": "control",
+      "params": "{\"use_compile\": true}",
+      "config": "futurebiohackers {\"use_compile\": true}",
+      "returncode": 0,
+      "folder": "artifacts/speedrun_runs/20261003-145623_ab-epochs-a/00_control",
+      "gpu": "NVIDIA A100 80GB PCIe",
+      "power_limit": "300.00 W",
+      "container_wall": 139.4,
+      "deadline_hit": false,
+      "complete": true,
+      "qualified": true,
+      "run_error": null,
+      "n": 2,
+      "trials_ok": 2,
+      "mean_acc": 0.7533,
+      "acc_std": 0.0015556349186103902,
+      "mean_time": 40.770328453000005,
+      "time_std": 0.15974288891766233,
+      "mean_eval": 0.1924242024999998,
+      "build_time": 46.055091192999996,
+      "mean_prepare": 0.08197691750000047,
+      "mean_train": 40.688351535500004,
+      "accs": [
+        0.7522,
+        0.7544
+      ],
+      "times": [
+        40.657373172999996,
+        40.88328373300001
+      ],
+      "evals": [
+        0.21713041799999644,
+        0.16771798700000318
+      ],
+      "verdict": "QUALIFIED (>= 75%)"
+    },
+    {
+      "label": "e36",
+      "params": "{\"epochs\": 36, \"use_compile\": true}",
+      "config": "futurebiohackers {\"epochs\": 36, \"use_compile\": true}",
+      "returncode": 0,
+      "folder": "artifacts/speedrun_runs/20261003-145623_ab-epochs-a/01_e36",
+      "gpu": "NVIDIA A100 80GB PCIe",
+      "power_limit": "300.00 W",
+      "container_wall": 130.3,
+      "deadline_hit": false,
+      "complete": true,
+      "qualified": true,
+      "run_error": null,
+      "n": 2,
+      "trials_ok": 2,
+      "mean_acc": 0.7539499999999999,
+      "acc_std": 0.0036062445840513878,
+      "mean_time": 37.547643256000015,
+      "time_std": 0.6783014189103623,
+      "mean_eval": 0.1866268554999948,
+      "build_time": 42.47935374399998,
+      "mean_prepare": 0.08667160500000648,
+      "mean_train": 37.46097165100001,
+      "accs": [
+        0.7565,
+        0.7514
+      ],
+      "times": [
+        38.02727478899999,
+        37.06801172300004
+      ],
+      "evals": [
+        0.20798045199998683,
+        0.16527325900000278
+      ],
+      "verdict": "QUALIFIED (>= 75%)"
+    },
+    {
+      "label": "e32",
+      "params": "{\"epochs\": 32, \"use_compile\": true}",
+      "config": "futurebiohackers {\"epochs\": 32, \"use_compile\": true}",
+      "returncode": 0,
+      "folder": "artifacts/speedrun_runs/20261003-145623_ab-epochs-a/02_e32",
+      "gpu": "NVIDIA A100 80GB PCIe",
+      "power_limit": "300.00 W",
+      "container_wall": 120.5,
+      "deadline_hit": false,
+      "complete": true,
+      "qualified": true,
+      "run_error": null,
+      "n": 2,
+      "trials_ok": 2,
+      "mean_acc": 0.7525999999999999,
+      "acc_std": 0.0015556349186104687,
+      "mean_time": 33.001539334,
+      "time_std": 0.07814518043132394,
+      "mean_eval": 0.19181407050001553,
+      "build_time": 42.50646864600003,
+      "mean_prepare": 0.08361360000000673,
+      "mean_train": 32.917925733999994,
+      "accs": [
+        0.7515,
+        0.7537
+      ],
+      "times": [
+        32.946282346999965,
+        33.056796321000036
+      ],
+      "evals": [
+        0.21184475400002611,
+        0.17178338700000495
+      ],
+      "verdict": "QUALIFIED (>= 75%)"
+    }
+  ]
+}
