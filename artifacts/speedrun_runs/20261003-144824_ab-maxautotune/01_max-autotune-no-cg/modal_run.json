@@ -1,0 +1,18 @@
+{
+  "returncode": 0,
+  "result_dir": "/__modal/volumes/vo-DeZzWP1Pou6XGy9Ow6ytCp/futurebiohackers/20261003T134455Z-477260e4",
+  "command": "/opt/venv/bin/python -m benchmark.run --n 2 --device cuda --data-root /data --results-root /results --params '{\"compile_mode\": \"max-autotune-no-cudagraphs\", \"use_compile\": true}' --submission futurebiohackers --build-timeout 300.0",
+  "wall_seconds": 211.1,
+  "deadline_hit": false,
+  "spec": {
+    "label": "max-autotune-no-cg",
+    "n": 2,
+    "submission": "futurebiohackers",
+    "submission_path": "",
+    "params": "{\"compile_mode\": \"max-autotune-no-cudagraphs\", \"use_compile\": true}",
+    "no_accuracy_target": false,
+    "seed": null,
+    "build_timeout": 300.0,
+    "torch_logs": "recompiles"
+  }
+}
