@@ -302,3 +302,4 @@
 {"time": "2026-10-04T00:04:37", "label": "profile-g3-512-compiled", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 287.2, "gpu_minutes": 5.04, "note": ""}
 {"time": "2026-10-04T00:08:34", "label": "r25/sys-tune-b", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 424.8, "gpu_minutes": 7.33, "note": ""}
 {"time": "2026-10-04T00:11:42", "label": "profile-g3-512-names", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 292.0, "gpu_minutes": 5.12, "note": ""}
+{"time": "2026-10-04T00:16:52", "label": "r25/sys-tune-a", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 925.2, "gpu_minutes": 15.67, "note": ""}

@@ -1,0 +1,32 @@
+{
+  "returncode": 0,
+  "wall_seconds": 151.6,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T230147Z-d2c37ced",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"autotune_backends\": \"ATEN\", \"count_nonfinite\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "aten-only",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"autotune_backends\": \"ATEN\", \"count_nonfinite\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"autotune_backends\": \"ATEN\", \"count_nonfinite\": true}",
+    "delta": {
+      "autotune_backends": "ATEN"
+    },
+    "hypothesis": "systems: autotune only ATen/cuDNN candidates (no Triton GEMM/conv templates): faster cold build; time and accuracy must match (an earlier -0.23 pp read on another operating point needs a re-check)",
+    "env": {},
+    "config": "futurebiohackers {\"autotune_backends\": \"ATEN\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

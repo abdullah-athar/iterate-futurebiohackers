@@ -1,0 +1,34 @@
+{
+  "returncode": 0,
+  "wall_seconds": 151.7,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T231355Z-1f1b0400",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"inductor_tuning\": [\"aggressive_fusion\"]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "aggfusion",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"inductor_tuning\": [\"aggressive_fusion\"]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"inductor_tuning\": [\"aggressive_fusion\"]}",
+    "delta": {
+      "inductor_tuning": [
+        "aggressive_fusion"
+      ]
+    },
+    "hypothesis": "systems: Inductor aggressive_fusion alone",
+    "env": {},
+    "config": "futurebiohackers {\"inductor_tuning\": [\"aggressive_fusion\"]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

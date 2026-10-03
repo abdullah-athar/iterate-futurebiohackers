@@ -1,0 +1,34 @@
+{
+  "returncode": 0,
+  "wall_seconds": 450.2,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T230148Z-2c09d213",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"inductor_tuning\": [\"coordinate_descent_tuning\"]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "cdt",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"inductor_tuning\": [\"coordinate_descent_tuning\"]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"inductor_tuning\": [\"coordinate_descent_tuning\"]}",
+    "delta": {
+      "inductor_tuning": [
+        "coordinate_descent_tuning"
+      ]
+    },
+    "hypothesis": "systems: Inductor coordinate-descent autotuning of every kernel (accuracy must be unchanged); README measured 0.5% within noise on main; adds compile time (4-CPU build to check if it wins)",
+    "env": {},
+    "config": "futurebiohackers {\"inductor_tuning\": [\"coordinate_descent_tuning\"]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

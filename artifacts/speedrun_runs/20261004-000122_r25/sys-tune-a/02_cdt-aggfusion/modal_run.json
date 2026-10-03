@@ -1,0 +1,35 @@
+{
+  "returncode": 0,
+  "wall_seconds": 196.5,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T231037Z-e3d9bc76",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"inductor_tuning\": [\"coordinate_descent_tuning\", \"aggressive_fusion\"]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "cdt-aggfusion",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"inductor_tuning\": [\"coordinate_descent_tuning\", \"aggressive_fusion\"]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"inductor_tuning\": [\"coordinate_descent_tuning\", \"aggressive_fusion\"]}",
+    "delta": {
+      "inductor_tuning": [
+        "coordinate_descent_tuning",
+        "aggressive_fusion"
+      ]
+    },
+    "hypothesis": "systems: coordinate-descent tuning plus aggressive fusion",
+    "env": {},
+    "config": "futurebiohackers {\"inductor_tuning\": [\"coordinate_descent_tuning\", \"aggressive_fusion\"]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
