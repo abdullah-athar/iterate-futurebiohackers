@@ -1,0 +1,88 @@
+{
+  "round": "r28",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "w128-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "w128-d233-e8.25",
+          "params": {
+            "widths": [
+              128,
+              256,
+              768
+            ],
+            "depths": [
+              2,
+              3,
+              3
+            ],
+            "epochs": 8.25
+          },
+          "hypothesis": "Devin's wider-shallower group 1 (128 channels, two convs) on our record (512 pair in group 3), 8.25 epochs"
+        },
+        {
+          "label": "w128-d233-e9.0",
+          "params": {
+            "widths": [
+              128,
+              256,
+              768
+            ],
+            "depths": [
+              2,
+              3,
+              3
+            ],
+            "epochs": 9.0
+          },
+          "hypothesis": "Devin's wider-shallower group 1 (128 channels, two convs) on our record (512 pair in group 3), 9.0 epochs"
+        }
+      ]
+    },
+    {
+      "name": "w128-b",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "w128-d233-e9.5",
+          "params": {
+            "widths": [
+              128,
+              256,
+              768
+            ],
+            "depths": [
+              2,
+              3,
+              3
+            ],
+            "epochs": 9.5
+          },
+          "hypothesis": "Devin's wider-shallower group 1 (128 channels, two convs) on our record (512 pair in group 3), 9.5 epochs"
+        },
+        {
+          "label": "w128-d233-e10.0",
+          "params": {
+            "widths": [
+              128,
+              256,
+              768
+            ],
+            "depths": [
+              2,
+              3,
+              3
+            ],
+            "epochs": 10.0
+          },
+          "hypothesis": "Devin's wider-shallower group 1 (128 channels, two convs) on our record (512 pair in group 3), 10.0 epochs"
+        }
+      ]
+    }
+  ]
+}
