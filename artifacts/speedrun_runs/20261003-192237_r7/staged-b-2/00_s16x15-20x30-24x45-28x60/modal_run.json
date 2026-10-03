@@ -1,0 +1,49 @@
+{
+  "returncode": 1,
+  "wall_seconds": 226.1,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T182416Z-93cc2f0b",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"res_schedule\": [[16, 0.15], [20, 0.3], [24, 0.45], [28, 0.6]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "s16x15-20x30-24x45-28x60",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"res_schedule\": [[16, 0.15], [20, 0.3], [24, 0.45], [28, 0.6]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"res_schedule\": [[16, 0.15], [20, 0.3], [24, 0.45], [28, 0.6]]}",
+    "delta": {
+      "res_schedule": [
+        [
+          16,
+          0.15
+        ],
+        [
+          20,
+          0.3
+        ],
+        [
+          24,
+          0.45
+        ],
+        [
+          28,
+          0.6
+        ]
+      ]
+    },
+    "hypothesis": "four-stage ramp from 16 px (exploratory; the cold build may exceed 300 s with five graphs)",
+    "env": {},
+    "config": "futurebiohackers {\"res_schedule\": [[16, 0.15], [20, 0.3], [24, 0.45], [28, 0.6]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

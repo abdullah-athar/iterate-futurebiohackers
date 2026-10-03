@@ -1,0 +1,42 @@
+{
+  "returncode": 0,
+  "wall_seconds": 126.6,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T182405Z-8e6b212e",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 9.25, \"res_schedule\": [[20, 0.25], [28, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "s20x25-28x50-e9.25",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 9.25, \"res_schedule\": [[20, 0.25], [28, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 9.25, \"res_schedule\": [[20, 0.25], [28, 0.5]]}",
+    "delta": {
+      "res_schedule": [
+        [
+          20,
+          0.25
+        ],
+        [
+          28,
+          0.5
+        ]
+      ],
+      "epochs": 9.25
+    },
+    "hypothesis": "two-stage 20/28 ramp with half an epoch bought back",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 9.25, \"res_schedule\": [[20, 0.25], [28, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

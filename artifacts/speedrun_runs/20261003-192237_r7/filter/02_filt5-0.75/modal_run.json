@@ -1,0 +1,33 @@
+{
+  "returncode": 1,
+  "wall_seconds": 74.8,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T182532Z-c1855c57",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"filter_keep\": 0.75, \"filter_start\": 5}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "filt5-0.75",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"filter_keep\": 0.75, \"filter_start\": 5}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"filter_keep\": 0.75, \"filter_start\": 5}",
+    "delta": {
+      "filter_start": 5,
+      "filter_keep": 0.75
+    },
+    "hypothesis": "filter from epoch 5",
+    "env": {},
+    "config": "futurebiohackers {\"filter_keep\": 0.75, \"filter_start\": 5}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

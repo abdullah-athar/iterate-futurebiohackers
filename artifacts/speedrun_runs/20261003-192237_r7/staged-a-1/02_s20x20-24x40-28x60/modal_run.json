@@ -1,0 +1,45 @@
+{
+  "returncode": 1,
+  "wall_seconds": 116.2,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T182731Z-9e296278",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"res_schedule\": [[20, 0.2], [24, 0.4], [28, 0.6]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "s20x20-24x40-28x60",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"res_schedule\": [[20, 0.2], [24, 0.4], [28, 0.6]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"res_schedule\": [[20, 0.2], [24, 0.4], [28, 0.6]]}",
+    "delta": {
+      "res_schedule": [
+        [
+          20,
+          0.2
+        ],
+        [
+          24,
+          0.4
+        ],
+        [
+          28,
+          0.6
+        ]
+      ]
+    },
+    "hypothesis": "three-stage ramp 20->24->28->32 over 60% of the steps",
+    "env": {},
+    "config": "futurebiohackers {\"res_schedule\": [[20, 0.2], [24, 0.4], [28, 0.6]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

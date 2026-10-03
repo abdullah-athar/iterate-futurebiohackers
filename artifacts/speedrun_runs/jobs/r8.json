@@ -1,0 +1,53 @@
+{
+  "round": "r8",
+  "n": 8,
+  "seed": 0,
+  "control": {"widths": [64, 256, 768]},
+  "jobs": [
+    {
+      "name": "knobs-a",
+      "control_index": 1,
+      "variants": [
+        {"label": "bias16", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0}, "hypothesis": "on the 64-channel base: BatchNorm bias lr 16x (32x gave +0.32 pp over 64x on the old net)"},
+        {"label": "ls0.2", "params": {"widths": [64, 256, 768], "label_smoothing": 0.2}, "hypothesis": "label smoothing 0.2 (0.25 beat 0.3)"},
+        {"label": "lr12", "params": {"widths": [64, 256, 768], "lr": 12.0}, "hypothesis": "lr 12.0 (10.8 beat 9.0)"}
+      ]
+    },
+    {
+      "name": "knobs-b",
+      "control_index": 1,
+      "variants": [
+        {"label": "wd0.0168", "params": {"widths": [64, 256, 768], "weight_decay": 0.0168}, "hypothesis": "weight decay x1.4 (neutral on the old net, untested here)"},
+        {"label": "warmup0.3", "params": {"widths": [64, 256, 768], "warmup": 0.3}, "hypothesis": "longer warmup"},
+        {"label": "final0.15", "params": {"widths": [64, 256, 768], "final_lr": 0.15}, "hypothesis": "less final decay"}
+      ]
+    },
+    {
+      "name": "knobs-c",
+      "control_index": 1,
+      "variants": [
+        {"label": "bn0.8", "params": {"widths": [64, 256, 768], "bn_momentum": 0.8}, "hypothesis": "faster BatchNorm statistics (0.7 beat 0.6)"},
+        {"label": "scale1.4", "params": {"widths": [64, 256, 768], "scaling_factor": 0.15555555555555556}, "hypothesis": "logit scale 1.4/9"},
+        {"label": "jitter0.2", "params": {"widths": [64, 256, 768], "jitter": 0.2}, "hypothesis": "weaker photometric jitter (0.45 was worse than 0.3)"}
+      ]
+    },
+    {
+      "name": "knobs-d",
+      "control_index": 1,
+      "variants": [
+        {"label": "mom0.9", "params": {"widths": [64, 256, 768], "momentum": 0.9}, "hypothesis": "momentum 0.9 (lr decoupled)"},
+        {"label": "ema4", "params": {"widths": [64, 256, 768], "ema_every": 4}, "hypothesis": "lookahead every 4 steps"},
+        {"label": "e9.25", "params": {"widths": [64, 256, 768], "epochs": 9.25}, "hypothesis": "k on the 64-channel base: 0.5 epoch more"}
+      ]
+    },
+    {
+      "name": "speed",
+      "control_index": 1,
+      "variants": [
+        {"label": "compile-loss-fused", "params": {"widths": [64, 256, 768], "compile_loss": true, "fused_sgd": true}, "hypothesis": "PR #5's speed switches together: compiled loss and fused SGD (speed only)"},
+        {"label": "gelu-tanh", "params": {"widths": [64, 256, 768], "gelu_approximate": "tanh"}, "hypothesis": "tanh GELU approximation (speed only; memory-bound kernels so likely nil)"},
+        {"label": "triton-crop", "params": {"widths": [64, 256, 768], "crop_mode": "triton"}, "hypothesis": "Triton crop on the 64-channel base (-0.04 s, +0.07 pp on the promoted base)"}
+      ]
+    }
+  ]
+}
