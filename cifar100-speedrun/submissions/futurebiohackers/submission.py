@@ -517,7 +517,7 @@ def build(context: BuildContext):
         raise ValueError("resolution_schedule entries must be [16|20|24|28, fraction]")
     if len(hyp["inner_kernels"]) != 3 or any(k not in (1, 3) for k in hyp["inner_kernels"]):
         raise ValueError("inner_kernels must contain three values of 1 or 3")
-    if hyp["g3_pair"] not in G3_PAIRS:
+    if not isinstance(hyp["g3_pair"], str) or hyp["g3_pair"] not in G3_PAIRS:
         raise ValueError(f"g3_pair must be one of {sorted(G3_PAIRS)}")
     if hyp["g3_pair"] != "full" and (depths[2] != 3 or hyp["inner_kernels"][2] != 3):
         raise ValueError("g3_pair variants need group 3 at depth 3 with 3x3 inner kernels")
@@ -644,7 +644,7 @@ def build(context: BuildContext):
         nonfinite=None,
     )
     if hyp["hard_fraction"] < 1:
-        proxy_hyp = {**hyp, "widths": hyp["proxy_widths"], "depths": [2, 2, 2]}
+        proxy_hyp = {**hyp, "widths": hyp["proxy_widths"], "depths": [2, 2, 2], "g3_pair": "full"}
         proxy = Net(proxy_hyp, context.num_classes).to(
             device, dtype, memory_format=torch.channels_last
         )
