@@ -36,13 +36,13 @@ AGENTS.md
   where the time goes. Launcher flags: `--tag T`, `--require-gpu sxm|pcie|any` (default
   sxm), `--require-power 400|500|any`, `--warm`, `--count-nonfinite`. Env: `MODAL_TIMEOUT_MIN`
   (default 20, hard cap per container), `MODAL_GPU_ATTEMPTS` (11), `MODAL_GPU_BUDGET_MIN`
-  (1263 = hard stop), `MODAL_JOB_LIMIT_MIN` (20: bigger jobs need `--allow-big`, ask first).
+  (3000 = hard stop), `MODAL_JOB_LIMIT_MIN` (20: bigger jobs need `--allow-big`, ask first).
   Windows: set `PYTHONUTF8=1` for every Modal command (`just modal` does).
 - GPU guard: judging is on an A100-SXM4-80GB, so every run requires that card (no fallback;
   wrong cards abort before build and are retried, each miss costs ~0.3 min and is logged).
   Modal's SXM cards come at 400 W and 500 W power limits (500 W is ~7% faster): the power
   limit is recorded with every result and comparisons are only valid within one container.
-  `GPU used: X/1263 min` is printed after every call from `artifacts/speedrun_runs/gpu_ledger.jsonl`.
+  `GPU used: X/3000 min` is printed after every call from `artifacts/speedrun_runs/gpu_ledger.jsonl`.
 - Scripts: `scripts/check_reset.py` (reset rules), `scripts/check_variants.py` (control path
   bit-identical to HEAD, every experimental switch runs), both via WSL on Windows.
 - Results: `cifar100-speedrun/results/<team>/<run_id>/` (for `just last`, gitignored) and

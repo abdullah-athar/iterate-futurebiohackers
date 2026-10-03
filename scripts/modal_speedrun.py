@@ -49,7 +49,7 @@ job's GPU time is estimated and jobs over MODAL_JOB_LIMIT_MIN (20) are refused u
 
 GPU budget: each container's wall time plus a start-up allowance is appended to
 artifacts/speedrun_runs/gpu_ledger.jsonl and "GPU used: X/1263 min" is printed after every
-call. MODAL_GPU_BUDGET_MIN (1263 = 63 + the 1200-minute cap) is a hard stop.
+call. MODAL_GPU_BUDGET_MIN (3000, the cap set on 3 Oct evening) is a hard stop.
 
 Set TEAM for another submission folder and MODAL_GPU for another GPU type (the guard is then
 off).
@@ -111,7 +111,7 @@ MIN_RUN_S = 90.0  # do not start a run with less container time left than this
 SCHEDULE_WAIT_S = 1800.0  # extra wait for Modal to find a container (parallel jobs may queue)
 CONTAINER_START_S = 15.0  # billed start-up allowance per container, not measurable inside it
 # Hard cap on the ledger total (raised to 2000 GPU-min on 3 Oct 2026, evening).
-GPU_BUDGET_MIN = float(os.environ.get("MODAL_GPU_BUDGET_MIN", "2000"))
+GPU_BUDGET_MIN = float(os.environ.get("MODAL_GPU_BUDGET_MIN", "3000"))
 GPU_CHECKPOINTS = [
     float(x) for x in os.environ.get("MODAL_GPU_CHECKPOINTS", "").split(",") if x.strip()
 ]
