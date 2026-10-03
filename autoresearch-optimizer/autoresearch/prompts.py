@@ -27,6 +27,20 @@ MODES: dict[str, str] = {
              "other's local search). The result must beat both on their respective instances.",
 }
 
+# Exploration-exploitation loop modes (autoresearch.exploration_exploitation); kept out of MODES so the bandit never allocates them.
+EXPLORATION_EXPLOITATION_MODES: dict[str, str] = {
+    "exploit": "Refine the parent WITHOUT changing what it fundamentally is: same type of algorithm, same "
+               "components, same move/neighbourhood classes. In scope: hyperparameters (rates, sizes, "
+               "thresholds, weights), how moves are sampled within the existing neighbourhood, operation order, "
+               "data structures, caching, incremental evaluation, early termination, efficiency (same search, "
+               "fewer evaluations). Out of scope: swapping the paradigm, adding a population to a single-incumbent "
+               "method, adding a new move class. Make small, targeted edits to candidate.py.",
+    "explore": "Write a solver whose strategy is clearly different from everything in the research landscape "
+               "below: a different core paradigm or a combination of components nobody has tried. Follow your "
+               "research direction. Reuse helpers from the parent if useful, but its core algorithm must change.",
+}
+
+
 @dataclass
 class Context:
     mode: str
@@ -78,7 +92,7 @@ def format_digest(entries: list[Entry], limit: int = 40) -> str:
 
 
 def build_user_prompt(problem_description: str, ctx: Context) -> str:
-    parts = [problem_description.strip(), "", f"## Mode: {ctx.mode}", MODES[ctx.mode], ""]
+    parts = [problem_description.strip(), "", f"## Mode: {ctx.mode}", {**MODES, **EXPLORATION_EXPLOITATION_MODES}[ctx.mode], ""]
     for e, src in zip(ctx.parents, ctx.parent_sources):
         parts += [f"## Parent #{e.id} ({e.status}, objective={e.objective:g}) — hypothesis: {e.hypothesis}",
                   "```python", src.strip(), "```", ""]

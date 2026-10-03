@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -29,15 +30,15 @@ TIER_SHARE = {6: 0.50, 3: 0.35, 1: 0.15}
 EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 # Fixes the centring vector and is offered to the describer as the starting vocabulary (0 uses).
-SEED_VOCAB = [
-    # paradigms
+SEED_PARADIGMS = [
     "simulated annealing", "tabu search", "genetic algorithm", "hill climbing", "iterated local search",
     "beam search", "branch and bound", "dynamic programming", "greedy construction", "random sampling",
     "variable neighbourhood search", "large neighbourhood search", "ant colony optimisation",
     "particle swarm optimisation", "memetic algorithm", "exhaustive enumeration", "integer linear programming",
     "consensus voting", "multiple sequence alignment", "centroid computation", "gradient descent",
     "monte carlo tree search", "constraint propagation", "expectation maximisation", "clustering",
-    # moves / representation / structure
+]
+SEED_STRUCTURE = [
     "substitution moves", "insertion moves", "deletion moves", "swap moves", "block moves",
     "best-improvement selection", "first-improvement selection", "full neighbourhood scan",
     "random neighbour sampling", "one-point crossover", "uniform crossover", "point mutation",
@@ -48,11 +49,13 @@ SEED_VOCAB = [
     "incremental distance update", "delta evaluation", "weighted objective", "set median initialisation",
     "random initialisation", "consensus initialisation", "length adjustment", "multi-start",
     "time-bounded search", "candidate pool", "surrogate scoring", "decomposition into subproblems",
-    # incidental detail
+]
+SEED_DETAIL = [
     "geometric cooling", "linear cooling", "fixed random seed", "tie-breaking rule", "memoisation",
     "early termination", "shuffled visiting order", "adaptive step size", "fixed iteration cap",
     "best-so-far tracking", "precomputed lookup table",
 ]
+SEED_VOCAB = SEED_PARADIGMS + SEED_STRUCTURE + SEED_DETAIL
 
 DESCRIBE_SCHEMA = {
     "type": "object",
@@ -64,8 +67,9 @@ DESCRIBE_SCHEMA = {
                       "required": ["term", "tier"]},
         },
         "new_terms": {"type": "array", "items": {"type": "string"}},
+        "summary": {"type": "string"},
     },
-    "required": ["terms", "new_terms"],
+    "required": ["terms", "new_terms", "summary"],
 }
 
 SYSTEM = "You classify optimisation algorithms with a short standardised vocabulary. Output only the requested JSON."
@@ -91,6 +95,7 @@ Vocabulary (term: uses so far), most used first:
 
 Reuse an existing vocabulary term wherever one fits, even if you would have worded it differently.
 Introduce a new term only when nothing existing captures the idea, and list every new term in new_terms.
+Also give a one-line summary (at most 25 words) of how the algorithm works, as compact pseudocode.
 
 Program:
 ```python
@@ -106,17 +111,20 @@ def _norm(term: str) -> str:
 class Descriptor:
     terms: list[tuple[str, int]]
     new_terms: list[str] = field(default_factory=list)
+    summary: str = ""
 
     @property
     def core(self) -> str:
         return next(t for t, tier in self.terms if tier == 6)
 
     def to_dict(self) -> dict:
-        return {"terms": [{"term": t, "tier": tier} for t, tier in self.terms], "new_terms": self.new_terms}
+        return {"terms": [{"term": t, "tier": tier} for t, tier in self.terms], "new_terms": self.new_terms,
+                "summary": self.summary}
 
     @classmethod
     def from_dict(cls, d: dict) -> Descriptor:
-        return cls([(_norm(x["term"]), int(x["tier"])) for x in d["terms"]], [_norm(t) for t in d.get("new_terms", [])])
+        return cls([(_norm(x["term"]), int(x["tier"])) for x in d["terms"]], [_norm(t) for t in d.get("new_terms", [])],
+                   " ".join(d.get("summary", "").split()))
 
     def __str__(self) -> str:
         return " / ".join(f"{t}[{tier}]" for t, tier in sorted(self.terms, key=lambda x: -x[1]))
@@ -165,6 +173,9 @@ def _validate(d: Descriptor) -> str | None:
     return None
 
 
+_CACHE_LOCK = threading.Lock()
+
+
 def describe(source: str, vocab: Vocabulary, problem: str, *, model: str = "sonnet",
              cache_path: Path | None = None, use_cache: bool = True, retries: int = 2) -> Descriptor:
     """One structured `claude -p` call per program, cached by normalised-source fingerprint."""
@@ -191,11 +202,11 @@ def describe(source: str, vocab: Vocabulary, problem: str, *, model: str = "sonn
     else:
         raise RuntimeError(f"describe failed: {error}")
     if cache_path:
-        # re-read so concurrent describers don't drop each other's entries
-        cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
-        cache[key] = d.to_dict()
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        cache_path.write_text(json.dumps(cache, indent=1))
+        with _CACHE_LOCK:  # re-read under the lock so concurrent describers don't drop each other's entries
+            cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+            cache[key] = d.to_dict()
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_path.write_text(json.dumps(cache, indent=1))
     return d
 
 

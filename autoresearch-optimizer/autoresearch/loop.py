@@ -234,11 +234,13 @@ class ResearchRun:
                            elapsed=time.perf_counter() - t0, prompt_tokens=prompt_tokens,
                            completion_tokens=completion_tokens)
 
-    def precheck(self, source: str, extra_prior: list[tuple[int, str]] = ()) -> tuple[list[str], NoveltyVerdict]:
+    def precheck(self, source: str, extra_prior: list[tuple[int, str]] = (),
+                 threshold: float | None = None) -> tuple[list[str], NoveltyVerdict]:
         """Import guard + novelty gate against every recorded candidate (and `extra_prior`)."""
         violations = check_imports(source, self.problem.allowed_imports)
         prior = [(e.id, self.store.read_candidate(e)) for e in self.entries() if e.source_path]
-        return violations, check_novelty(source, prior + list(extra_prior), self.config.novelty_threshold)
+        return violations, check_novelty(source, prior + list(extra_prior),
+                                         self.config.novelty_threshold if threshold is None else threshold)
 
     def record(self, source: str, hypothesis: str, mode: str, parent_ids: list[int], proposer: str,
                evals: dict[str, dict], pre: tuple[list[str], NoveltyVerdict], **fields) -> Entry:
@@ -257,7 +259,7 @@ class ResearchRun:
         elif novelty.is_duplicate:
             entry.status = STATUS_REJECTED_DUPLICATE
             entry.verdict = VERDICT_UNTESTED
-            entry.note = f"near-duplicate of #{novelty.nearest_id} (similarity {novelty.max_similarity:.3f}); not evaluated"
+            entry.note = entry.note or f"near-duplicate of #{novelty.nearest_id} (similarity {novelty.max_similarity:.3f}); not evaluated"
         else:
             entry.evals = evals
             self._apply_cascade(entry)

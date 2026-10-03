@@ -35,6 +35,7 @@ class Assignment:
     mode: str
     parent_ids: list[int]
     direction: str = ""
+    notes: str = ""  # extra STATUS.md section (exploration-exploitation loop: descriptor contract, research landscape)
 
 
 def allocate(run: ResearchRun, n: int, rng: random.Random) -> list[Assignment]:
@@ -93,7 +94,7 @@ PROMPT = "Read AGENT.md and STATUS.md in the current directory and follow them. 
 def write_workspace(run: ResearchRun, a: Assignment, gen: int, n: int, mix: str, turn_s: int, ws: Path,
                     eval_backend: str) -> None:
     ctx = run.context(mode=a.mode, parent_ids=a.parent_ids)
-    (ws / "STATUS.md").write_text(build_user_prompt(run.problem.describe(), ctx))
+    (ws / "STATUS.md").write_text(build_user_prompt(run.problem.describe(), ctx) + (f"\n\n{a.notes}" if a.notes else ""))
     (ws / "AGENT.md").write_text(AGENT_MD.format(worker=a.worker, gen=gen, mode=a.mode, n=n, mix=mix,
                                                  turn_s=turn_s, half=turn_s // 2,
                                                  direction=a.direction or "your choice"))
@@ -235,6 +236,9 @@ def format_event(r: dict) -> str:
     if k == "gen_end":
         return (f"gen {r['gen']} end: best #{r['best_id']}={r['best']:g}; {r['evaluated']} evaluated, {r['kept']} kept; "
                 f"{r['seconds']:.0f}s; cost so far ${r['cost_usd']:.2f}")
+    if k == "explore_exploit_select":
+        return (f"gen {r['gen']} exploit:explore {r['k']}:{r['l']} — K {r['k_kept']} kept, {r['drifted']} drifted to L; "
+                f"L pool {r['pool']} -> {r['selected']} selected (min dist {r['min_dists']}), {r['unfilled']} slot(s) unfilled")
     if k == "holdout":
         return f"holdout: seed {r['seed']:g} -> best #{r['best_id']} {r['best']:g} (baseline {r['baseline']:g})"
     if k == "run_end":
@@ -263,34 +267,53 @@ def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propo
         for r in (r for r in results if r["source"]):
             r["pre"] = run.precheck(r["source"], extra_prior=arrivals)
             arrivals.append((next_id + len(arrivals), r["source"]))
-        todo = [r for r in results if r["source"] and not r["pre"][0] and not r["pre"][1].is_duplicate]
-        emit("eval_start", gen=gen, n=len(todo), dup=sum(1 for r in results if r.get("pre") and r["pre"][1].is_duplicate),
+        emit("eval_start", gen=gen, n=len(passed(results)), dup=sum(1 for r in results if r.get("pre") and r["pre"][1].is_duplicate),
              guard=sum(1 for r in results if r.get("pre") and r["pre"][0]), empty=sum(1 for r in results if not r["source"]))
-        te = time.time()
-        for r, ev in zip(todo, evaluate_many([r["source"] for r in todo])):
-            r["evals"] = ev if isinstance(ev, dict) else {}
-            if not isinstance(ev, dict):
-                r["usage"]["eval_error"] = repr(ev)[:300]
-        eval_s = max(30.0, time.time() - te)
-        for r in (r for r in results if r["source"]):
-            a, u = r["assignment"], r["usage"]
-            e = run.record(r["source"], r["hypothesis"], a.mode, a.parent_ids, f"claude-code:{u.get('model', '?')}",
-                           r.get("evals", {}), r["pre"], generation=gen, usage=u, elapsed=u.get("seconds", 0.0),
-                           prompt_tokens=u.get("prompt_tokens", 0), completion_tokens=u.get("completion_tokens", 0))
-            emit("entry", gen=gen, id=e.id, worker=a.worker, mode=a.mode, status=e.status, verdict=e.verdict,
-                 objective=None if not e.scored else e.objective, new_best=e.improved_global)
-            proposals += 1
-        entries = run.entries()
-        best = run.archive(entries).global_best
-        gen_entries = [e for e in entries if e.generation == gen]
-        emit("gen_end", gen=gen, best_id=best.id, best=best.objective, seconds=round(time.time() - tg, 1),
-             evaluated=sum(1 for e in gen_entries if e.evals), kept=sum(1 for e in gen_entries if e.status == "kept"),
-             cost_usd=round(sum(e.usage.get("cost_usd", 0.0) or 0.0 for e in entries), 2))
+        eval_s, n = evaluate_and_record(run, gen, results, evaluate_many, emit)
+        proposals += n
+        emit_gen_end(run, gen, tg, emit)
         gen += 1
         generations += 1
     write_holdout(run, emit)
     best = run.archive().global_best
     emit("run_end", generations=generations, proposals=proposals, best_id=best.id, best=best.objective)
+
+
+def passed(results: list[dict]) -> list[dict]:
+    """Results with a source that passed the import guard and the novelty gate."""
+    return [r for r in results if r["source"] and not r["pre"][0] and not r["pre"][1].is_duplicate]
+
+
+def evaluate_and_record(run: ResearchRun, gen: int, results: list[dict], evaluate_many, emit) -> tuple[float, int]:
+    """Evaluate the results that passed the gates, then record every result with a source in list order.
+    Returns (evaluation wall-clock seconds, number recorded)."""
+    todo = passed(results)
+    te = time.time()
+    for r, ev in zip(todo, evaluate_many([r["source"] for r in todo]) if todo else []):
+        r["evals"] = ev if isinstance(ev, dict) else {}
+        if not isinstance(ev, dict):
+            r["usage"]["eval_error"] = repr(ev)[:300]
+    eval_s = max(30.0, time.time() - te)
+    n = 0
+    for r in (r for r in results if r["source"]):
+        a, u = r["assignment"], r["usage"]
+        e = run.record(r["source"], r["hypothesis"], a.mode, a.parent_ids, f"claude-code:{u.get('model', '?')}",
+                       r.get("evals", {}), r["pre"], generation=gen, usage=u, elapsed=u.get("seconds", 0.0),
+                       prompt_tokens=u.get("prompt_tokens", 0), completion_tokens=u.get("completion_tokens", 0),
+                       note=r.get("note", ""))
+        emit("entry", gen=gen, id=e.id, worker=a.worker, mode=a.mode, status=e.status, verdict=e.verdict,
+             objective=None if not e.scored else e.objective, new_best=e.improved_global)
+        n += 1
+    return eval_s, n
+
+
+def emit_gen_end(run: ResearchRun, gen: int, tg: float, emit, **extra) -> None:
+    entries = run.entries()
+    best = run.archive(entries).global_best
+    gen_entries = [e for e in entries if e.generation == gen]
+    emit("gen_end", gen=gen, best_id=best.id, best=best.objective, seconds=round(time.time() - tg, 1),
+         evaluated=sum(1 for e in gen_entries if e.evals), kept=sum(1 for e in gen_entries if e.status == "kept"),
+         cost_usd=round(sum(e.usage.get("cost_usd", 0.0) or 0.0 for e in entries), 2), **extra)
 
 
 def write_holdout(run: ResearchRun, emit) -> None:
