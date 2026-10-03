@@ -1,0 +1,43 @@
+{
+  "returncode": 0,
+  "wall_seconds": 108.3,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T210743Z-2ccce720",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"bn_recal_batches\": 2, \"count_nonfinite\": true, \"epochs\": 9.25, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "A-bnrecal2",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"bn_recal_batches\": 2, \"count_nonfinite\": true, \"epochs\": 9.25, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"bn_recal_batches\": 2, \"count_nonfinite\": true, \"epochs\": 9.25, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.25
+        ],
+        [
+          28,
+          0.5
+        ]
+      ],
+      "epochs": 9.25,
+      "bn_recal_batches": 2
+    },
+    "hypothesis": "BatchNorm recalibration after training: no-grad train-mode pass over 2048 center-cropped training images for the final lookahead weights (timed, inside train)",
+    "env": {},
+    "config": "futurebiohackers {\"bn_recal_batches\": 2, \"epochs\": 9.25, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
