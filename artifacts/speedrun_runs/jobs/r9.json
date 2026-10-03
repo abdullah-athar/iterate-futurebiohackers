@@ -1,0 +1,26 @@
+{
+  "round": "r9",
+  "n": 8,
+  "seed": 0,
+  "control": {"widths": [64, 256, 768]},
+  "jobs": [
+    {
+      "name": "stack-a",
+      "control_index": 1,
+      "variants": [
+        {"label": "S-e8.75", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0}, "hypothesis": "w64 base + bias 16 (+0.14) + lr 12 (+0.16): additivity at 8.75 epochs"},
+        {"label": "S-e9.0", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "epochs": 9.0}, "hypothesis": "same stack with a quarter epoch more (~5.0 s)"},
+        {"label": "S-e9.25", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "epochs": 9.25}, "hypothesis": "same stack with half an epoch more (~5.1 s, accuracy headroom)"}
+      ]
+    },
+    {
+      "name": "stack-b",
+      "control_index": 1,
+      "variants": [
+        {"label": "S-triton-e8.75", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "crop_mode": "triton"}, "hypothesis": "stack plus the Triton crop (speed only)"},
+        {"label": "S-triton-e9.0", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "crop_mode": "triton", "epochs": 9.0}, "hypothesis": "stack plus the Triton crop at 9.0 epochs"},
+        {"label": "S-fused-compiled-e9.0", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "compile_loss": true, "fused_sgd": true, "epochs": 9.0}, "hypothesis": "stack plus PR #5's compiled loss and fused SGD at 9.0 epochs (speed only)"}
+      ]
+    }
+  ]
+}

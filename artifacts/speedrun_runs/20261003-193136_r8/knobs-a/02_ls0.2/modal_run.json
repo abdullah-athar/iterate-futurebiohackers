@@ -1,0 +1,37 @@
+{
+  "returncode": 1,
+  "wall_seconds": 74.4,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T183528Z-0cd059d5",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"label_smoothing\": 0.2, \"widths\": [64, 256, 768]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "ls0.2",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"label_smoothing\": 0.2, \"widths\": [64, 256, 768]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"label_smoothing\": 0.2, \"widths\": [64, 256, 768]}",
+    "delta": {
+      "widths": [
+        64,
+        256,
+        768
+      ],
+      "label_smoothing": 0.2
+    },
+    "hypothesis": "label smoothing 0.2 (0.25 beat 0.3)",
+    "env": {},
+    "config": "futurebiohackers {\"label_smoothing\": 0.2, \"widths\": [64, 256, 768]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

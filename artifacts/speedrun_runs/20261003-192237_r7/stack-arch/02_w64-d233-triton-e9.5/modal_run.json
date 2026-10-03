@@ -1,0 +1,43 @@
+{
+  "returncode": 1,
+  "wall_seconds": 149.1,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T182808Z-76d33121",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"crop_mode\": \"triton\", \"depths\": [2, 3, 3], \"epochs\": 9.5, \"widths\": [64, 256, 768]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "w64-d233-triton-e9.5",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"crop_mode\": \"triton\", \"depths\": [2, 3, 3], \"epochs\": 9.5, \"widths\": [64, 256, 768]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"crop_mode\": \"triton\", \"depths\": [2, 3, 3], \"epochs\": 9.5, \"widths\": [64, 256, 768]}",
+    "delta": {
+      "widths": [
+        64,
+        256,
+        768
+      ],
+      "depths": [
+        2,
+        3,
+        3
+      ],
+      "crop_mode": "triton",
+      "epochs": 9.5
+    },
+    "hypothesis": "group-1 cuts plus the Triton crop, with 0.75 epoch bought back",
+    "env": {},
+    "config": "futurebiohackers {\"crop_mode\": \"triton\", \"depths\": [2, 3, 3], \"epochs\": 9.5, \"widths\": [64, 256, 768]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
