@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 125.6,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T193535Z-dfa12fb1",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"stem\": \"conv1x1\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "stem-conv1x1",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"stem\": \"conv1x1\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"stem\": \"conv1x1\"}",
+    "delta": {
+      "stem": "conv1x1"
+    },
+    "hypothesis": "stem D: group 1's first conv is 1x1 (24 -> 64) at 31x31 then the pool; saves 8/9 of conv1's FLOPs, keeps the 31x31 BN/GELU/pool",
+    "env": {},
+    "config": "futurebiohackers {\"stem\": \"conv1x1\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

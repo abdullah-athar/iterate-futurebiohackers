@@ -1,0 +1,37 @@
+{
+  "returncode": 1,
+  "wall_seconds": 123.7,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T193006Z-cb13f0b8",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"stem\": \"whiten4s2\", \"widths\": [96, 256, 768]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "stem-whiten4s2-w96",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"stem\": \"whiten4s2\", \"widths\": [96, 256, 768]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"stem\": \"whiten4s2\", \"widths\": [96, 256, 768]}",
+    "delta": {
+      "stem": "whiten4s2",
+      "widths": [
+        96,
+        256,
+        768
+      ]
+    },
+    "hypothesis": "stem B: frozen 4x4 stride-2 whitening (3 -> 96 channels, 15x15) replaces group 1's first conv and pool; group 1 at 96 channels starts at conv2",
+    "env": {},
+    "config": "futurebiohackers {\"stem\": \"whiten4s2\", \"widths\": [96, 256, 768]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

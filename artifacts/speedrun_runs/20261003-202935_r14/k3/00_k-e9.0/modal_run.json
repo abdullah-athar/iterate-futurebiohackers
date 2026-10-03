@@ -1,0 +1,32 @@
+{
+  "returncode": 0,
+  "wall_seconds": 75.7,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T193001Z-a6422fef",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 9.0}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "k-e9.0",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 9.0}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 9.0}",
+    "delta": {
+      "epochs": 9.0
+    },
+    "hypothesis": "k calibration on the promoted recipe (64/256/768, 9.5 ep): accuracy per second of epochs, lower point",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 9.0}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 135.4,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T193012Z-2d5b32e6",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"stem\": \"space_to_depth\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "stem-s2d",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"stem\": \"space_to_depth\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"stem\": \"space_to_depth\"}",
+    "delta": {
+      "stem": "space_to_depth"
+    },
+    "hypothesis": "stem A as specified: pixel_unshuffle(2), 2x2 whitening on 16x16x12 -> 15x15x96, group 1's 3x3 conv at 15x15 then its pool (7x7 group 1); whitening stats from the unshuffled training images in prepare",
+    "env": {},
+    "config": "futurebiohackers {\"stem\": \"space_to_depth\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 125.5,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T193328Z-1923cd44",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"stem\": \"whiten3s2\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "stem-whiten3s2",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"stem\": \"whiten3s2\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"stem\": \"whiten3s2\"}",
+    "delta": {
+      "stem": "whiten3s2"
+    },
+    "hypothesis": "stem B': frozen 3x3 stride-2 whitening (3 -> 54 channels, 15x15) then a 1x1 conv 54 -> 64 without pool; removes the 31x31 conv and its BN/GELU/pool",
+    "env": {},
+    "config": "futurebiohackers {\"stem\": \"whiten3s2\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

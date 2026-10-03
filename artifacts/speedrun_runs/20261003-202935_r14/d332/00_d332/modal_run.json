@@ -1,0 +1,36 @@
+{
+  "returncode": 1,
+  "wall_seconds": 138.2,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T193003Z-f8e92548",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"depths\": [3, 3, 2]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "d332",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"depths\": [3, 3, 2]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"depths\": [3, 3, 2]}",
+    "delta": {
+      "depths": [
+        3,
+        3,
+        2
+      ]
+    },
+    "hypothesis": "depth 2 in group 3 only (drops the most expensive single conv, 768->768 at 3x3, 16% of the FLOPs); round 1 on the old network lost 0.94 pp for 0.33 s; d232/d322 on this base lost 1.4-1.6 pp",
+    "env": {},
+    "config": "futurebiohackers {\"depths\": [3, 3, 2]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

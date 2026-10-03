@@ -1,0 +1,33 @@
+{
+  "returncode": 1,
+  "wall_seconds": 77.4,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T193535Z-e50b39dc",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 10.25, \"stem\": \"whiten3s2\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "stem-whiten3s2-e10.25",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 10.25, \"stem\": \"whiten3s2\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 10.25, \"stem\": \"whiten3s2\"}",
+    "delta": {
+      "stem": "whiten3s2",
+      "epochs": 10.25
+    },
+    "hypothesis": "stem B' at equal time: 0.75 extra epochs (~0.37 s) to buy back the expected ~0.35 s saving; direct equal-time accuracy read",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 10.25, \"stem\": \"whiten3s2\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

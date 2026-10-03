@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 110.2,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T193343Z-759f2745",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"stem\": \"space_to_depth_nopool\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "stem-s2d-nopool",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"stem\": \"space_to_depth_nopool\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"stem\": \"space_to_depth_nopool\"}",
+    "delta": {
+      "stem": "space_to_depth_nopool"
+    },
+    "hypothesis": "stem A keeping group 1 at 15x15 (no pool after conv1): same conv1 FLOPs as the 31x31 conv (4x channels, 1/4 positions) but no 31x31 activations or pool traffic; lossless patchify instead of max-pooled whitening",
+    "env": {},
+    "config": "futurebiohackers {\"stem\": \"space_to_depth_nopool\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
