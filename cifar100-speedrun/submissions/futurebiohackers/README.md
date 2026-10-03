@@ -14,27 +14,31 @@ smaller-crop training also works.
 
 ## Development results
 
-The 8.5-epoch candidate initially averaged 75.143% in 6.501 s over three trials.
-The required longer check then showed why the small screen was insufficient:
+All **40 fresh trials** of the selected 9.5-epoch recipe completed successfully:
 
 | Recipe | Trials | Mean accuracy | Mean preparation + training |
 | --- | ---: | ---: | ---: |
-| Original 128/384/576 model, 8.5 epochs | 40 | 75.327% | 6.977 s |
-| Smaller 96/256/768 model, 8.5 epochs | 40 | 74.902% | 5.772 s |
+| Original 128/384/576 model, 8.5 epochs | 3 | 75.480% | 7.458 s |
+| Selected 96/256/768 model, 9.5 epochs | 40 | 75.2495% | 6.859 s |
 
-These runs shared the same Modal A100 SXM allocation and used seeds 10000–10039;
-all trials completed, with none discarded. The smaller model was faster but did
-not qualify. Its training schedule is now extended to **9.5 epochs**, and another
-40-trial check is running with fresh seeds starting at 20000.
+Both runs shared one Modal A100 SXM allocation. The selected recipe was **8.0%
+faster** than the paired control. Its accuracy standard deviation was 0.264
+percentage points, and its time standard deviation was 0.029 seconds. The new
+recipe used seeds 20000–20039; the control used the first three of those seeds.
+No trials were discarded. This is development validation; official judging still
+requires an A100 80GB PCIe and the organizer's private 40 seeds.
 
-The under-three-second target has not been reached. Modal A100 SXM measurements
-are development results; official judging requires an A100 80GB PCIe and the
-organizer's 40 seeds. The original recipe in PR #3 previously reached 75.29% in
-8.11 s across 40 trials on another Modal allocation.
+The under-three-second target has not been reached. The original recipe in PR #3
+previously reached 75.29% in 8.11 s across 40 trials on another Modal allocation.
+
+The 8.5-epoch version of the new architecture initially looked promising over
+three trials, but a fresh 40-trial run averaged 74.902% in 5.772 s and missed the
+accuracy gate. Extending training to 9.5 epochs recovered the accuracy margin.
+The failed check remains in the experiment log.
 
 Run the selected defaults from the repository root with `just modal 40`.
-The unsuccessful 40-trial candidate is `20261003T154736Z-304b8a2b`; its paired
-control is `20261003T154214Z-9b6bf221`.
+The successful 40-trial result is `20261003T155840Z-bee7f356`; its paired control
+is `20261003T155703Z-6e4f0e48`.
 
 ## Experiments and progress
 
