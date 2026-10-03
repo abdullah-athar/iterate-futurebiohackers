@@ -1,0 +1,17 @@
+{
+  "round": "r5",
+  "n": 16,
+  "seed": 0,
+  "control": {"epochs": 8.5},
+  "jobs": [
+    {
+      "name": "confirm16",
+      "control_index": 1,
+      "variants": [
+        {"label": "S7-res28-e9.0", "params": {"bias_scaler": 32.0, "label_smoothing": 0.25, "lr": 10.8, "bn_momentum": 0.7, "jitter": 0.3, "scaling_factor": 0.1388888888888889, "train_resolution": 28, "resolution_switch": 0.5, "epochs": 9.0}, "hypothesis": "r4: +0.33 +- 0.11 pp, -0.18 s (75.33%); n=16 confirmation"},
+        {"label": "S7-res28-e8.75", "params": {"bias_scaler": 32.0, "label_smoothing": 0.25, "lr": 10.8, "bn_momentum": 0.7, "jitter": 0.3, "scaling_factor": 0.1388888888888889, "train_resolution": 28, "resolution_switch": 0.5, "epochs": 8.75}, "hypothesis": "r4: +0.17 +- 0.09 pp, -0.36 s (75.17%); n=16 confirmation"},
+        {"label": "S6-res28-e9.0", "params": {"bias_scaler": 32.0, "label_smoothing": 0.25, "lr": 10.8, "bn_momentum": 0.7, "jitter": 0.3, "momentum": 0.8, "train_resolution": 28, "resolution_switch": 0.5, "epochs": 9.0}, "hypothesis": "r4: +0.22 +- 0.18 pp, -0.11 s (75.22% / 5.90 s); n=16 confirmation"}
+      ]
+    }
+  ]
+}
