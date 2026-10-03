@@ -94,9 +94,10 @@ def main() -> int:
     check("train returned an nn.Module", isinstance(model, torch.nn.Module))
     after_train_1 = snapshot(model)
     check(
-        "train #1 populated the optimizer state (momentum buffers)", len(state.optimizer.state) > 0
+        "train #1 populated the optimizer state (momentum buffers)",
+        len(state.optimizers[0].state) > 0,
     )
-    optimizer_1 = state.optimizer
+    optimizer_1 = state.optimizers[0]
 
     # Trial 2: seed 43, same state object --------------------------------------------
     seed_everything(43)
@@ -112,7 +113,7 @@ def main() -> int:
     check("prepare #2 reset BatchNorm (running stats, counters, biases)", batchnorm_is_fresh(model))
     check(
         "prepare #2 built a NEW optimizer with EMPTY state",
-        state.optimizer is not optimizer_1 and len(state.optimizer.state) == 0,
+        state.optimizers[0] is not optimizer_1 and len(state.optimizers[0].state) == 0,
     )
     # Gradients are not reset in prepare, and need not be: _fit zeroes them before every
     # backward, and the "reused state == fresh build" check below proves they cannot leak.
