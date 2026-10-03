@@ -1,0 +1,43 @@
+{
+  "returncode": 0,
+  "wall_seconds": 85.2,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T213929Z-818a0b91",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"aug_off_last\": 1.0, \"count_nonfinite\": true, \"epochs\": 9.25, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "A-augoff1.0",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"aug_off_last\": 1.0, \"count_nonfinite\": true, \"epochs\": 9.25, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"aug_off_last\": 1.0, \"count_nonfinite\": true, \"epochs\": 9.25, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.25
+        ],
+        [
+          28,
+          0.5
+        ]
+      ],
+      "epochs": 9.25,
+      "aug_off_last": 1.0
+    },
+    "hypothesis": "no-augmentation finish for the last 1.0 epoch",
+    "env": {},
+    "config": "futurebiohackers {\"aug_off_last\": 1.0, \"epochs\": 9.25, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

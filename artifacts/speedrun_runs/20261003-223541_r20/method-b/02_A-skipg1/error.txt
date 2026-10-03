@@ -1,0 +1,24 @@
+Traceback (most recent call last):
+  File "/root/speedrun/benchmark/worker.py", line 111, in run_worker
+    model = module.train(state)
+            ^^^^^^^^^^^^^^^^^^^
+  File "/__modal/volumes/vo-DeZzWP1Pou6XGy9Ow6ytCp/futurebiohackers/20261003T213944Z-6178ee1f/source/submission.py", line 747, in train
+    _fit(state, state.total_steps)
+  File "/__modal/volumes/vo-DeZzWP1Pou6XGy9Ow6ytCp/futurebiohackers/20261003T213944Z-6178ee1f/source/submission.py", line 884, in _fit
+    optimizer.step()
+  File "/.uv/.venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 484, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/.uv/.venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 89, in _use_grad
+    ret = func(self, *args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/.uv/.venv/lib/python3.12/site-packages/torch/optim/sgd.py", line 123, in step
+    sgd(
+  File "/.uv/.venv/lib/python3.12/site-packages/torch/optim/sgd.py", line 299, in sgd
+    func(
+  File "/.uv/.venv/lib/python3.12/site-packages/torch/_dynamo/eval_frame.py", line 600, in _fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/.uv/.venv/lib/python3.12/site-packages/torch/optim/sgd.py", line 491, in _fused_sgd
+    torch._fused_sgd_(
+TypeError: expected Tensor as element 4 in argument 2, but got NoneType

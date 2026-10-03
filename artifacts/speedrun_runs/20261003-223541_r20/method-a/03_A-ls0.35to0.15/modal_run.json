@@ -1,0 +1,44 @@
+{
+  "returncode": 0,
+  "wall_seconds": 162.6,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T214055Z-0991c3ee",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 9.25, \"label_smoothing\": 0.35, \"label_smoothing_end\": 0.15, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "A-ls0.35to0.15",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 9.25, \"label_smoothing\": 0.35, \"label_smoothing_end\": 0.15, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 9.25, \"label_smoothing\": 0.35, \"label_smoothing_end\": 0.15, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.25
+        ],
+        [
+          28,
+          0.5
+        ]
+      ],
+      "epochs": 9.25,
+      "label_smoothing": 0.35,
+      "label_smoothing_end": 0.15
+    },
+    "hypothesis": "label smoothing scheduled linearly 0.35 -> 0.15 over the examples (smoothing as a tensor input, same graph)",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 9.25, \"label_smoothing\": 0.35, \"label_smoothing_end\": 0.15, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

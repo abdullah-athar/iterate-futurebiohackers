@@ -1,0 +1,111 @@
+{
+  "n_trials": 8,
+  "accuracy_target": 0.75,
+  "device": "cuda",
+  "official": false,
+  "synthetic": false,
+  "eval_timeout": 5.0,
+  "eval_batch_size": 1024,
+  "build_timeout": 600.0,
+  "trial_timeout": 600,
+  "startup_timeout": 120.0,
+  "cpu_threads": 4,
+  "run_id": "20261003T213944Z-6178ee1f",
+  "submission": "/root/speedrun/submissions/futurebiohackers",
+  "parameters": {
+    "count_nonfinite": true,
+    "epochs": 9.25,
+    "resolution_schedule": [
+      [
+        24,
+        0.25
+      ],
+      [
+        28,
+        0.5
+      ]
+    ],
+    "skip_residual_groups": [
+      1
+    ],
+    "skip_residual_until": 0.25
+  },
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "harness_commit": null,
+  "harness_sha256": {
+    "__init__.py": "9602833beed47e2d67b1e717cc34dde96186d0a3775e52b3913470d351161ad6",
+    "_submission.py": "04a88be329495bad4d0c5fcff434261e2ba8c1659383e847057eecc49160cfb1",
+    "api.py": "d096455bc44a3e876746096336802ce50a9eaf45af6acb3ccc5e9120e43049e2",
+    "config.py": "7777d0bef6a8cbd2aa9677ba6ac5a908fb208bd82f62c575822879ac22ba4595",
+    "data.py": "a082716f43849236980881db8e28214ecb3c63d231ddeb6120b085d072a43e96",
+    "evaluate.py": "f5d4f6652f75135e1377ff02622731bac8c2a3f5b8ae9b161a72b61e83768c1c",
+    "hardware.py": "a6d349dbe8bf5467764eb708c9f788f510d7fec2772dd80985f3ca7bc02fc7fa",
+    "harness.py": "459e1021a01cd285e403ceae40c72683b39a487dffa2a64384609ce1f0ee5196",
+    "interrupts.py": "27a55da8d55bc7ad2c5dc49c3e74fb35d0d17e94638b747be92df3e1119689f9",
+    "run.py": "bddaaf9d75fe3b0a3d3c83920f9ffc6e9e5f4ca1a2908b63a6821626d82221e6",
+    "scoring.py": "bb78783105e6e56b4f73b8e253d8a0bef7045ed68eab1980e3fa0769344f68dd",
+    "timing.py": "1314af08dabdc46d2407b6f59e27e4db1c4072a2f12594fe16dbcd0e20bda5fd",
+    "worker.py": "5b2354c5204c76c6c1f23f90bfec2ca6a8acc752192335cf71c2999a62087896"
+  },
+  "submission_sha256": {
+    "LICENSE.airbench": "418c56bc42284062ac536f12496a0e1d9c8edb68bcde8da29675bd48492ce022",
+    "LICENSE.hiverge": "441860e612321c24328fd1ddea9771e1057345d21fa652dd9dbb8d0747e6d87e",
+    "README.md": "37ebc7d01075c2dbafd8cae7eb3bda77b75b1837bba8543b5279bcd2d601863d",
+    "kernels.py": "843fac2cfede82b233e43b47e2bbbb507d9316512951189f58e976148199f10a",
+    "submission.py": "af3d1729b0701a912234a7bb57ffa0d4fff112f5ee7a86e6036af7a687182dd2"
+  },
+  "dataset": "CIFAR-100",
+  "evaluation": "single-view",
+  "accuracy_units": "fraction",
+  "time_units": "seconds",
+  "environment": {
+    "python": "3.12.10",
+    "torch": "2.4.0+cu124",
+    "torchvision": "0.19.0+cu124",
+    "cuda_runtime": "12.4",
+    "cudnn": 90100,
+    "platform": "Linux-4.19.0-gvisor-x86_64-with-glibc2.36",
+    "os": {
+      "NAME": "Debian GNU/Linux",
+      "ID": "debian",
+      "PRETTY_NAME": "Debian GNU/Linux 12 (bookworm)",
+      "VERSION_ID": "12",
+      "VERSION": "12 (bookworm)",
+      "VERSION_CODENAME": "bookworm",
+      "HOME_URL": "https://www.debian.org/",
+      "SUPPORT_URL": "https://www.debian.org/support",
+      "BUG_REPORT_URL": "https://bugs.debian.org/"
+    },
+    "cpu": "",
+    "cpu_count": 20,
+    "cpu_threads": 4,
+    "cuda_devices": [
+      "NVIDIA A100-SXM4-80GB"
+    ],
+    "gpu_telemetry": [
+      {
+        "name": "NVIDIA A100-SXM4-80GB",
+        "uuid": "GPU-5209c622-4f89-5a95-e349-81c148e7d143",
+        "driver_version": "580.95.05",
+        "temperature.gpu": "34",
+        "power.draw": "60.19",
+        "power.limit": "400.00",
+        "clocks.sm": "210",
+        "clocks.mem": "1593",
+        "memory.total": "81920",
+        "mig.mode.current": "Disabled"
+      }
+    ],
+    "network_interfaces": []
+  },
+  "build_time": 84.386775323
+}

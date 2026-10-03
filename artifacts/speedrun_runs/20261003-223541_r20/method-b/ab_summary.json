@@ -1,0 +1,242 @@
+{
+  "round": "r20",
+  "job": "method-b",
+  "environment": {
+    "task_id": "ta-01M41V3EWM3PBR9VM30X2P16AR",
+    "hostname": "modal",
+    "region": "uk",
+    "cloud": "CLOUD_PROVIDER_AZURE",
+    "cpu_count": 20,
+    "affinity_cpus": 20,
+    "cgroup_cpu_max": "20000000",
+    "compile_threads_env": null,
+    "gpu_name": "NVIDIA A100-SXM4-80GB",
+    "gpu_memory": "81920 MiB",
+    "gpu_power_limit": "400.00 W",
+    "driver": "580.95.05",
+    "mig": "Disabled"
+  },
+  "gpu_attempts": [
+    "NVIDIA A100-SXM4-80GB @ 400.00 W [task ta-01M41V3EWM3PBR9VM30X2P16AR CLOUD_PROVIDER_AZURE/uk]"
+  ],
+  "container_seconds": 358.1,
+  "rows": [
+    {
+      "label": "A-skipg0",
+      "params": "{\"count_nonfinite\": true, \"epochs\": 9.25, \"resolution_schedule\": [[24, 0.25], [28, 0.5]], \"skip_residual_groups\": [0], \"skip_residual_until\": 0.25}",
+      "delta": {
+        "resolution_schedule": [
+          [
+            24,
+            0.25
+          ],
+          [
+            28,
+            0.5
+          ]
+        ],
+        "epochs": 9.25,
+        "skip_residual_until": 0.25,
+        "skip_residual_groups": [
+          0
+        ]
+      },
+      "hypothesis": "progressive depth: group 1 runs without its conv2/conv3 residual branch for the first 25% of the examples (skip graphs compiled in default mode)",
+      "config": "futurebiohackers {\"epochs\": 9.25, \"resolution_schedule\": [[24, 0.25], [28, 0.5]], \"skip_residual_groups\": [0], \"skip_residual_until\": 0.25}",
+      "returncode": 1,
+      "folder": "artifacts/speedrun_runs/20261003-223541_r20/method-b/00_A-skipg0",
+      "gpu": "NVIDIA A100-SXM4-80GB",
+      "power_limit": "400.00 W",
+      "task_id": "ta-01M41V3EWM3PBR9VM30X2P16AR",
+      "region": "uk",
+      "cloud": "CLOUD_PROVIDER_AZURE",
+      "container_wall": 103.6,
+      "deadline_hit": false,
+      "nonfinite": null,
+      "build_mode": "warm",
+      "complete": false,
+      "qualified": false,
+      "run_error": "TypeError: expected Tensor as element 1 in argument 2, but got NoneType",
+      "n": 8,
+      "trials_ok": 0,
+      "mean_acc": null,
+      "acc_std": null,
+      "mean_time": null,
+      "time_std": null,
+      "mean_eval": null,
+      "build_time": 88.275006479,
+      "mean_prepare": null,
+      "mean_train": null,
+      "by_trial": {},
+      "seeds": [],
+      "accs": [],
+      "times": [],
+      "evals": [],
+      "verdict": "INCOMPLETE (TypeError: expected Tensor as element 1 in argument 2, but got NoneType)",
+      "paired": {},
+      "dtime_adj": null
+    },
+    {
+      "label": "control",
+      "params": "{\"count_nonfinite\": true, \"epochs\": 9.25, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+      "delta": {},
+      "hypothesis": "control",
+      "config": "futurebiohackers {}",
+      "returncode": 0,
+      "folder": "artifacts/speedrun_runs/20261003-223541_r20/method-b/01_control",
+      "gpu": "NVIDIA A100-SXM4-80GB",
+      "power_limit": "400.00 W",
+      "task_id": "ta-01M41V3EWM3PBR9VM30X2P16AR",
+      "region": "uk",
+      "cloud": "CLOUD_PROVIDER_AZURE",
+      "container_wall": 106.0,
+      "deadline_hit": false,
+      "nonfinite": 0,
+      "build_mode": "warm",
+      "complete": true,
+      "qualified": true,
+      "run_error": null,
+      "n": 8,
+      "trials_ok": 8,
+      "mean_acc": 0.75075,
+      "acc_std": 0.001066369006086933,
+      "mean_time": 4.352381970249997,
+      "time_std": 0.010073329874093677,
+      "mean_eval": 0.08147217175000421,
+      "build_time": 56.64233799499999,
+      "mean_prepare": 0.036131876124997575,
+      "mean_train": 4.3162500941249995,
+      "by_trial": {
+        "0": [
+          0.7497,
+          4.339789377000017
+        ],
+        "1": [
+          0.7506,
+          4.340178213999991
+        ],
+        "2": [
+          0.7498,
+          4.342666551999997
+        ],
+        "3": [
+          0.7497,
+          4.352531774999989
+        ],
+        "4": [
+          0.7528,
+          4.358448971999991
+        ],
+        "5": [
+          0.7512,
+          4.361659113999991
+        ],
+        "6": [
+          0.7514,
+          4.360362094999999
+        ],
+        "7": [
+          0.7508,
+          4.363419663000002
+        ]
+      },
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "accs": [
+        0.7497,
+        0.7506,
+        0.7498,
+        0.7497,
+        0.7528,
+        0.7512,
+        0.7514,
+        0.7508
+      ],
+      "times": [
+        4.339789377000017,
+        4.340178213999991,
+        4.342666551999997,
+        4.352531774999989,
+        4.358448971999991,
+        4.361659113999991,
+        4.360362094999999,
+        4.363419663000002
+      ],
+      "evals": [
+        0.09029700599998591,
+        0.07806851700001971,
+        0.08102506000000176,
+        0.08175377700001718,
+        0.08066497100000447,
+        0.079582060000007,
+        0.08073042099999839,
+        0.07965556199999924
+      ],
+      "verdict": "QUALIFIED (>= 75%)"
+    },
+    {
+      "label": "A-skipg1",
+      "params": "{\"count_nonfinite\": true, \"epochs\": 9.25, \"resolution_schedule\": [[24, 0.25], [28, 0.5]], \"skip_residual_groups\": [1], \"skip_residual_until\": 0.25}",
+      "delta": {
+        "resolution_schedule": [
+          [
+            24,
+            0.25
+          ],
+          [
+            28,
+            0.5
+          ]
+        ],
+        "epochs": 9.25,
+        "skip_residual_until": 0.25,
+        "skip_residual_groups": [
+          1
+        ]
+      },
+      "hypothesis": "progressive depth: group 2 without its residual branch for the first 25%",
+      "config": "futurebiohackers {\"epochs\": 9.25, \"resolution_schedule\": [[24, 0.25], [28, 0.5]], \"skip_residual_groups\": [1], \"skip_residual_until\": 0.25}",
+      "returncode": 1,
+      "folder": "artifacts/speedrun_runs/20261003-223541_r20/method-b/02_A-skipg1",
+      "gpu": "NVIDIA A100-SXM4-80GB",
+      "power_limit": "400.00 W",
+      "task_id": "ta-01M41V3EWM3PBR9VM30X2P16AR",
+      "region": "uk",
+      "cloud": "CLOUD_PROVIDER_AZURE",
+      "container_wall": 98.4,
+      "deadline_hit": false,
+      "nonfinite": null,
+      "build_mode": "warm",
+      "complete": false,
+      "qualified": false,
+      "run_error": "TypeError: expected Tensor as element 4 in argument 2, but got NoneType",
+      "n": 8,
+      "trials_ok": 0,
+      "mean_acc": null,
+      "acc_std": null,
+      "mean_time": null,
+      "time_std": null,
+      "mean_eval": null,
+      "build_time": 84.386775323,
+      "mean_prepare": null,
+      "mean_train": null,
+      "by_trial": {},
+      "seeds": [],
+      "accs": [],
+      "times": [],
+      "evals": [],
+      "verdict": "INCOMPLETE (TypeError: expected Tensor as element 4 in argument 2, but got NoneType)",
+      "paired": {},
+      "dtime_adj": null
+    }
+  ],
+  "profile": null
+}

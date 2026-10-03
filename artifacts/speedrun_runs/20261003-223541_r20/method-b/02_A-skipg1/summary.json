@@ -1,0 +1,19 @@
+{
+  "requested_trials": 8,
+  "number_of_trials": 1,
+  "successful_trials": 0,
+  "failed_trials": 1,
+  "complete": false,
+  "accuracy_target": 0.75,
+  "run_error": "TypeError: expected Tensor as element 4 in argument 2, but got NoneType",
+  "mean_accuracy": null,
+  "accuracy_std": 0.0,
+  "mean_training_time": null,
+  "training_time_std": 0.0,
+  "mean_evaluation_time": null,
+  "evaluation_time_std": 0.0,
+  "qualified": false,
+  "official": false,
+  "dataset": "CIFAR-100",
+  "run_id": "20261003T213944Z-6178ee1f"
+}
