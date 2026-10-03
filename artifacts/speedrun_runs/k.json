@@ -1,13 +1,9 @@
 {
-  "k": 0.7,
+  "k": 1.0,
   "unit": "accuracy percentage points per second of prepare+train",
-  "source": "Scalar kept at 0.7 (the geometric mean of the two directions below). Round r14/k3 on the promoted recipe (64/256/768 stack, 9.5 ep, SXM 400 W, n=8 paired, control 75.53 pct / 5.08 s): e9.0 -0.47 +- 0.13 pp / -0.26 s, e10.0 -0.05 +- 0.07 pp / +0.25 s, e10.5 +0.15 +- 0.09 pp / +0.53 s. The accuracy-vs-epochs curve has a knee at 9.5 epochs: k_down ~1.8 pp/s when cutting epochs, k_up ~0.3 pp/s when adding them. So a cut that loses accuracy cannot be bought back with epochs (judge cuts by direct equal-time runs), and a gainer converts to time at ~1.8 pp/s by trimming epochs. Earlier: r6/k2 on the 8.75-ep 96/256/768 recipe gave 0.65 pp/s (rounded 0.7); 128/384/576 (calib, r1) 0.445; 96/256/768 at 8.5 ep (r3-r5) 1.0.",
-  "k_down": 1.8,
-  "k_up": 0.3,
-  "ladder": {"round": "r14", "job": "k3", "control": {"epochs": 9.5, "mean_acc": 75.53, "mean_time": 5.08},
-             "points": [{"epochs": 9.0, "dacc_pp": -0.47, "se": 0.13, "dtime_s": -0.26},
-                        {"epochs": 10.0, "dacc_pp": -0.05, "se": 0.07, "dtime_s": 0.25},
-                        {"epochs": 10.5, "dacc_pp": 0.15, "se": 0.09, "dtime_s": 0.53}]},
+  "source": "PROVISIONAL for the new baseline recipe merged from main on 3 Oct (64/256/768, 28 px first half, 9 epochs, 4.65 s): 1.0 pp/s until round r16/k4 (paired epochs ladder 8.5 / 9.0 / 9.5 / 10.0, n=8, SXM 400 W) replaces it. Expect an asymmetric rate around a knee, as measured on our previous network (r14/k3: 1.8 pp/s below 9.5 epochs, 0.3 pp/s above).",
+  "k_down": null,
+  "k_up": null,
   "previous": [
     {
       "k": 0.445,
@@ -25,7 +21,24 @@
         "r4",
         "r5"
       ]
+    },
+    {
+      "k": 0.7,
+      "network": "our 64/256/768 stack (PR #12 recipe then the 9.5-epoch promotion); r14/k3 ladder: k_down 1.8, k_up 0.3",
+      "rounds": [
+        "r6",
+        "r7",
+        "r8",
+        "r9",
+        "r9b",
+        "r10",
+        "r11",
+        "r12",
+        "r13",
+        "r14",
+        "r15"
+      ]
     }
   ],
-  "time": "2026-10-03T20:50:00"
+  "time": "2026-10-03T21:35:00"
 }

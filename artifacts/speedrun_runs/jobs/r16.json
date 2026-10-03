@@ -1,0 +1,56 @@
+{
+  "round": "r16",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "k4",
+      "control_index": 1,
+      "variants": [
+        {"label": "e8.5", "params": {"epochs": 8.5},
+         "hypothesis": "k calibration on the new baseline (9 epochs): half an epoch less"},
+        {"label": "e9.5", "params": {"epochs": 9.5},
+         "hypothesis": "k calibration: half an epoch more"},
+        {"label": "e10.0", "params": {"epochs": 10.0},
+         "hypothesis": "k calibration: one epoch more (knee check)"}
+      ]
+    },
+    {
+      "name": "port-a",
+      "control_index": 1,
+      "variants": [
+        {"label": "bias16", "params": {"bias_scaler": 16.0},
+         "hypothesis": "port: BatchNorm-bias lr 16x instead of 32x gave +0.14 pp on our 64/256/768 network"},
+        {"label": "lr13.8", "params": {"lr": 13.8},
+         "hypothesis": "port: lr x1.2 (11.5 -> 13.8); lr 10.8 -> 12 gave +0.16 pp on our network"},
+        {"label": "lr15.3", "params": {"lr": 15.3},
+         "hypothesis": "port: lr x1.33 (11.5 -> 15.3), the upper end of the known-winner range"}
+      ]
+    },
+    {
+      "name": "port-b",
+      "control_index": 1,
+      "variants": [
+        {"label": "wd0.0238", "params": {"weight_decay": 0.0238},
+         "hypothesis": "port: weight decay x1.4 (0.017 -> 0.0238); x1.4 gave +0.19 pp on our network"},
+        {"label": "bn0.7", "params": {"bn_momentum": 0.7},
+         "hypothesis": "port: BatchNorm momentum 0.7 instead of 0.5 (our promoted value)"},
+        {"label": "jitter0.3", "params": {"color_jitter": [0.3, 0.3]},
+         "hypothesis": "port: brightness/contrast jitter 0.3 instead of 0.2 (our promoted value)"}
+      ]
+    },
+    {
+      "name": "port-c",
+      "control_index": 1,
+      "variants": [
+        {"label": "res24q-28h", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]]},
+         "hypothesis": "port: 24x24 for the first quarter of the examples, then the baseline's 28 px half, then 32; the README's 24 px test ([[24,0.33],[28,0.67]] at 10.5 ep) cost 0.8 pt"},
+        {"label": "bs512-lr16-e8", "params": {"batch_size": 512, "lr": 16.0, "epochs": 8.0},
+         "hypothesis": "README lead: batch 512 with lr 16 for 8 epochs matched 9 epochs of batch 1024 and was 4% faster over 10 trials"},
+        {"label": "bs768-lr14-e8.5", "params": {"batch_size": 768, "lr": 14.0, "epochs": 8.5},
+         "hypothesis": "README lead: batch 768 with lr 14 for 8.5 epochs, 2% faster at equal accuracy"}
+      ]
+    }
+  ]
+}
