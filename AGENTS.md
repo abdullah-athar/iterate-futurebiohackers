@@ -7,3 +7,4 @@
 - Load relevant science skills from `.agents/skills/` or `.claude/skills/` when useful.
 - Preserve the bundled third-party skills and their licenses; keep project code separate.
 - `cifar100-speedrun/` is the organizer's competition repo (git subtree, Python 3.12, its own uv env). Only edit `cifar100-speedrun/submissions/futurebiohackers/`; use `just` from the repo root to run it.
+- CIFAR-100 speedrun details (envs, commands, rules, git workflow): see the `CIFAR-100 speedrun` section of `CLAUDE.md` and `scripts/README_speedrun.md`.
