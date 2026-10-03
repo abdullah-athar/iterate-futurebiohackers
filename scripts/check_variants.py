@@ -110,6 +110,9 @@ VARIANTS = {
     },
     "head_lr_half": {"head_lr": 0.5},
     "whiten_eps_4x": {"whiten_eps": 2e-3},
+    "bn_scale": {"bn_scale": True},
+    "depths433": {"depths": [4, 3, 3]},
+    "depths434_k331": {"depths": [4, 3, 4], "conv_kernels": [3, 3, 1]},
     # his (must keep running after the port)
     "indexed_crop": {"crop_mode": "indexed"},
     "depths233": {"depths": [2, 3, 3]},
@@ -357,6 +360,39 @@ def main() -> int:
                 < 1e-12
                 and not any(id(q) in head for q in opt_groups[1]["params"]),
             )
+    for name, run in runs.items():
+        hyp, net = run.state.hyp, run.state.net
+        groups = net.layers[1:4]
+        if hyp["depths"] and 4 in hyp["depths"]:
+            check(
+                f"{name}: groups with depth 4 have conv4/norm4, the others do not ({hyp['depths']})",
+                all(
+                    (g.conv4 is not None and g.norm4 is not None) == (d == 4)
+                    for g, d in zip(groups, hyp["depths"])
+                ),
+            )
+        if hyp["bn_scale"]:
+            named = list(net.named_parameters())
+            bn_weights = [id(p) for n, p in named if "norm" in n and n.endswith("weight")]
+            bn_biases = [id(p) for n, p in named if "norm" in n and n.endswith("bias")]
+            opt_groups = run.state.optimizer.param_groups
+            base_ids = {id(p) for p in opt_groups[1]["params"]}
+            check(
+                f"{name}: every BatchNorm scale trains, sits in the base-lr group, and the "
+                "bias group holds exactly the BatchNorm biases",
+                bn_weights
+                and all(p.requires_grad for n, p in named if "norm" in n)
+                and all(i in base_ids for i in bn_weights)
+                and sorted(id(p) for p in opt_groups[0]["params"]) == sorted(bn_biases),
+            )
+    check(
+        "the default path keeps the BatchNorm scales frozen (not in any optimizer group)",
+        all(
+            not p.requires_grad
+            for n, p in d.state.net.named_parameters()
+            if "norm" in n and n.endswith("weight")
+        ),
+    )
     check(
         "a stride-2 first conv keeps the stem's group sizes: conv [31, 15, 7, 3], "
         "space_to_depth_nopool [15, 7, 3, 1]",
@@ -417,6 +453,8 @@ def main() -> int:
         "conv_kernels with a 2": {"conv_kernels": [3, 3, 2]},
         "head_lr 0": {"head_lr": 0},
         "whiten_eps 0": {"whiten_eps": 0},
+        "depths with a 5": {"depths": [5, 3, 3]},
+        "bn_scale as a string": {"bn_scale": "yes"},
     }
     for name, delta in rejected.items():
         try:

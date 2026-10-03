@@ -57,6 +57,7 @@ DEFAULTS = {
     "conv_kernels": [3, 3, 3],  # kernel of each group's second and third conv (1 or 3)
     "head_lr": 1.0,  # learning-rate multiplier for the linear head
     "whiten_eps": 5e-4,  # added to the patch-covariance eigenvalues before the inverse sqrt
+    "bn_scale": False,  # train the BatchNorm scale at the base lr (airbench freezes it at 1)
     "scaling_factor": 1.25 / 9,  # logit scale (airbench uses 1/9)
     "bn_momentum": 0.7,
     "ema_every": 5,  # lookahead EMA period in steps; 0 disables it
@@ -129,9 +130,9 @@ def _stem_sizes(stem, resolution, conv1_stride=1):
 
 
 class BatchNorm(nn.BatchNorm2d):
-    def __init__(self, num_features, momentum):
+    def __init__(self, num_features, momentum, trainable_scale=False):
         super().__init__(num_features, eps=1e-12, momentum=1 - momentum)
-        self.weight.requires_grad = False
+        self.weight.requires_grad = trainable_scale
 
     def activate(self, x, approximate, residual=None):
         x = self(x)
@@ -178,6 +179,7 @@ class ConvGroup(nn.Module):
         first_pool=True,
         first_stride=1,
         inner_kernel=3,
+        bn_scale=False,
     ):
         super().__init__()
         if first_kernel is None:
@@ -190,12 +192,15 @@ class ConvGroup(nn.Module):
             self.conv1 = Conv(channels_in, channels_out, first_kernel, first_stride)
             # a strided first conv does the downsampling itself
             self.pool = nn.MaxPool2d(2) if first_pool and first_stride == 1 else nn.Identity()
-            self.norm1 = BatchNorm(channels_out, bn_momentum)
+            self.norm1 = BatchNorm(channels_out, bn_momentum, bn_scale)
         self.pool_first = pool_first
         self.conv2 = Conv(channels_out, channels_out, inner_kernel)
-        self.norm2 = BatchNorm(channels_out, bn_momentum)
-        self.conv3 = Conv(channels_out, channels_out, inner_kernel) if depth == 3 else None
-        self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
+        self.norm2 = BatchNorm(channels_out, bn_momentum, bn_scale)
+        self.conv3 = Conv(channels_out, channels_out, inner_kernel) if depth >= 3 else None
+        self.norm3 = BatchNorm(channels_out, bn_momentum, bn_scale) if depth >= 3 else None
+        # depth 4: a fourth conv with its own residual over the third's output
+        self.conv4 = Conv(channels_out, channels_out, inner_kernel) if depth == 4 else None
+        self.norm4 = BatchNorm(channels_out, bn_momentum, bn_scale) if depth == 4 else None
         self.approximate = gelu_approximate
         self.depth2_residual = depth2_residual  # depth 2: skip connection over conv2
 
@@ -208,7 +213,10 @@ class ConvGroup(nn.Module):
             return self.norm2.activate(self.conv2(x), self.approximate, residual)
         x0 = x
         x = self.norm2.activate(self.conv2(x), self.approximate)
-        return self.norm3.activate(self.conv3(x), self.approximate, x0)
+        x = self.norm3.activate(self.conv3(x), self.approximate, x0)
+        if self.conv4 is None:
+            return x
+        return self.norm4.activate(self.conv4(x), self.approximate, x)
 
 
 class Net(nn.Module):
@@ -239,6 +247,7 @@ class Net(nn.Module):
                 first_pool=first_pool,
                 first_stride=hyp["conv1_stride"],
                 inner_kernel=hyp["conv_kernels"][0],
+                bn_scale=hyp["bn_scale"],
             ),
             ConvGroup(
                 w1,
@@ -249,6 +258,7 @@ class Net(nn.Module):
                 hyp["pool_first"][1],
                 skip,
                 inner_kernel=hyp["conv_kernels"][1],
+                bn_scale=hyp["bn_scale"],
             ),
             ConvGroup(
                 w2,
@@ -259,6 +269,7 @@ class Net(nn.Module):
                 hyp["pool_first"][2],
                 skip,
                 inner_kernel=hyp["conv_kernels"][2],
+                bn_scale=hyp["bn_scale"],
             ),
             nn.AdaptiveMaxPool2d(1),
         )
@@ -460,8 +471,8 @@ def build(context: BuildContext):
     if len(hyp["widths"]) != 3 or any(w <= 0 for w in hyp["widths"]):
         raise ValueError("widths must contain three positive channel counts")
     depths = hyp["depths"] or [hyp["depth"]] * 3
-    if len(depths) != 3 or any(d not in (2, 3) for d in depths):
-        raise ValueError("depths must contain three values of 2 or 3")
+    if len(depths) != 3 or any(d not in (2, 3, 4) for d in depths):
+        raise ValueError("depths must contain three values of 2, 3 or 4")
     if hyp["train_resolution"] not in (24, 28, 32) or not 0 <= hyp["resolution_switch"] <= 1:
         raise ValueError(
             "train_resolution must be 24, 28, or 32; resolution_switch must be in [0, 1]"
@@ -510,6 +521,8 @@ def build(context: BuildContext):
         raise ValueError("head_lr must be positive")
     if not hyp["whiten_eps"] > 0:
         raise ValueError("whiten_eps must be positive")
+    if not isinstance(hyp["bn_scale"], bool):
+        raise ValueError("bn_scale must be a boolean")
     for resolution in _resolutions(hyp):
         # every resolution must keep a map >= 2x2 at each pool (and >= 3x3 at a strided conv)
         _stem_sizes(stem, resolution, hyp["conv1_stride"])
@@ -697,8 +710,12 @@ def prepare(state, data: TrainingData, seed: int) -> None:
 
 
 def _make_optimizer(net, lr, lr_biases, wd, hyp, device):
-    norm_biases = [p for name, p in net.named_parameters() if "norm" in name and p.requires_grad]
-    others = [p for name, p in net.named_parameters() if "norm" not in name and p.requires_grad]
+    def is_norm_bias(name):
+        return "norm" in name and name.endswith("bias")
+
+    params = [(n, p) for n, p in net.named_parameters() if p.requires_grad]
+    norm_biases = [p for name, p in params if is_norm_bias(name)]
+    others = [p for name, p in params if not is_norm_bias(name)]
     groups = [
         dict(params=norm_biases, lr=lr_biases, weight_decay=wd / lr_biases),
         dict(params=others, lr=lr, weight_decay=wd / lr),
