@@ -7,19 +7,20 @@ An adaptation of Keller Jordan's [airbench](https://github.com/KellerJordan/cifa
 ## Recipe
 
 - **Network**: frozen 2x2 patch-whitening conv (initialized from 5,000 training images in
-  `prepare`), then three conv groups of widths 96/256/768. Each group has three 3x3 convs
-  with 2x2 max-pooling after the first and a residual over the last two. BatchNorm has frozen
-  weights and momentum 0.7, activations are GELU, global max pooling feeds a linear head whose
-  logits are scaled by 1.25/9, and the model runs in fp16 and channels-last.
-- **Training**: 8.75 epochs, batch 1024, Nesterov SGD (lr 10.8, wd 0.012 per 1024 examples,
+  `prepare`), then three conv groups of widths 128/256/768. The first group has two 3x3
+  convs, the others three with a residual over the last two; each pools 2x2 after its first
+  conv. BatchNorm has frozen weights and momentum 0.5, activations are GELU, a plain full-
+  map max pool (not adaptive pooling, whose backward uses slow atomics) feeds a linear head
+  whose logits are scaled by 1.25/9, and the model runs in fp16 and channels-last.
+- **Training**: 8.25 epochs, batch 1024, Nesterov SGD (lr 11.5, wd 0.017 per 1024 examples,
   momentum 0.85, 32x lr on BatchNorm biases). Label smoothing 0.25. 23% warmup, then linear
   decay to 0.07x. Lookahead EMA every 5 steps. The first quarter of the steps trains on
   24x24 crops (a bilinear downscale of the training set made in `prepare`), the rest on
   32x32.
 - **Augmentation**: alternating flip, 2-pixel reflect-padded translation, and per-image
   brightness/contrast jitter of strength 0.3 drawn from a generator seeded by the trial seed.
-- **Untimed `build`**: `torch.compile(mode="max-autotune")` for the 32x32 graph, a second
-  static graph in the default mode for the 24x24 steps, plus a warmup of the training and
+- **Untimed `build`**: `torch.compile(mode="max-autotune")` for the 32x32 graph, the label-smoothed loss compiled
+  separately, a second static graph in the default mode for the 24x24 steps, plus a warmup of the training and
   evaluation kernels on random synthetic images at both sizes. `prepare` resets every
   parameter, BatchNorm statistic, optimizer, EMA buffer and the jitter generator before each
   trial.
@@ -28,6 +29,33 @@ Every setting can be overridden for experiments with `--params`; the defaults ar
 submitted recipe.
 
 ## Development results
+
+### Current defaults (stacked on the accuracy-recovery recipe)
+
+Paired 40-trial runs with random seed starts, same Hugging Face Jobs container
+(`a100-large`, A100-SXM4-80GB), current defaults against the accuracy-recovery recipe below
+(`scripts/hf_ab.sh`). The HF card is faster than Modal's, so compare rows within a job only.
+
+| Seed start | This recipe | Accuracy-recovery recipe (8.75 ep) |
+| --- | ---: | ---: |
+| 466919630 | 75.24% in 5.109 s | 75.27% in 5.690 s |
+| 350181315 | 75.32% in 5.126 s | 75.31% in 5.712 s |
+
+About 0.58 s (10%) faster at equal accuracy. Screened in paired 16-trial runs against the
+accuracy-recovery recipe (75.27-75.41% in 5.59-5.67 s in those jobs):
+
+| Change on top of the accuracy-recovery recipe | Accuracy | Time |
+| --- | ---: | ---: |
+| 2-conv 128-wide first group, lr 11.5, wd 0.017, BN momentum 0.5, 8.25 ep | 75.19-75.23% | 5.22-5.30 s |
+| + full-map `max_pool2d` instead of `AdaptiveMaxPool2d` | 75.20% | 5.07 s |
+| + compiled label-smoothed loss (**selected**) | 75.25% | 4.99 s |
+| + SiLU instead of GELU | 74.81% | 4.93 s |
+| at 8.0 epochs | 74.99-75.06% | 4.93-5.07 s |
+| first quarter at 24x24 extended to 35% | 75.02% | 5.02 s |
+| wd 0.02 / lr 12.5 / BN momentum 0.6 / label smoothing 0.3 | 75.05-75.24% | 5.02-5.08 s |
+| lr 11.5, wd 0.017, BN 0.5 only (8.75 ep, original widths) | 75.48% | 5.63 s |
+
+### Accuracy-recovery recipe (previous defaults)
 
 40 trials (seeds 0-39) with the official accuracy target and a cold `build`, on Modal
 NVIDIA A100-SXM4-80GB cards (judging hardware), one run per power limit:
