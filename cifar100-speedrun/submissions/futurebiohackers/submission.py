@@ -92,8 +92,15 @@ class Conv(nn.Conv2d):
 
     def reset_parameters(self):
         super().reset_parameters()
+        # Same values as nn.init.dirac_(w[: w.size(1)]) (identity kernel on the first `in`
+        # output channels) with one fill and one index_put instead of a kernel launch per
+        # channel: that loop was most of prepare's 63 ms reset time.
         w = self.weight.data
-        nn.init.dirac_(w[: w.size(1)])
+        first = w[: w.size(1)]
+        first.zero_()
+        n = min(first.size(0), first.size(1))
+        idx = torch.arange(n, device=w.device)
+        first[idx, idx, w.size(2) // 2, w.size(3) // 2] = 1
 
 
 class ConvGroup(nn.Module):
