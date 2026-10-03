@@ -18,7 +18,7 @@ h1{font-size:28px;margin:0 0 4px}h2{font-size:19px;margin:0 0 4px}h3{font-size:1
 svg.chart{max-width:100%;height:auto;display:block}
 svg .grid{stroke:#eef2f7;stroke-width:1}svg .axis{stroke:#cbd5e1;stroke-width:1}
 svg .tick,svg .val,svg .seg{font-size:11px;fill:#64748b}svg .seg{fill:#fff;font-weight:600}svg .label{font-size:12px;fill:#334155}
-svg .ref{font-size:11px}svg .end{font-size:11px;fill:var(--ink)}svg .endbg{fill:var(--card);opacity:.92}svg .cat{font-size:12px;fill:#0f172a}
+svg .ref{font-size:11px}svg .end{font-size:11px;fill:var(--ink)}svg .cat{font-size:12px;fill:#0f172a}
 svg [data-tip]{cursor:pointer}svg.chart circle[data-tip]:hover{r:7}
 .linbar{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;margin:0 0 4px}.linbar .tabs{margin:0;align-items:center}.linbar .tabs>span{font-size:13px;color:var(--muted);margin-right:2px}
 .linzoom button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 10px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted);margin-left:4px}
@@ -42,7 +42,7 @@ footer{color:var(--muted);font-size:12px;margin-top:30px}
 .events{margin:0;padding-left:18px;font-size:12.5px;color:#334155}.events li{margin:2px 0}
 @media print{.tabs{display:none}.panel{display:block!important}}
 </style></head><body><main>
-<h1>Autoresearch — objective optimisation &amp; flavour comparison</h1><p class='sub'>problem: <b>median_string</b> · 3 runs · updated 2026-10-03 21:40:21 UTC</p>
+<h1>Autoresearch — objective optimisation &amp; flavour comparison</h1><p class='sub'>problem: <b>median_string</b> · 3 runs · updated 2026-10-03 21:53:38 UTC</p>
 <section class='card'><h2>Now</h2><p class='lead'>Swarm progress from <code>events.jsonl</code> (newest first).</p><h3>Haiku</h3><div class='kpis'><div class='kpi'><div class='v'>gen 2</div><div class='k'>generation</div><div class='d'>finished</div></div><div class='kpi'><div class='v'>6:26</div><div class='k'>elapsed</div><div class='d'>budget 20 min</div></div><div class='kpi'><div class='v'>19,794</div><div class='k'>best objective</div><div class='d'>#7</div></div><div class='kpi'><div class='v'>8</div><div class='k'>proposals recorded</div><div class='d'>this generation: ok 3, timeout 1</div></div><div class='kpi'><div class='v'>$0.85</div><div class='k'>agent cost</div><div class='d'>Claude Code reported cost</div></div></div><ul class='events'><li><code>run end: 2 generation(s), 8 proposals, best #7=19794</code></li><li><code>holdout: seed 22575 -&gt; best #7 19786 (baseline 23986)</code></li><li><code>gen 2 end: best #7=19794; 4 evaluated, 2 kept; 193s; cost so far $0.85</code></li><li><code>gen 2 #8 w03 [new_family] failed/inconclusive -</code></li><li><code>gen 2 #7 w02 [fix_losers] kept/supported 19794 ** NEW BEST **</code></li><li><code>gen 2 #6 w01 [tune] evaluated/falsified 21060</code></li><li><code>gen 2 #5 w00 [tune] kept/supported 19851 ** NEW BEST **</code></li><li><code>gen 2 evaluating 4 candidate(s) (0 duplicate, 0 guard, 0 hypothesis-gate, 0 empty skipped)</code></li><li><code>gen 2 w01 [tune] timeout 181s $0.00 — Adaptive budget-split multi-restart: initial 40% budget for set-median local search; remai</code></li><li><code>gen 2 w03 [new_family] ok 133s $0.17 — Window-based alignment consensus: iteratively rebuild center via position-wise voting on c</code></li><li><code>gen 2 w00 [tune] ok 121s $0.11 — Add perturbation-based restarts in remaining time budget (15% after main phase): perturb b</code></li><li><code>gen 2 w02 [fix_losers] ok 118s $0.13 — Add insertion/deletion moves to local search on small instances (k≤25): parent uses only s</code></li><li><code>gen 2 start: tune 2, fix_losers 1, new_family 1; best #2=19853</code></li><li><code>gen 1 end: best #2=19853; 4 evaluated, 1 kept; 189s; cost so far $0.44</code></li></ul><h3>Sonnet</h3><div class='kpis'><div class='kpi'><div class='v'>gen 2</div><div class='k'>generation</div><div class='d'>finished</div></div><div class='kpi'><div class='v'>1:17</div><div class='k'>elapsed</div><div class='d'>budget 20 min</div></div><div class='kpi'><div class='v'>19,280</div><div class='k'>best objective</div><div class='d'>#6</div></div><div class='kpi'><div class='v'>8</div><div class='k'>proposals recorded</div><div class='d'>this generation: ok 4</div></div><div class='kpi'><div class='v'>$0.54</div><div class='k'>agent cost</div><div class='d'>Claude Code reported cost</div></div></div><ul class='events'><li><code>run end: 2 generation(s), 8 proposals, best #6=19280</code></li><li><code>holdout: seed 22575 -&gt; best #6 19200 (baseline 23986)</code></li><li><code>gen 2 end: best #6=19280; 4 evaluated, 4 kept; 34s; cost so far $0.54</code></li><li><code>gen 2 #8 w03 [merge] kept/unconfirmed 19244</code></li><li><code>gen 2 #7 w02 [new_family] kept/partial 19374</code></li><li><code>gen 2 #6 w01 [fix_losers] kept/supported 19280 ** NEW BEST **</code></li><li><code>gen 2 #5 w00 [tune] kept/supported 19316 ** NEW BEST **</code></li><li><code>gen 2 evaluating 4 candidate(s) (0 duplicate, 0 guard, 0 hypothesis-gate, 0 empty skipped)</code></li><li><code>gen 2 w01 [fix_losers] ok 23s $0.06 — Anytime budget split: 30% multi-start vote refinement from top-6 set medians, polish sweep</code></li><li><code>gen 2 w03 [merge] ok 23s $0.07 — Merge #2 vote refinement with #3&#x27;s top-3 multi-start, then sub/del/ins sweeps (adds indel </code></li><li><code>gen 2 w02 [new_family] ok 21s $0.06 — After single-edit local search converges, exhaustively replace every 2-char window with al</code></li><li><code>gen 2 w00 [tune] ok 19s $0.06 — Run parent&#x27;s vote refinement from the top-3 set medians (rank 0 first, others time-capped)</code></li><li><code>gen 2 start: tune 1, fix_losers 1, new_family 1, merge 1; best #2=19437</code></li><li><code>gen 1 end: best #2=19437; 4 evaluated, 3 kept; 39s; cost so far $0.29</code></li></ul><h3>Opus</h3><div class='kpis'><div class='kpi'><div class='v'>gen 2</div><div class='k'>generation</div><div class='d'>finished</div></div><div class='kpi'><div class='v'>2:35</div><div class='k'>elapsed</div><div class='d'>budget 20 min</div></div><div class='kpi'><div class='v'>18,525</div><div class='k'>best objective</div><div class='d'>#5</div></div><div class='kpi'><div class='v'>8</div><div class='k'>proposals recorded</div><div class='d'>this generation: ok 4</div></div><div class='kpi'><div class='v'>$1.32</div><div class='k'>agent cost</div><div class='d'>Claude Code reported cost</div></div></div><ul class='events'><li><code>run end: 2 generation(s), 8 proposals, best #5=18525</code></li><li><code>holdout: seed 22575 -&gt; best #5 18441 (baseline 23986)</code></li><li><code>gen 2 end: best #5=18525; 4 evaluated, 1 kept; 85s; cost so far $1.32</code></li><li><code>gen 2 #8 w03 [merge] evaluated/falsified 18628</code></li><li><code>gen 2 #7 w02 [new_family] evaluated/falsified 18738</code></li><li><code>gen 2 #6 w01 [fix_losers] evaluated/falsified 18650</code></li><li><code>gen 2 #5 w00 [tune] kept/supported 18525 ** NEW BEST **</code></li><li><code>gen 2 evaluating 4 candidate(s) (0 duplicate, 0 guard, 0 hypothesis-gate, 0 empty skipped)</code></li><li><code>gen 2 w02 [new_family] ok 72s $0.21 — After alignment consensus, replace greedy single-edit polish with exact window optimizatio</code></li><li><code>gen 2 w01 [fix_losers] ok 52s $0.17 — Anytime budget split: run the parent&#x27;s voted local search to convergence (capped at 80% of</code></li><li><code>gen 2 w03 [merge] ok 38s $0.16 — Merge: seed parent #2&#x27;s alignment-voted local search with parent #4&#x27;s iterated alignment c</code></li><li><code>gen 2 w00 [tune] ok 31s $0.13 — Keep parent #2&#x27;s algorithm but in the single-move phase accept every improving vote-ranked</code></li><li><code>gen 2 start: tune 1, fix_losers 1, new_family 1, merge 1; best #2=18655</code></li><li><code>gen 1 end: best #2=18655; 4 evaluated, 2 kept; 67s; cost so far $0.65</code></li></ul></section>
 <div class="kpis"><div class="kpi"><div class="v">+23.5%</div><div class="k">best improvement vs set-median baseline</div><div class="d">Opus · validate split</div></div><div class="kpi"><div class="v">+19.8%</div><div class="k">vs strongest classical solver (template)</div><div class="d">23,085 → agents&#x27; best 18,525 · same CPU budget</div></div><div class="kpi"><div class="v">921.0k</div><div class="k">agent tokens used</div><div class="d">8 evaluations in 2.6m · $1.32</div></div><div class="kpi"><div class="v">49.0k</div><div class="k">tokens per 1% gained</div><div class="d">Opus · research efficiency</div></div><div class="kpi"><div class="v">+23.1%</div><div class="k">held-out improvement (unseen instances)</div><div class="d">Opus</div></div><div class="kpi"><div class="v">0</div><div class="k">duplicate proposals skipped</div><div class="d">evaluations saved by the novelty gate; their proposal tokens were still spent</div></div></div>
 <section class='card'><h2>Quality vs efficiency</h2><p class='lead'><b>Opus</b> finds the best solver (18,525, +18.8% vs the seed); <b>Sonnet</b> is the cheapest run ($0.54, +15.5% vs the seed in 1.3m). A ★ marks the winner of each measure. Proposers: Haiku: <code>claude-code:haiku</code> · Sonnet: <code>claude-code:sonnet</code> · Opus: <code>claude-code:opus</code>.</p><div class='qe'><div class='qe-grp'><h3>Quality · Opus wins</h3><figure class='qe-fig'><figcaption><b>gain over the seed</b><span>validate split · higher is better</span></figcaption><svg class="chart" viewBox="0 0 420 86" role="img">
@@ -151,14 +151,14 @@ Keep set-median start + greedy local search but remove the 50-move cap and searc
 <circle cx="584.0" cy="310.3" r="5" fill="#059669" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 18,525
 Keep parent #2&#x27;s algorithm but in the single-move phase accept every improving vote-ranked move within one pass (moves stay in base-string coordinates via _apply, conflicting positions skipped) instead of recomputing all k editops after each accepted move, and raise the time fraction 0.8-&gt;0.9; the 3 DNA instances that hit the deadline (dna_mid_480bp_k20, dna_mid_640bp_k25, dna_mid_noisy_400bp) should converge further for lower scores while converged ones (protein, cohort) keep their score."/>
 </svg></div><div class="panel " data-group="x" data-key="tokens"><svg class="chart" viewBox="0 0 920 380" width="920" height="380" role="img">
-<line class="grid" x1="64" x2="896" y1="335.4" y2="335.4"/>
-<text class="tick" x="56" y="339.4" text-anchor="end">18,000</text>
-<line class="grid" x1="64" x2="896" y1="240.0" y2="240.0"/>
-<text class="tick" x="56" y="244.0" text-anchor="end">20,000</text>
-<line class="grid" x1="64" x2="896" y1="144.7" y2="144.7"/>
-<text class="tick" x="56" y="148.7" text-anchor="end">22,000</text>
-<line class="grid" x1="64" x2="896" y1="49.3" y2="49.3"/>
-<text class="tick" x="56" y="53.3" text-anchor="end">24,000</text>
+<line class="grid" x1="64" x2="896" y1="334.9" y2="334.9"/>
+<text class="tick" x="56" y="338.9" text-anchor="end">18,000</text>
+<line class="grid" x1="64" x2="896" y1="254.1" y2="254.1"/>
+<text class="tick" x="56" y="258.1" text-anchor="end">20,000</text>
+<line class="grid" x1="64" x2="896" y1="173.3" y2="173.3"/>
+<text class="tick" x="56" y="177.3" text-anchor="end">22,000</text>
+<line class="grid" x1="64" x2="896" y1="92.5" y2="92.5"/>
+<text class="tick" x="56" y="96.5" text-anchor="end">24,000</text>
 <text class="tick" x="64.0" y="350" text-anchor="middle">0</text>
 <text class="tick" x="193.0" y="350" text-anchor="middle">500.0k</text>
 <text class="tick" x="322.1" y="350" text-anchor="middle">1000.0k</text>
@@ -167,54 +167,51 @@ Keep parent #2&#x27;s algorithm but in the single-move phase accept every improv
 <text class="tick" x="709.2" y="350" text-anchor="middle">2500.0k</text>
 <text class="tick" x="838.3" y="350" text-anchor="middle">3000.0k</text>
 <line class="axis" x1="64" x2="896" y1="332" y2="332"/>
-<line class="axis" x1="64" x2="64" y1="18" y2="332"/>
+<line class="axis" x1="64" x2="64" y1="66" y2="332"/>
 <text class="label" x="480" y="372" text-anchor="middle">cumulative agent tokens (prompt + completion)</text>
-<text class="label" transform="translate(14,175) rotate(-90)" text-anchor="middle">objective (total edit distance, lower is better)</text>
-<line x1="64" x2="896" y1="39.7" y2="39.7" stroke="#64748b" stroke-dasharray="6 4" stroke-width="1.5"/>
-<text class="ref" x="892" y="34.7" text-anchor="end" fill="#64748b">set-median baseline = 24,202</text>
-<line x1="64" x2="896" y1="297.9" y2="297.9" stroke="#16a34a" stroke-dasharray="2 4" stroke-width="1.5"/>
-<text class="ref" x="892" y="292.9" text-anchor="end" fill="#16a34a">planted reference (not proven optimal) = 18,787</text>
-<line x1="64" x2="896" y1="92.9" y2="92.9" stroke="#b45309" stroke-dasharray="4 3" stroke-width="1.5"/>
-<text class="ref" x="892" y="87.9" text-anchor="end" fill="#b45309">best classical solver (template) = 23,085</text>
-<line x1="896.0" x2="896.0" y1="18" y2="332" stroke="#2563eb" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Haiku: run ended at 3223.8k"/>
-<rect class="endbg" x="769.2" y="21" width="124" height="15" rx="3"/>
-<text class="end" x="890.0" y="32" text-anchor="end">Haiku end · 3223.8k</text>
-<line x1="220.2" x2="220.2" y1="18" y2="332" stroke="#dc2626" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Sonnet: run ended at 605.3k"/>
-<rect class="endbg" x="223.2" y="37" width="124" height="15" rx="3"/>
-<text class="end" x="226.2" y="48" text-anchor="start">Sonnet end · 605.3k</text>
-<line x1="301.7" x2="301.7" y1="18" y2="332" stroke="#059669" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Opus: run ended at 921.0k"/>
-<rect class="endbg" x="304.7" y="53" width="111" height="15" rx="3"/>
-<text class="end" x="307.7" y="64" text-anchor="start">Opus end · 921.0k</text>
-<path d="M64.0,105.7 H176.4 V105.7 H241.0 V247.0 H241.0 V247.0 H514.7 V247.0 H608.7 V247.1 H608.7 V247.1 H717.9 V249.8 H896.0 V249.8 H896.0" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linejoin="round"/>
-<circle cx="241.0" cy="247.0" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,853
+<text class="label" transform="translate(14,199) rotate(-90)" text-anchor="middle">objective (total edit distance, lower is better)</text>
+<line x1="64" x2="896" y1="84.3" y2="84.3" stroke="#64748b" stroke-dasharray="6 4" stroke-width="1.5"/>
+<text class="ref" x="892" y="79.3" text-anchor="end" fill="#64748b">set-median baseline = 24,202</text>
+<line x1="64" x2="896" y1="303.1" y2="303.1" stroke="#16a34a" stroke-dasharray="2 4" stroke-width="1.5"/>
+<text class="ref" x="892" y="298.1" text-anchor="end" fill="#16a34a">planted reference (not proven optimal) = 18,787</text>
+<line x1="64" x2="896" y1="129.5" y2="129.5" stroke="#b45309" stroke-dasharray="4 3" stroke-width="1.5"/>
+<text class="ref" x="892" y="124.5" text-anchor="end" fill="#b45309">best classical solver (template) = 23,085</text>
+<line x1="896.0" x2="896.0" y1="4" y2="332" stroke="#2563eb" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Haiku end · 3223.8k"/>
+<text class="end" x="890.0" y="14" text-anchor="end">Haiku end · 3223.8k</text>
+<line x1="220.2" x2="220.2" y1="20" y2="332" stroke="#dc2626" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Sonnet end · 605.3k"/>
+<text class="end" x="226.2" y="30" text-anchor="start">Sonnet end · 605.3k</text>
+<line x1="301.7" x2="301.7" y1="36" y2="332" stroke="#059669" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Opus end · 921.0k"/>
+<text class="end" x="307.7" y="46" text-anchor="start">Opus end · 921.0k</text>
+<path d="M64.0,140.3 H176.4 V140.3 H241.0 V260.0 H241.0 V260.0 H514.7 V260.0 H608.7 V260.1 H608.7 V260.1 H717.9 V262.4 H896.0 V262.4 H896.0" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="241.0" cy="260.0" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,853
 Exhaustive local search: check all single-character substitutions at each position and pick the best one (instead of greedy first-improvement). This provides more thorough local optimization to reach better local optima; expect lower scores on all instances."/>
-<circle cx="608.7" cy="247.1" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 19,851
+<circle cx="608.7" cy="260.1" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 19,851
 Add perturbation-based restarts in remaining time budget (15% after main phase): perturb best solution found and run local search again, creating adaptive starting points that can escape local optima without regression risk since we only accept improvements; expect slight gains or no change on all instances."/>
-<circle cx="717.9" cy="249.8" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#7 [fix_losers] → 19,794
+<circle cx="717.9" cy="262.4" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#7 [fix_losers] → 19,794
 Add insertion/deletion moves to local search on small instances (k≤25): parent uses only substitutions but instances have 5-10% indel noise; exhaustive search including single-char indels exploits this on instances with fewer strings, targeting dna_mid_480bp_k20, dna_mid_640bp_k25, protein_mid_320aa."/>
-<path d="M64.0,105.7 H86.0 V114.8 H108.0 V266.9 H130.0 V266.9 H152.0 V266.9 H168.5 V272.6 H185.4 V274.3 H202.3 V274.3 H220.2 V274.3 H896.0" fill="none" stroke="#dc2626" stroke-width="2.4" stroke-linejoin="round"/>
-<circle cx="86.0" cy="114.8" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#1 [tune] → 22,626
+<path d="M64.0,140.3 H86.0 V148.0 H108.0 V276.8 H130.0 V276.8 H152.0 V276.8 H168.5 V281.7 H185.4 V283.2 H202.3 V283.2 H220.2 V283.2 H896.0" fill="none" stroke="#dc2626" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="86.0" cy="148.0" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#1 [tune] → 22,626
 Population of 6 set-medians each locally optimised (sub/del/ins), then path relinking via editops between all pairs + local search; expect gains on all, esp. high-noise DNA."/>
-<circle cx="108.0" cy="266.9" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,437
+<circle cx="108.0" cy="276.8" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,437
 Replace 50-step greedy substitution with alignment-vote refinement (majority of editops incl. indels) then full substitution sweeps; expect lower on all, esp. long DNA/noisy."/>
-<circle cx="168.5" cy="272.6" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 19,316
+<circle cx="168.5" cy="281.7" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 19,316
 Run parent&#x27;s vote refinement from the top-3 set medians (rank 0 first, others time-capped) and keep the best before substitution sweeps; guards against bad single start, expect lower on noisy DNA/protein/cohort, never worse than parent on start."/>
-<circle cx="185.4" cy="274.3" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#6 [fix_losers] → 19,280
+<circle cx="185.4" cy="283.2" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#6 [fix_losers] → 19,280
 Anytime budget split: 30% multi-start vote refinement from top-6 set medians, polish sweep, then iterated local search (random perturb + vote refine) in remaining time; expect lower on all Levenshtein instances, esp. noisy DNA/protein."/>
-<path d="M64.0,105.7 H92.9 V105.7 H121.1 V304.1 H155.4 V304.1 H183.6 V304.1 H206.8 V310.3 H237.5 V310.3 H263.0 V310.3 H301.7 V310.3 H896.0" fill="none" stroke="#059669" stroke-width="2.4" stroke-linejoin="round"/>
-<circle cx="121.1" cy="304.1" r="5" fill="#059669" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 18,655
+<path d="M64.0,140.3 H92.9 V140.3 H121.1 V308.4 H155.4 V308.4 H183.6 V308.4 H206.8 V313.7 H237.5 V313.7 H263.0 V313.7 H301.7 V313.7 H896.0" fill="none" stroke="#059669" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="121.1" cy="308.4" r="5" fill="#059669" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 18,655
 Keep set-median start + greedy local search but remove the 50-move cap and search an exhaustive alignment-voted edit neighbourhood (sub/ins/del proposals from editops vs all strings, majority batch step first, then individual moves ranked by vote) until no improving move exists; expect lower scores on all 5 instances, most on dna_mid_640bp_k25 and dna_mid_cohort_280bp."/>
-<circle cx="206.8" cy="310.3" r="5" fill="#059669" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 18,525
+<circle cx="206.8" cy="313.7" r="5" fill="#059669" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 18,525
 Keep parent #2&#x27;s algorithm but in the single-move phase accept every improving vote-ranked move within one pass (moves stay in base-string coordinates via _apply, conflicting positions skipped) instead of recomputing all k editops after each accepted move, and raise the time fraction 0.8-&gt;0.9; the 3 DNA instances that hit the deadline (dna_mid_480bp_k20, dna_mid_640bp_k25, dna_mid_noisy_400bp) should converge further for lower scores while converged ones (protein, cohort) keep their score."/>
 </svg></div><div class="panel " data-group="x" data-key="seconds"><svg class="chart" viewBox="0 0 920 380" width="920" height="380" role="img">
-<line class="grid" x1="64" x2="896" y1="335.4" y2="335.4"/>
-<text class="tick" x="56" y="339.4" text-anchor="end">18,000</text>
-<line class="grid" x1="64" x2="896" y1="240.0" y2="240.0"/>
-<text class="tick" x="56" y="244.0" text-anchor="end">20,000</text>
-<line class="grid" x1="64" x2="896" y1="144.7" y2="144.7"/>
-<text class="tick" x="56" y="148.7" text-anchor="end">22,000</text>
-<line class="grid" x1="64" x2="896" y1="49.3" y2="49.3"/>
-<text class="tick" x="56" y="53.3" text-anchor="end">24,000</text>
+<line class="grid" x1="64" x2="896" y1="334.9" y2="334.9"/>
+<text class="tick" x="56" y="338.9" text-anchor="end">18,000</text>
+<line class="grid" x1="64" x2="896" y1="254.1" y2="254.1"/>
+<text class="tick" x="56" y="258.1" text-anchor="end">20,000</text>
+<line class="grid" x1="64" x2="896" y1="173.3" y2="173.3"/>
+<text class="tick" x="56" y="177.3" text-anchor="end">22,000</text>
+<line class="grid" x1="64" x2="896" y1="92.5" y2="92.5"/>
+<text class="tick" x="56" y="96.5" text-anchor="end">24,000</text>
 <text class="tick" x="64.0" y="350" text-anchor="middle">0s</text>
 <text class="tick" x="171.9" y="350" text-anchor="middle">50s</text>
 <text class="tick" x="279.8" y="350" text-anchor="middle">1.7m</text>
@@ -224,54 +221,51 @@ Keep parent #2&#x27;s algorithm but in the single-move phase accept every improv
 <text class="tick" x="711.5" y="350" text-anchor="middle">5.0m</text>
 <text class="tick" x="819.4" y="350" text-anchor="middle">5.8m</text>
 <line class="axis" x1="64" x2="896" y1="332" y2="332"/>
-<line class="axis" x1="64" x2="64" y1="18" y2="332"/>
+<line class="axis" x1="64" x2="64" y1="66" y2="332"/>
 <text class="label" x="480" y="372" text-anchor="middle">wall-clock</text>
-<text class="label" transform="translate(14,175) rotate(-90)" text-anchor="middle">objective (total edit distance, lower is better)</text>
-<line x1="64" x2="896" y1="39.7" y2="39.7" stroke="#64748b" stroke-dasharray="6 4" stroke-width="1.5"/>
-<text class="ref" x="892" y="34.7" text-anchor="end" fill="#64748b">set-median baseline = 24,202</text>
-<line x1="64" x2="896" y1="297.9" y2="297.9" stroke="#16a34a" stroke-dasharray="2 4" stroke-width="1.5"/>
-<text class="ref" x="892" y="292.9" text-anchor="end" fill="#16a34a">planted reference (not proven optimal) = 18,787</text>
-<line x1="64" x2="896" y1="92.9" y2="92.9" stroke="#b45309" stroke-dasharray="4 3" stroke-width="1.5"/>
-<text class="ref" x="892" y="87.9" text-anchor="end" fill="#b45309">best classical solver (template) = 23,085</text>
-<line x1="896.0" x2="896.0" y1="18" y2="332" stroke="#2563eb" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Haiku: run ended at 6.4m"/>
-<rect class="endbg" x="787.8" y="21" width="105" height="15" rx="3"/>
-<text class="end" x="890.0" y="32" text-anchor="end">Haiku end · 6.4m</text>
-<line x1="227.6" x2="227.6" y1="18" y2="332" stroke="#dc2626" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Sonnet: run ended at 1.3m"/>
-<rect class="endbg" x="230.6" y="37" width="111" height="15" rx="3"/>
-<text class="end" x="233.6" y="48" text-anchor="start">Sonnet end · 1.3m</text>
-<line x1="399.0" x2="399.0" y1="18" y2="332" stroke="#059669" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Opus: run ended at 2.6m"/>
-<rect class="endbg" x="402.0" y="53" width="99" height="15" rx="3"/>
-<text class="end" x="405.0" y="64" text-anchor="start">Opus end · 2.6m</text>
-<path d="M64.0,105.7 H478.5 V105.7 H478.5 V247.0 H478.5 V247.0 H478.5 V247.0 H896.0 V247.1 H896.0 V247.1 H896.0 V249.8 H896.0 V249.8 H896.0" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linejoin="round"/>
-<circle cx="478.5" cy="247.0" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,853
+<text class="label" transform="translate(14,199) rotate(-90)" text-anchor="middle">objective (total edit distance, lower is better)</text>
+<line x1="64" x2="896" y1="84.3" y2="84.3" stroke="#64748b" stroke-dasharray="6 4" stroke-width="1.5"/>
+<text class="ref" x="892" y="79.3" text-anchor="end" fill="#64748b">set-median baseline = 24,202</text>
+<line x1="64" x2="896" y1="303.1" y2="303.1" stroke="#16a34a" stroke-dasharray="2 4" stroke-width="1.5"/>
+<text class="ref" x="892" y="298.1" text-anchor="end" fill="#16a34a">planted reference (not proven optimal) = 18,787</text>
+<line x1="64" x2="896" y1="129.5" y2="129.5" stroke="#b45309" stroke-dasharray="4 3" stroke-width="1.5"/>
+<text class="ref" x="892" y="124.5" text-anchor="end" fill="#b45309">best classical solver (template) = 23,085</text>
+<line x1="896.0" x2="896.0" y1="4" y2="332" stroke="#2563eb" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Haiku end · 6.4m"/>
+<text class="end" x="890.0" y="14" text-anchor="end">Haiku end · 6.4m</text>
+<line x1="227.6" x2="227.6" y1="20" y2="332" stroke="#dc2626" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Sonnet end · 1.3m"/>
+<text class="end" x="233.6" y="30" text-anchor="start">Sonnet end · 1.3m</text>
+<line x1="399.0" x2="399.0" y1="36" y2="332" stroke="#059669" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Opus end · 2.6m"/>
+<text class="end" x="405.0" y="46" text-anchor="start">Opus end · 2.6m</text>
+<path d="M64.0,140.3 H478.5 V140.3 H478.5 V260.0 H478.5 V260.0 H478.5 V260.0 H896.0 V260.1 H896.0 V260.1 H896.0 V262.4 H896.0 V262.4 H896.0" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="478.5" cy="260.0" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,853
 Exhaustive local search: check all single-character substitutions at each position and pick the best one (instead of greedy first-improvement). This provides more thorough local optimization to reach better local optima; expect lower scores on all instances."/>
-<circle cx="896.0" cy="247.1" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 19,851
+<circle cx="896.0" cy="260.1" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 19,851
 Add perturbation-based restarts in remaining time budget (15% after main phase): perturb best solution found and run local search again, creating adaptive starting points that can escape local optima without regression risk since we only accept improvements; expect slight gains or no change on all instances."/>
-<circle cx="896.0" cy="249.8" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#7 [fix_losers] → 19,794
+<circle cx="896.0" cy="262.4" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#7 [fix_losers] → 19,794
 Add insertion/deletion moves to local search on small instances (k≤25): parent uses only substitutions but instances have 5-10% indel noise; exhaustive search including single-char indels exploits this on instances with fewer strings, targeting dna_mid_480bp_k20, dna_mid_640bp_k25, protein_mid_320aa."/>
-<path d="M64.0,105.7 H154.3 V114.8 H154.3 V266.9 H154.3 V266.9 H154.3 V266.9 H227.6 V272.6 H227.6 V274.3 H227.6 V274.3 H227.6 V274.3 H896.0" fill="none" stroke="#dc2626" stroke-width="2.4" stroke-linejoin="round"/>
-<circle cx="154.3" cy="114.8" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#1 [tune] → 22,626
+<path d="M64.0,140.3 H154.3 V148.0 H154.3 V276.8 H154.3 V276.8 H154.3 V276.8 H227.6 V281.7 H227.6 V283.2 H227.6 V283.2 H227.6 V283.2 H896.0" fill="none" stroke="#dc2626" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="154.3" cy="148.0" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#1 [tune] → 22,626
 Population of 6 set-medians each locally optimised (sub/del/ins), then path relinking via editops between all pairs + local search; expect gains on all, esp. high-noise DNA."/>
-<circle cx="154.3" cy="266.9" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,437
+<circle cx="154.3" cy="276.8" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,437
 Replace 50-step greedy substitution with alignment-vote refinement (majority of editops incl. indels) then full substitution sweeps; expect lower on all, esp. long DNA/noisy."/>
-<circle cx="227.6" cy="272.6" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 19,316
+<circle cx="227.6" cy="281.7" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 19,316
 Run parent&#x27;s vote refinement from the top-3 set medians (rank 0 first, others time-capped) and keep the best before substitution sweeps; guards against bad single start, expect lower on noisy DNA/protein/cohort, never worse than parent on start."/>
-<circle cx="227.6" cy="274.3" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#6 [fix_losers] → 19,280
+<circle cx="227.6" cy="283.2" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#6 [fix_losers] → 19,280
 Anytime budget split: 30% multi-start vote refinement from top-6 set medians, polish sweep, then iterated local search (random perturb + vote refine) in remaining time; expect lower on all Levenshtein instances, esp. noisy DNA/protein."/>
-<path d="M64.0,105.7 H216.1 V105.7 H216.1 V304.1 H216.1 V304.1 H216.1 V304.1 H398.9 V310.3 H398.9 V310.3 H398.9 V310.3 H399.0 V310.3 H896.0" fill="none" stroke="#059669" stroke-width="2.4" stroke-linejoin="round"/>
-<circle cx="216.1" cy="304.1" r="5" fill="#059669" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 18,655
+<path d="M64.0,140.3 H216.1 V140.3 H216.1 V308.4 H216.1 V308.4 H216.1 V308.4 H398.9 V313.7 H398.9 V313.7 H398.9 V313.7 H399.0 V313.7 H896.0" fill="none" stroke="#059669" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="216.1" cy="308.4" r="5" fill="#059669" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 18,655
 Keep set-median start + greedy local search but remove the 50-move cap and search an exhaustive alignment-voted edit neighbourhood (sub/ins/del proposals from editops vs all strings, majority batch step first, then individual moves ranked by vote) until no improving move exists; expect lower scores on all 5 instances, most on dna_mid_640bp_k25 and dna_mid_cohort_280bp."/>
-<circle cx="398.9" cy="310.3" r="5" fill="#059669" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 18,525
+<circle cx="398.9" cy="313.7" r="5" fill="#059669" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 18,525
 Keep parent #2&#x27;s algorithm but in the single-move phase accept every improving vote-ranked move within one pass (moves stay in base-string coordinates via _apply, conflicting positions skipped) instead of recomputing all k editops after each accepted move, and raise the time fraction 0.8-&gt;0.9; the 3 DNA instances that hit the deadline (dna_mid_480bp_k20, dna_mid_640bp_k25, dna_mid_noisy_400bp) should converge further for lower scores while converged ones (protein, cohort) keep their score."/>
 </svg></div><div class="panel " data-group="x" data-key="cost"><svg class="chart" viewBox="0 0 920 380" width="920" height="380" role="img">
-<line class="grid" x1="64" x2="896" y1="335.4" y2="335.4"/>
-<text class="tick" x="56" y="339.4" text-anchor="end">18,000</text>
-<line class="grid" x1="64" x2="896" y1="240.0" y2="240.0"/>
-<text class="tick" x="56" y="244.0" text-anchor="end">20,000</text>
-<line class="grid" x1="64" x2="896" y1="144.7" y2="144.7"/>
-<text class="tick" x="56" y="148.7" text-anchor="end">22,000</text>
-<line class="grid" x1="64" x2="896" y1="49.3" y2="49.3"/>
-<text class="tick" x="56" y="53.3" text-anchor="end">24,000</text>
+<line class="grid" x1="64" x2="896" y1="334.9" y2="334.9"/>
+<text class="tick" x="56" y="338.9" text-anchor="end">18,000</text>
+<line class="grid" x1="64" x2="896" y1="254.1" y2="254.1"/>
+<text class="tick" x="56" y="258.1" text-anchor="end">20,000</text>
+<line class="grid" x1="64" x2="896" y1="173.3" y2="173.3"/>
+<text class="tick" x="56" y="177.3" text-anchor="end">22,000</text>
+<line class="grid" x1="64" x2="896" y1="92.5" y2="92.5"/>
+<text class="tick" x="56" y="96.5" text-anchor="end">24,000</text>
 <text class="tick" x="64.0" y="350" text-anchor="middle">$0.00</text>
 <text class="tick" x="190.4" y="350" text-anchor="middle">$0.20</text>
 <text class="tick" x="316.8" y="350" text-anchor="middle">$0.40</text>
@@ -280,44 +274,41 @@ Keep parent #2&#x27;s algorithm but in the single-move phase accept every improv
 <text class="tick" x="695.9" y="350" text-anchor="middle">$1.00</text>
 <text class="tick" x="822.3" y="350" text-anchor="middle">$1.20</text>
 <line class="axis" x1="64" x2="896" y1="332" y2="332"/>
-<line class="axis" x1="64" x2="64" y1="18" y2="332"/>
+<line class="axis" x1="64" x2="64" y1="66" y2="332"/>
 <text class="label" x="480" y="372" text-anchor="middle">cumulative agent cost (Claude Code&#x27;s estimate)</text>
-<text class="label" transform="translate(14,175) rotate(-90)" text-anchor="middle">objective (total edit distance, lower is better)</text>
-<line x1="64" x2="896" y1="39.7" y2="39.7" stroke="#64748b" stroke-dasharray="6 4" stroke-width="1.5"/>
-<text class="ref" x="892" y="34.7" text-anchor="end" fill="#64748b">set-median baseline = 24,202</text>
-<line x1="64" x2="896" y1="297.9" y2="297.9" stroke="#16a34a" stroke-dasharray="2 4" stroke-width="1.5"/>
-<text class="ref" x="892" y="292.9" text-anchor="end" fill="#16a34a">planted reference (not proven optimal) = 18,787</text>
-<line x1="64" x2="896" y1="92.9" y2="92.9" stroke="#b45309" stroke-dasharray="4 3" stroke-width="1.5"/>
-<text class="ref" x="892" y="87.9" text-anchor="end" fill="#b45309">best classical solver (template) = 23,085</text>
-<line x1="601.4" x2="601.4" y1="18" y2="332" stroke="#2563eb" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Haiku: run ended at $0.85"/>
-<rect class="endbg" x="604.4" y="21" width="111" height="15" rx="3"/>
-<text class="end" x="607.4" y="32" text-anchor="start">Haiku end · $0.85</text>
-<line x1="402.6" x2="402.6" y1="18" y2="332" stroke="#dc2626" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Sonnet: run ended at $0.54"/>
-<rect class="endbg" x="405.6" y="37" width="118" height="15" rx="3"/>
-<text class="end" x="408.6" y="48" text-anchor="start">Sonnet end · $0.54</text>
-<line x1="896.0" x2="896.0" y1="18" y2="332" stroke="#059669" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Opus: run ended at $1.32"/>
-<rect class="endbg" x="787.8" y="53" width="105" height="15" rx="3"/>
-<text class="end" x="890.0" y="64" text-anchor="end">Opus end · $1.32</text>
-<path d="M64.0,105.7 H143.9 V105.7 H195.0 V247.0 H195.0 V247.0 H344.1 V247.0 H414.3 V247.1 H414.3 V247.1 H496.9 V249.8 H601.4 V249.8 H896.0" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linejoin="round"/>
-<circle cx="195.0" cy="247.0" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,853
+<text class="label" transform="translate(14,199) rotate(-90)" text-anchor="middle">objective (total edit distance, lower is better)</text>
+<line x1="64" x2="896" y1="84.3" y2="84.3" stroke="#64748b" stroke-dasharray="6 4" stroke-width="1.5"/>
+<text class="ref" x="892" y="79.3" text-anchor="end" fill="#64748b">set-median baseline = 24,202</text>
+<line x1="64" x2="896" y1="303.1" y2="303.1" stroke="#16a34a" stroke-dasharray="2 4" stroke-width="1.5"/>
+<text class="ref" x="892" y="298.1" text-anchor="end" fill="#16a34a">planted reference (not proven optimal) = 18,787</text>
+<line x1="64" x2="896" y1="129.5" y2="129.5" stroke="#b45309" stroke-dasharray="4 3" stroke-width="1.5"/>
+<text class="ref" x="892" y="124.5" text-anchor="end" fill="#b45309">best classical solver (template) = 23,085</text>
+<line x1="601.4" x2="601.4" y1="4" y2="332" stroke="#2563eb" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Haiku end · $0.85"/>
+<text class="end" x="607.4" y="14" text-anchor="start">Haiku end · $0.85</text>
+<line x1="402.6" x2="402.6" y1="20" y2="332" stroke="#dc2626" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Sonnet end · $0.54"/>
+<text class="end" x="408.6" y="30" text-anchor="start">Sonnet end · $0.54</text>
+<line x1="896.0" x2="896.0" y1="36" y2="332" stroke="#059669" stroke-dasharray="5 4" stroke-width="1.5" data-tip="Opus end · $1.32"/>
+<text class="end" x="890.0" y="46" text-anchor="end">Opus end · $1.32</text>
+<path d="M64.0,140.3 H143.9 V140.3 H195.0 V260.0 H195.0 V260.0 H344.1 V260.0 H414.3 V260.1 H414.3 V260.1 H496.9 V262.4 H601.4 V262.4 H896.0" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="195.0" cy="260.0" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,853
 Exhaustive local search: check all single-character substitutions at each position and pick the best one (instead of greedy first-improvement). This provides more thorough local optimization to reach better local optima; expect lower scores on all instances."/>
-<circle cx="414.3" cy="247.1" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 19,851
+<circle cx="414.3" cy="260.1" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 19,851
 Add perturbation-based restarts in remaining time budget (15% after main phase): perturb best solution found and run local search again, creating adaptive starting points that can escape local optima without regression risk since we only accept improvements; expect slight gains or no change on all instances."/>
-<circle cx="496.9" cy="249.8" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#7 [fix_losers] → 19,794
+<circle cx="496.9" cy="262.4" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#7 [fix_losers] → 19,794
 Add insertion/deletion moves to local search on small instances (k≤25): parent uses only substitutions but instances have 5-10% indel noise; exhaustive search including single-char indels exploits this on instances with fewer strings, targeting dna_mid_480bp_k20, dna_mid_640bp_k25, protein_mid_320aa."/>
-<path d="M64.0,105.7 H110.3 V114.8 H154.7 V266.9 H200.2 V266.9 H245.1 V266.9 H280.1 V272.6 H320.9 V274.3 H358.4 V274.3 H402.6 V274.3 H896.0" fill="none" stroke="#dc2626" stroke-width="2.4" stroke-linejoin="round"/>
-<circle cx="110.3" cy="114.8" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#1 [tune] → 22,626
+<path d="M64.0,140.3 H110.3 V148.0 H154.7 V276.8 H200.2 V276.8 H245.1 V276.8 H280.1 V281.7 H320.9 V283.2 H358.4 V283.2 H402.6 V283.2 H896.0" fill="none" stroke="#dc2626" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="110.3" cy="148.0" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#1 [tune] → 22,626
 Population of 6 set-medians each locally optimised (sub/del/ins), then path relinking via editops between all pairs + local search; expect gains on all, esp. high-noise DNA."/>
-<circle cx="154.7" cy="266.9" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,437
+<circle cx="154.7" cy="276.8" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,437
 Replace 50-step greedy substitution with alignment-vote refinement (majority of editops incl. indels) then full substitution sweeps; expect lower on all, esp. long DNA/noisy."/>
-<circle cx="280.1" cy="272.6" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 19,316
+<circle cx="280.1" cy="281.7" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 19,316
 Run parent&#x27;s vote refinement from the top-3 set medians (rank 0 first, others time-capped) and keep the best before substitution sweeps; guards against bad single start, expect lower on noisy DNA/protein/cohort, never worse than parent on start."/>
-<circle cx="320.9" cy="274.3" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#6 [fix_losers] → 19,280
+<circle cx="320.9" cy="283.2" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#6 [fix_losers] → 19,280
 Anytime budget split: 30% multi-start vote refinement from top-6 set medians, polish sweep, then iterated local search (random perturb + vote refine) in remaining time; expect lower on all Levenshtein instances, esp. noisy DNA/protein."/>
-<path d="M64.0,105.7 H181.8 V105.7 H276.9 V304.1 H374.9 V304.1 H475.9 V304.1 H556.0 V310.3 H664.8 V310.3 H795.8 V310.3 H896.0 V310.3 H896.0" fill="none" stroke="#059669" stroke-width="2.4" stroke-linejoin="round"/>
-<circle cx="276.9" cy="304.1" r="5" fill="#059669" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 18,655
+<path d="M64.0,140.3 H181.8 V140.3 H276.9 V308.4 H374.9 V308.4 H475.9 V308.4 H556.0 V313.7 H664.8 V313.7 H795.8 V313.7 H896.0 V313.7 H896.0" fill="none" stroke="#059669" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="276.9" cy="308.4" r="5" fill="#059669" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 18,655
 Keep set-median start + greedy local search but remove the 50-move cap and search an exhaustive alignment-voted edit neighbourhood (sub/ins/del proposals from editops vs all strings, majority batch step first, then individual moves ranked by vote) until no improving move exists; expect lower scores on all 5 instances, most on dna_mid_640bp_k25 and dna_mid_cohort_280bp."/>
-<circle cx="556.0" cy="310.3" r="5" fill="#059669" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 18,525
+<circle cx="556.0" cy="313.7" r="5" fill="#059669" stroke="#fff" stroke-width="1.5" data-tip="#5 [tune] → 18,525
 Keep parent #2&#x27;s algorithm but in the single-move phase accept every improving vote-ranked move within one pass (moves stay in base-string coordinates via _apply, conflicting positions skipped) instead of recomputing all k editops after each accepted move, and raise the time fraction 0.8-&gt;0.9; the 3 DNA instances that hit the deadline (dna_mid_480bp_k20, dna_mid_640bp_k25, dna_mid_noisy_400bp) should converge further for lower scores while converged ones (protein, cohort) keep their score."/>
 </svg></div></section>
 <section class='card'><h2>Flavour scoreboard</h2><p class='lead'>Lower objective is better. Δ is relative to the set-median baseline on the validate split; held-out Δ is on fresh instances the loop never saw. 'tokens / 1%' = total agent tokens per percentage point gained over the seed.</p><div style='overflow-x:auto'><table><tr><th class='l'>flavour</th><th>best objective (seed)</th><th>Δ vs baseline</th><th>gap closed</th><th>held-out Δ</th><th>proposals</th><th>evaluated</th><th>kept</th><th>dupes skipped</th><th>crashed</th><th>tokens</th><th>tokens / 1%</th><th>evals to 1st gain</th><th>wall-clock</th></tr><tr class=''><td class='l'><span class='sw' style='background:#2563eb'></span><b>Haiku</b><span class='note' style='display:block;font-size:12px;color:#64748b'>novelty_threshold=0.95, max_novelty_attempts=3, exploit=0.7, patience=4, patience_generations=1, ucb_c=0.8, time_budget_ms=1000, modes=None, evaluator_hash=7efbc910a1cf</span></td><td>19,794 <span class='muted'>(22,816)</span></td><td><b>+18.2%</b></td><td>81%</td><td>+17.5%</td><td>8</td><td>8</td><td>3</td><td>0</td><td>1</td><td>3223.8k</td><td>243.4k</td><td>2</td><td>6.4m</td></tr><tr class=''><td class='l'><span class='sw' style='background:#dc2626'></span><b>Sonnet</b><span class='note' style='display:block;font-size:12px;color:#64748b'>novelty_threshold=0.95, max_novelty_attempts=3, exploit=0.7, patience=4, patience_generations=1, ucb_c=0.8, time_budget_ms=1000, modes=None, evaluator_hash=7efbc910a1cf</span></td><td>19,280 <span class='muted'>(22,816)</span></td><td><b>+20.3%</b></td><td>91%</td><td>+20.0%</td><td>8</td><td>8</td><td>7</td><td>0</td><td>0</td><td>605.3k</td><td>39.1k</td><td>1</td><td>1.3m</td></tr><tr class='best'><td class='l'><span class='sw' style='background:#059669'></span><b>Opus</b><span class='note' style='display:block;font-size:12px;color:#64748b'>novelty_threshold=0.95, max_novelty_attempts=3, exploit=0.7, patience=4, patience_generations=1, ucb_c=0.8, time_budget_ms=1000, modes=None, evaluator_hash=7efbc910a1cf</span></td><td>18,525 <span class='muted'>(22,816)</span></td><td><b>+23.5%</b></td><td>105%</td><td>+23.1%</td><td>8</td><td>8</td><td>3</td><td>0</td><td>1</td><td>921.0k</td><td>49.0k</td><td>2</td><td>2.6m</td></tr></table></div><h3>Prompt-mode hit rate (global wins + per-instance wins / tried)</h3><table><tr><th class='l'>flavour</th><th><span class="badge" style="background:#f97316">fix_losers</span></th><th><span class="badge" style="background:#ec4899">merge</span></th><th><span class="badge" style="background:#8b5cf6">new_family</span></th><th><span class="badge" style="background:#0ea5e9">tune</span></th></tr><tr><td class='l'><span class='sw' style='background:#2563eb'></span>Haiku</td><td>1+0 / 2</td><td>—</td><td>0+0 / 2</td><td>2+0 / 4</td></tr><tr><td class='l'><span class='sw' style='background:#dc2626'></span>Sonnet</td><td>1+1 / 2</td><td>0+1 / 1</td><td>0+1 / 2</td><td>3+0 / 3</td></tr><tr><td class='l'><span class='sw' style='background:#059669'></span>Opus</td><td>0+0 / 2</td><td>0+0 / 1</td><td>0+1 / 2</td><td>2+0 / 3</td></tr></table></section>
