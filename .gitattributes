@@ -1,2 +1,1 @@
-# Shell scripts must keep LF endings so they run under WSL/Linux after a Windows checkout
 *.sh text eol=lf
