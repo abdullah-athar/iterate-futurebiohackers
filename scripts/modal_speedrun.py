@@ -814,8 +814,19 @@ def _stats(run: dict, out: Path, environment: dict) -> dict:
         verdict += f": build exceeded {_sec(build_time)} s"
     if row["deadline_hit"]:
         verdict += " (interrupted at the container deadline)"
-    if build_time is not None and build_time > 300 and row["build_mode"] == "cold":
-        verdict += f"; BUILD > 300 s ({build_time:.0f} s cold)"
+    if build_time is not None and row["build_mode"] == "cold":
+        # Build clause (team policy, 3 Oct): the judges' four-CPU cold build is estimated as
+        # 1.8x the 20-CPU cold build (measured ratio range 1.1-1.8); a finalist passes below
+        # 400 s, an estimate above 350 s calls for one real `::main --cpus 4` measurement.
+        if (row.get("config") or "").endswith("[cpus 4]"):
+            flag = " FAILS THE BUILD CLAUSE" if build_time >= 400 else ""
+            verdict += f"; 4-CPU cold build {build_time:.0f} s (measured){flag}"
+        else:
+            estimate = 1.8 * build_time
+            if estimate >= 400:
+                verdict += f"; 4-CPU build estimate {estimate:.0f} s (1.8 x cold): MEASURE IT"
+            elif estimate > 350:
+                verdict += f"; 4-CPU build estimate {estimate:.0f} s (> 350: measure once before submitting)"
     if row["nonfinite"]:
         verdict += f"; NON-FINITE LOSSES: {row['nonfinite']}"
     several = s["successful_trials"] > 1
