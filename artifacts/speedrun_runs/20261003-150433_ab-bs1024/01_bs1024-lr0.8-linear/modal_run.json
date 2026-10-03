@@ -1,0 +1,18 @@
+{
+  "returncode": 1,
+  "result_dir": "/__modal/volumes/vo-DeZzWP1Pou6XGy9Ow6ytCp/futurebiohackers/20261003T140010Z-c7d315eb",
+  "command": "/opt/venv/bin/python -m benchmark.run --n 2 --device cuda --data-root /data --results-root /results --params '{\"batch_size\": 1024, \"lr\": 0.8, \"use_compile\": true}' --submission futurebiohackers --build-timeout 300.0",
+  "wall_seconds": 131.5,
+  "deadline_hit": false,
+  "spec": {
+    "label": "bs1024-lr0.8-linear",
+    "n": 2,
+    "submission": "futurebiohackers",
+    "submission_path": "",
+    "params": "{\"batch_size\": 1024, \"lr\": 0.8, \"use_compile\": true}",
+    "no_accuracy_target": false,
+    "seed": null,
+    "build_timeout": 300.0,
+    "torch_logs": "recompiles"
+  }
+}

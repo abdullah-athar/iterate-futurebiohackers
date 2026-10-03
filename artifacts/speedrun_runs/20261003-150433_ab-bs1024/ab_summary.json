@@ -1,0 +1,134 @@
+{
+  "tag": "ab-bs1024",
+  "environment": {
+    "task_id": "ta-01M410WJAQTX5DDV3XFK155KQR",
+    "hostname": "modal",
+    "region": "us-west",
+    "cloud": "CLOUD_PROVIDER_AZURE",
+    "gpu_name": "NVIDIA A100 80GB PCIe",
+    "gpu_memory": "81920 MiB",
+    "gpu_power_limit": "300.00 W",
+    "driver": "580.95.05",
+    "mig": "Disabled",
+    "versions": "python 3.12.10 torch 2.4.0+cu124 torchvision 0.19.0+cu124 cuda_runtime 12.4 cudnn 90100 cuda_available True\ncuda_devices ['NVIDIA A100 80GB PCIe']",
+    "cpu_count": 20,
+    "cpu_affinity": 20
+  },
+  "pcie_attempts": [
+    "NVIDIA A100 80GB PCIe [task ta-01M410WJAQTX5DDV3XFK155KQR]"
+  ],
+  "container_seconds": 413.8,
+  "rows": [
+    {
+      "label": "control",
+      "params": "{\"use_compile\": true}",
+      "config": "futurebiohackers {\"use_compile\": true}",
+      "returncode": 0,
+      "folder": "artifacts/speedrun_runs/20261003-150433_ab-bs1024/00_control",
+      "gpu": "NVIDIA A100 80GB PCIe",
+      "power_limit": "300.00 W",
+      "container_wall": 138.3,
+      "deadline_hit": false,
+      "complete": true,
+      "qualified": true,
+      "run_error": null,
+      "n": 2,
+      "trials_ok": 2,
+      "mean_acc": 0.7592,
+      "acc_std": 0.00042426406871188177,
+      "mean_time": 41.519951324000004,
+      "time_std": 0.28487217257623,
+      "mean_eval": 0.1902078169999868,
+      "build_time": 43.757818067,
+      "mean_prepare": 0.08045749900000487,
+      "mean_train": 41.439493825,
+      "accs": [
+        0.7595,
+        0.7589
+      ],
+      "times": [
+        41.31851627900001,
+        41.721386369
+      ],
+      "evals": [
+        0.2135519709999869,
+        0.16686366299998667
+      ],
+      "verdict": "QUALIFIED (>= 75%)"
+    },
+    {
+      "label": "bs1024-lr0.8-linear",
+      "params": "{\"batch_size\": 1024, \"lr\": 0.8, \"use_compile\": true}",
+      "config": "futurebiohackers {\"batch_size\": 1024, \"lr\": 0.8, \"use_compile\": true}",
+      "returncode": 1,
+      "folder": "artifacts/speedrun_runs/20261003-150433_ab-bs1024/01_bs1024-lr0.8-linear",
+      "gpu": "NVIDIA A100 80GB PCIe",
+      "power_limit": "300.00 W",
+      "container_wall": 131.5,
+      "deadline_hit": false,
+      "complete": true,
+      "qualified": false,
+      "run_error": null,
+      "n": 2,
+      "trials_ok": 2,
+      "mean_acc": 0.7475,
+      "acc_std": 0.003676955262170035,
+      "mean_time": 38.586309828500006,
+      "time_std": 0.16277139968432075,
+      "mean_eval": 0.20300945249999813,
+      "build_time": 41.916970348999996,
+      "mean_prepare": 0.08250408900001105,
+      "mean_train": 38.503805739499995,
+      "accs": [
+        0.7501,
+        0.7449
+      ],
+      "times": [
+        38.471213068,
+        38.701406589000015
+      ],
+      "evals": [
+        0.2255717470000036,
+        0.18044715799999267
+      ],
+      "verdict": "BELOW 75%"
+    },
+    {
+      "label": "bs1024-lr0.566-sqrt",
+      "params": "{\"batch_size\": 1024, \"lr\": 0.566, \"use_compile\": true}",
+      "config": "futurebiohackers {\"batch_size\": 1024, \"lr\": 0.566, \"use_compile\": true}",
+      "returncode": 1,
+      "folder": "artifacts/speedrun_runs/20261003-150433_ab-bs1024/02_bs1024-lr0.566-sqrt",
+      "gpu": "NVIDIA A100 80GB PCIe",
+      "power_limit": "300.00 W",
+      "container_wall": 132.2,
+      "deadline_hit": false,
+      "complete": true,
+      "qualified": false,
+      "run_error": null,
+      "n": 2,
+      "trials_ok": 2,
+      "mean_acc": 0.74815,
+      "acc_std": 7.071067811864696e-05,
+      "mean_time": 38.75129326799998,
+      "time_std": 0.05273809839217265,
+      "mean_eval": 0.19089685099999087,
+      "build_time": 42.931303928000034,
+      "mean_prepare": 0.081920166499998,
+      "mean_train": 38.669373101499986,
+      "accs": [
+        0.7482,
+        0.7481
+      ],
+      "times": [
+        38.78858473499997,
+        38.714001800999995
+      ],
+      "evals": [
+        0.21304985099999385,
+        0.1687438509999879
+      ],
+      "verdict": "BELOW 75%"
+    }
+  ]
+}
