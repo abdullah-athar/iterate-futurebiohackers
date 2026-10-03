@@ -1,0 +1,37 @@
+{
+  "returncode": 0,
+  "wall_seconds": 95.5,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T171158Z-769fbe08",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"bias_scaler\": 32.0, \"bn_momentum\": 0.7, \"count_nonfinite\": true, \"epochs\": 8.5, \"jitter\": 0.3, \"label_smoothing\": 0.25, \"lr\": 10.8, \"scaling_factor\": 0.1388888888888889}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "S7-e8.5",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"bias_scaler\": 32.0, \"bn_momentum\": 0.7, \"count_nonfinite\": true, \"epochs\": 8.5, \"jitter\": 0.3, \"label_smoothing\": 0.25, \"lr\": 10.8, \"scaling_factor\": 0.1388888888888889}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"bias_scaler\": 32.0, \"bn_momentum\": 0.7, \"count_nonfinite\": true, \"epochs\": 8.5, \"jitter\": 0.3, \"label_smoothing\": 0.25, \"lr\": 10.8, \"scaling_factor\": 0.1388888888888889}",
+    "delta": {
+      "bias_scaler": 32.0,
+      "label_smoothing": 0.25,
+      "lr": 10.8,
+      "bn_momentum": 0.7,
+      "jitter": 0.3,
+      "scaling_factor": 0.1388888888888889,
+      "epochs": 8.5
+    },
+    "hypothesis": "S7 without resizing: additivity of scale x1.25 on top of the stack (~75.5% at ~6.05 s)",
+    "config": "futurebiohackers {\"bias_scaler\": 32.0, \"bn_momentum\": 0.7, \"epochs\": 8.5, \"jitter\": 0.3, \"label_smoothing\": 0.25, \"lr\": 10.8, \"scaling_factor\": 0.1388888888888889}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

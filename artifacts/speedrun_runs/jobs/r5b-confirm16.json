@@ -1,0 +1,17 @@
+{
+  "round": "r5",
+  "n": 16,
+  "seed": 0,
+  "control": {"epochs": 8.5},
+  "jobs": [
+    {
+      "name": "confirm16b",
+      "control_index": 1,
+      "variants": [
+        {"label": "S7-res24s0.25-e9.0", "params": {"bias_scaler": 32.0, "label_smoothing": 0.25, "lr": 10.8, "bn_momentum": 0.7, "jitter": 0.3, "scaling_factor": 0.1388888888888889, "train_resolution": 24, "resolution_switch": 0.25, "epochs": 9.0}, "hypothesis": "r4: +0.42 +- 0.13 pp, -0.19 s (75.40% / 5.77 s); n=16 confirmation of the lead candidate"},
+        {"label": "S7-res24s0.25-e8.75", "params": {"bias_scaler": 32.0, "label_smoothing": 0.25, "lr": 10.8, "bn_momentum": 0.7, "jitter": 0.3, "scaling_factor": 0.1388888888888889, "train_resolution": 24, "resolution_switch": 0.25, "epochs": 8.75}, "hypothesis": "lead candidate trimmed by a quarter epoch (~5.6 s) in case the margin allows"},
+        {"label": "S7-res24s0.25-e9.25", "params": {"bias_scaler": 32.0, "label_smoothing": 0.25, "lr": 10.8, "bn_momentum": 0.7, "jitter": 0.3, "scaling_factor": 0.1388888888888889, "train_resolution": 24, "resolution_switch": 0.25, "epochs": 9.25}, "hypothesis": "lead candidate with a quarter epoch more (~5.93 s) as the accuracy-safe fallback"}
+      ]
+    }
+  ]
+}
