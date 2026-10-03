@@ -71,7 +71,6 @@ import sys
 import tempfile
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
@@ -469,7 +468,9 @@ def _ledger_add(
     label: str, gpu: str, container_seconds: float, note: str = "", power: str | None = None
 ) -> float:
     """Append one container's GPU time to the ledger and print the running total."""
-    minutes = (container_seconds + CONTAINER_START_S) / 60 if container_seconds > 0 else 0.0
+    # Every container that ran is billed at least its start-up; only a cancelled call that
+    # never got a container costs nothing.
+    minutes = 0.0 if note.startswith("cancelled") else (container_seconds + CONTAINER_START_S) / 60
     with _LOCK:
         try:
             ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -914,13 +915,9 @@ def _make_spec(
     }
 
 
-def _run_job(job: dict, cfg: dict) -> dict:
-    """One container: the control, then the job's variants; stats, registry and LOG rows."""
+def _job_specs(job: dict, cfg: dict) -> list[dict]:
+    """The harness runs of one job: the control first, then the variants (+ optional profile)."""
     name = job["name"]
-
-    def say(message: str) -> None:
-        print(f"[{name}] {message}", flush=True)
-
     n = int(job.get("n", cfg["n"]))
     control_params = {**cfg["control"], **job.get("control_params", {})}
     specs = []
@@ -965,8 +962,30 @@ def _run_job(job: dict, cfg: dict) -> dict:
     labels = [s["label"] for s in specs]
     if len(set(labels)) != len(labels):
         raise RuntimeError(f"{name}: variant labels must be unique: {labels}")
+    return specs
+
+
+def _run_job(job: dict, cfg: dict) -> dict:
+    """One container (sequential launcher path): call the GPU, then finish the job."""
+    specs = _job_specs(job, cfg)
+    say = _sayer(job["name"])
     say(f"{len(specs)} runs: " + ", ".join(f"{s['label']}={_config_label(s)}" for s in specs))
-    payload = _call_gpu(specs, cfg["require"], f"{cfg['round']}/{name}", cfg["warm"], say)
+    payload = _call_gpu(specs, cfg["require"], f"{cfg['round']}/{job['name']}", cfg["warm"], say)
+    return _finish_job(job, cfg, payload)
+
+
+def _sayer(name: str):
+    def say(message: str) -> None:
+        print(f"[{name}] {message}", flush=True)
+
+    return say
+
+
+def _finish_job(job: dict, cfg: dict, payload: dict) -> dict:
+    """Save a finished container's runs; stats, paired deltas, registry and LOG rows."""
+    name = job["name"]
+    say = _sayer(name)
+    n = int(job.get("n", cfg["n"]))
     out = cfg["out_root"] / _safe(name)
     rows: list[dict] = []
     profile_report = None
@@ -1031,6 +1050,105 @@ def _run_job(job: dict, cfg: dict) -> dict:
         "log_rows": log_rows,
         "folder": out.relative_to(REPO_ROOT).as_posix(),
     }
+
+
+def _run_jobs(jobs: list[dict], cfg: dict, parallel: int) -> dict:
+    """Run jobs on up to `parallel` containers at once from ONE thread: spawn, poll, retry.
+
+    The Modal client is not safe to drive from several threads inside `modal run`, so each
+    job is a small state machine: spawned -> (guard miss -> respawn) -> finished/failed.
+    Finished jobs are saved immediately, so a failure elsewhere never loses them.
+    """
+    label_of = {job["name"]: f"{cfg['round']}/{job['name']}" for job in jobs}
+    guarded = cfg["require"].get("gpu", "any") != "any" or str(cfg["require"].get("power")) != "any"
+    attempts = GPU_ATTEMPTS if guarded else 1
+    pending = list(jobs)
+    active: dict[str, dict] = {}
+    outcomes: dict[str, dict | Exception] = {}
+    wait_limit = RUN_TIMEOUT + SCHEDULE_WAIT_S
+
+    def launch(job: dict, state: dict) -> None:
+        state["attempt"] += 1
+        state["t0"] = time.time()
+        state["call"] = run_benchmarks.spawn(
+            state["specs"], cfg["require"], float(RUN_TIMEOUT), cfg["warm"]
+        )
+        _sayer(job["name"])(
+            f"spawned attempt {state['attempt']}/{attempts} ({len(state['specs'])} runs, "
+            f"{'warm' if cfg['warm'] else 'cold'} cache)"
+        )
+
+    while pending or active:
+        while pending and len(active) < max(1, parallel):
+            job = pending.pop(0)
+            try:
+                state = {"job": job, "specs": _job_specs(job, cfg), "attempt": 0, "landed": []}
+                launch(job, state)
+                active[job["name"]] = state
+            except Exception as exc:  # noqa: BLE001 - keep the other jobs going
+                outcomes[job["name"]] = exc
+                print(f"[{job['name']}] FAILED to launch: {exc}", flush=True)
+        for name, state in list(active.items()):
+            job, say = state["job"], _sayer(name)
+            try:
+                payload = state["call"].get(timeout=0)
+            except (TimeoutError, modal.exception.TimeoutError):
+                if time.time() - state["t0"] > wait_limit:
+                    state["call"].cancel()
+                    _ledger_add(f"{label_of[name]} (NO START)", "?", 0.0, note="cancelled")
+                    outcomes[name] = RuntimeError(f"no result after {wait_limit:.0f} s")
+                    say(f"FAILED: {outcomes[name]}")
+                    del active[name]
+                continue
+            except modal.exception.FunctionTimeoutError:
+                _ledger_add(f"{label_of[name]} (TIMEOUT)", "?", float(RUN_TIMEOUT), note="timeout")
+                outcomes[name] = RuntimeError(f"Modal killed the container after {RUN_TIMEOUT} s")
+                say(f"FAILED: {outcomes[name]}")
+                del active[name]
+                continue
+            except Exception as exc:  # noqa: BLE001
+                _ledger_add(
+                    f"{label_of[name]} (FAILED {type(exc).__name__})",
+                    "?",
+                    min(time.time() - state["t0"], float(RUN_TIMEOUT)),
+                    note="local wall time of the failed call",
+                )
+                outcomes[name] = exc
+                say(f"FAILED: {exc!r}")
+                del active[name]
+                continue
+            env = payload["environment"]
+            gpu, power = env.get("gpu_name", "?"), env.get("gpu_power_limit")
+            state["landed"].append(_where(env))
+            if payload["gpu_mismatch"]:
+                _ledger_add(
+                    f"{label_of[name]} (gpu-guard miss {state['attempt']})",
+                    gpu,
+                    payload["container_seconds"],
+                    note=f"aborted before build: {_gpu_mismatch(env, cfg['require'])}",
+                    power=power,
+                )
+                say(f"GPU guard: attempt {state['attempt']}/{attempts} landed on {_where(env)}.")
+                if state["attempt"] < attempts:
+                    launch(job, state)
+                else:
+                    outcomes[name] = RuntimeError(
+                        f"no card matching {cfg['require']} in {attempts} attempts"
+                    )
+                    say(f"FAILED: {outcomes[name]}")
+                    del active[name]
+                continue
+            _ledger_add(label_of[name], gpu, payload["container_seconds"], power=power)
+            payload["gpu_attempts"] = state["landed"]
+            del active[name]
+            try:
+                outcomes[name] = _finish_job(job, cfg, payload)
+            except Exception as exc:  # noqa: BLE001 - results are in the Volume regardless
+                outcomes[name] = exc
+                say(f"FAILED while saving results: {exc!r}")
+        if active:
+            time.sleep(5)
+    return outcomes
 
 
 def _regenerate_leaderboard() -> None:
@@ -1279,15 +1397,7 @@ def screen(
     )
     total = _plan(selected, cfg, allow_big)
     _check_budget(total)
-    outcomes: dict[str, dict | Exception] = {}
-    with ThreadPoolExecutor(max_workers=max(1, min(parallel, len(selected)))) as pool:
-        futures = {pool.submit(_run_job, job, cfg): job["name"] for job in selected}
-        for future, name in futures.items():
-            try:
-                outcomes[name] = future.result()
-            except Exception as exc:  # noqa: BLE001 - one failed job must not hide the others
-                outcomes[name] = exc
-                print(f"[{name}] FAILED: {exc}", flush=True)
+    outcomes = _run_jobs(selected, cfg, parallel)
     print("\n" + "=" * 100 + f"\nround {cfg['round']} summary\n" + "=" * 100, flush=True)
     for name in names:
         outcome = outcomes.get(name)
