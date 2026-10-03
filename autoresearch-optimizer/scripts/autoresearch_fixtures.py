@@ -190,3 +190,16 @@ def solve(instance) -> str:
             return t
         t, score = cand, total
 '''
+
+# passes screen (returns the set median) but spins past the CPU budget on the medium instances
+SLOW_ON_VALIDATE = '''
+import time
+from median_string.metrics import compute_set_median
+
+def solve(instance):
+    if len(instance.strings[0]) > 18:
+        t = time.process_time()
+        while time.process_time() - t < 2:
+            pass
+    return compute_set_median(instance.strings, metric=instance.metric)[0]
+'''
