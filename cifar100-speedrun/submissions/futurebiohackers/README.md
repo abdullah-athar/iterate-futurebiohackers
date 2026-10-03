@@ -2,102 +2,90 @@
 
 This is a convolutional image classifier based on Keller Jordan's
 [airbench](https://github.com/KellerJordan/cifar10-airbench), trained from scratch.
-The selected model uses three convolution blocks with 96, 256 and 768 channels.
-It makes the first two blocks smaller, where images are largest and processing is
-expensive, and gives the final block more capacity to distinguish the 100 classes.
+It uses three convolution blocks with 96, 256 and 768 channels. Smaller early
+blocks reduce work where images are largest; the final block retains capacity
+for distinguishing CIFAR-100's 100 classes.
 
-Training uses 9.5 epochs, batches of 1024 images, half precision, channels-last
-memory layout, Nesterov SGD and label smoothing. Convolution blocks use SiLU
-activations, and the forward pass and training loss compile together. A moving average stabilizes the
-weights. Training-image normalization and patch whitening happen inside the timer.
-The final ordinary max pool covers the whole feature map, avoiding the slower
-atomic backward kernel used by adaptive pooling. Experimental smaller-crop
-training also works.
+The selected recipe trains for **eight epochs in batches of 512**. It uses half
+precision, channels-last layout, SiLU activations, Nesterov SGD, label smoothing
+and a moving average of model weights. The model's forward pass and loss compile
+together. Ordinary max pooling covers the whole final feature map, avoiding the
+slower adaptive-pool backward kernel.
 
-## Development results
+Compared with PR #10, the main changes are smaller batches, fewer epochs and
+PyTorch's fused SGD update, which combines optimizer operations into fewer GPU
+kernels. Learning rate is 18, weight decay is 0.01425, and the whitening bias
+trains for 1.5 epochs. Training-image normalization and patch whitening remain
+inside the timer.
 
-All **40 fresh trials** of each recipe below completed successfully. Each pair
-shared one Modal A100 SXM allocation; pairs used different allocations.
+## Development validation
+
+All **40 fresh trials** of both recipes completed successfully on the same Modal
+A100 SXM allocation, using seeds 160000–160039.
 
 | Recipe | Trials | Mean accuracy | Mean preparation + training |
 | --- | ---: | ---: | ---: |
-| Pair A: frozen PR #5, GELU + adaptive pooling | 40 | 75.395% | 6.736 s |
-| Pair A: ordinary full-map max pooling | 40 | 75.328% | 6.517 s |
-| Pair A: ordinary pooling + compiled forward/loss | 40 | 75.33425% | 6.463 s |
-| Pair B: frozen PR #5, GELU + adaptive pooling | 40 | 75.28775% | 6.755 s |
-| Pair B: selected SiLU + ordinary pooling + compiled forward/loss | 40 | 75.12575% | 6.309 s |
+| Frozen PR #10: batch 1024, 9.5 epochs, ordinary SGD | 40 | 75.1825% | 6.285433 s |
+| Selected: batch 512, eight epochs, fused SGD | 40 | 75.225% | 5.575874 s |
 
-The selected recipe was **6.6% faster** than the paired PR #5 control. Its
-accuracy standard deviation was 0.241 percentage points, and its time standard
-deviation was 0.015 seconds. Pair A used seeds 40000–40039, and pair B used seeds
-50000–50039. No trials were discarded. SiLU has a smaller accuracy margin than
-the GELU variant. This is development validation; official judging still
-requires an A100 80GB PCIe and the organizer's private 40 seeds.
+The selected recipe was **11.3% faster** than the paired control. Accuracy
+standard deviation was 0.244 percentage points; time standard deviation was
+0.019 seconds. Every ordered seed and trial succeeded; no trials were discarded.
+The submission source matches the validated snapshot byte for byte (SHA-256
+`354cc62f0dbd550005c3ad3ca5de5368ab8bd7786124f5b75a704d0a03066d89`).
 
-PyTorch Profiler found 0.335 seconds in the final adaptive max-pool backward
-kernel across 456 training steps. Replacing that kernel motivated the pooling
-experiment; these profiler times include diagnostic overhead and are separate
-from the scored harness measurements above. SiLU and compiling the forward pass
-with the loss were inspired by [Hiverge's CIFAR-10 speedrun](https://github.com/hiverge/cifar10-speedrun).
+This beats the 5.8-second development milestone. The under-three-second target
+has not been reached. Official judging still requires an A100 80GB PCIe and the
+organizer's private 40 seeds; an SXM result is not official acceptance.
+
+Successful result: `20261003T183951Z-d023aca8`; paired control:
+`20261003T183430Z-6993f0dc`. The archived records contain the source, all ordered
+trial records and environment details. Run defaults with `just modal 40`.
+
+The unfused smaller-batch recipe separately passed all 40 seeds 140000–140039 at
+75.1245% / 6.314 s, versus its same-allocation PR #10 control at 75.1585% / 6.908 s.
+Different pairs use different GPU allocations; compare their paired speedups.
+
+## Profiling and experiments
+
+PyTorch Profiler found 0.335 seconds in adaptive max-pool backward across 456
+steps, motivating the whole-map pooling change. Optimizer GPU work consumed
+another 0.231 seconds in that diagnostic, motivating the separate fused-SGD
+screen. Profiler times include diagnostic overhead and are separate from scored
+harness measurements. SiLU and compiling the model with the loss were inspired
+by [Hiverge's CIFAR-10 speedrun](https://github.com/hiverge/cifar10-speedrun).
 Its test-time augmentation is excluded because this challenge requires one view.
 
-PR #5's earlier 96/256/768 model passed 40 trials at 75.2495% / 6.859 s,
-8.0% faster than its three-trial original-width control. The
-under-three-second target has not been reached. The original recipe in PR #3
-previously reached 75.29% in 8.11 s across 40 trials on another Modal allocation.
-
-The 8.5-epoch version of the new architecture initially looked promising over
-three trials, but a fresh 40-trial run averaged 74.902% in 5.772 s and missed the
-accuracy gate. Extending training to 9.5 epochs recovered the accuracy margin.
-The failed check remains in the experiment log.
-
-Run the selected defaults from the repository root with `just modal 40`.
-The successful SiLU result is `20261003T171035Z-534b9a20`; its paired control
-is `20261003T170512Z-da23dc47`. The archived run records contain the full source,
-explicit parameter overrides, all ordered trial records and environment details.
-
-## Experiments and progress
-
-`--params` exposes smaller early crops (24 or 28 pixels followed by 32), different
-block widths/depths, proxy-based hard-example selection, alternative pooling and
-optimizer settings, per-image training brightness/contrast jitter, and an optional
-Triton crop/flip kernel. Grouped Muon is an experimental optimizer, disabled in the
-selected recipe. These other experiments are
-turned off in the selected defaults. The 28px, nine-epoch candidate missed
-the target over five fresh trials; proxy selection and fused optimizer settings
-also failed to improve the qualifying result. The unsuccessful experimental
-BN/GELU fusion was excluded from the submitted source.
+Optional parameters cover smaller early crops, block widths/depths, proxy-based
+hard-example selection, alternative optimizers, per-image training color jitter,
+and a Triton crop/flip kernel. These experiments are off in selected defaults.
+A separate CNN/attention prototype failed accuracy and is not in this submission.
 
 `scripts/modal_experiments.py` runs bounded comparisons through the unchanged
-competition harness and reserves spending against a $50 cap.
-`scripts/track_speedrun.py` writes a live log under
-`artifacts/runtime-optimization/`, sorted by time, with each experiment's main
-changes, accuracy, trial count and paired control. It also generates a local
-review dashboard under `.lavish/`.
+harness and reserves spending against a $50 cap. `scripts/track_speedrun.py`
+writes `artifacts/runtime-optimization/progress.md` and a local review dashboard,
+sorted by time with the main change, accuracy, trial count and paired control.
+Unsuccessful and incomplete runs remain in that log.
 
 ## Data and evaluation checks
 
-Build warms compilation and kernels using random synthetic images only. Every
-trial resets model weights, BatchNorm statistics, gradients, optimizer state,
-moving averages and any proxy masks. Preparation and training use only the
-harness-provided training images and labels. Evaluation uses one image view and
-frozen training statistics; it does not fit to test images, use test-batch
-statistics or change registered model state.
+Build warms compilation and kernels using synthetic images only. Every trial
+resets weights, BatchNorm statistics, gradients, optimizer state, moving averages
+and any proxy masks. Preparation and training use only the harness-provided
+training images and labels. Evaluation uses one view per image and frozen
+training statistics; it never fits to test images, uses test-batch statistics or
+changes model state. Predictions do not depend on other test images.
 
 The [rules](https://github.com/AIDDA-Institute/CIFAR-100-speedrun/blob/main/RULES.md)
 allow comparing reported test accuracy during development. Test results never
-choose a stopping point or hard-example masks within a trial. Source review found
-no test-data leakage; official acceptance still requires organizer review and the
-prescribed environment.
+choose stopping points or hard-example masks within a trial. Source review found
+no test-data leakage; official acceptance still requires organizer review.
 
-The correctness checks cover resets, immutable training inputs, evaluation state
-and batch independence (27 CPU tests), plus exact crop/flip equivalence across
-layouts and resolutions (36 GPU checks) and exact ordinary/adaptive pooling
-outputs and gradients, including ties (24 GPU checks). The GPU benchmark applies the harness's
-own output and state checks. Run the CPU checks from `cifar100-speedrun/` with
-`uv run python -m pytest -q ../scripts/test_speedrun_recipe.py`.
+27 CPU correctness checks pass in PyTorch 2.4, including resets, immutable inputs,
+evaluation state and image independence. GPU checks cover 36 crop/flip cases and
+24 exact pooling output/gradient cases, including ties. Each scored trial also
+passes the unchanged harness's output and state checks.
 
-Adapted under the MIT license, Copyright (c) 2024 Keller Jordan. The full original
-permission notice is preserved in `LICENSE.airbench`.
-The experimental Muon implementation adapts ideas and Newton-Schulz coefficients
-from Hiverge; its original MIT permission notice is preserved in `LICENSE.hiverge`.
+Adapted under the MIT license, Copyright (c) 2024 Keller Jordan; the full notice is
+preserved in `LICENSE.airbench`. The optional Muon implementation adapts ideas and
+Newton–Schulz coefficients from Hiverge; its notice is in `LICENSE.hiverge`.

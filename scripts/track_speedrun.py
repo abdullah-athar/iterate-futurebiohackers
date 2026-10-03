@@ -38,10 +38,15 @@ def describe_change(record):
                             "activation",
                             "global_pool",
                             "compile_forward_loss",
+                            "batch_size",
+                            "fused_sgd",
+                            "lr",
                         )
                     }
                     p = {**values, **p}
     if record.get("control") or "Initial reproduction" in record["name"]:
+        if record.get("reference") == "pr10":
+            return "Frozen PR #10 control (SiLU + ordinary pool + compiled loss)"
         if record.get("reference") == "pr5":
             return "Frozen PR #5 validated control (96/256/768, 9.5 epochs)"
         return "Frozen PR #3 control"
@@ -77,6 +82,8 @@ def describe_change(record):
         changes.append("Grouped Muon filter optimizer")
     if p.get("brightness") or p.get("contrast"):
         changes.append("Per-image training brightness/contrast jitter")
+    if p.get("hybrid_layers"):
+        changes.append(f"CNN stem + {p['hybrid_layers']} small-token attention layers")
     if p.get("gelu_approximate") == "tanh":
         changes.append("Approximate GELU")
     if "batch_size" in p:

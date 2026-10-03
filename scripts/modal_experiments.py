@@ -26,6 +26,7 @@ results = modal.Volume.from_name("cifar100-results", create_if_missing=True)
 OUTPUT = ROOT / "artifacts/runtime-optimization"
 CONTROL = OUTPUT / "control"
 PR5_CONTROL = OUTPUT / "pr5_control"
+PR10_CONTROL = OUTPUT / "pr10_control"
 if modal.is_local() and not CONTROL.exists():
     CONTROL.mkdir(parents=True)
     baseline = subprocess.check_output(
@@ -48,6 +49,17 @@ if modal.is_local() and not PR5_CONTROL.exists():
         cwd=ROOT,
     )
     (PR5_CONTROL / "submission.py").write_bytes(baseline)
+if modal.is_local() and not PR10_CONTROL.exists():
+    PR10_CONTROL.mkdir(parents=True)
+    baseline = subprocess.check_output(
+        [
+            "git",
+            "show",
+            "bcf5a0e:cifar100-speedrun/submissions/futurebiohackers/submission.py",
+        ],
+        cwd=ROOT,
+    )
+    (PR10_CONTROL / "submission.py").write_bytes(baseline)
 # $5/hour conservatively exceeds current A100 + four CPUs + 32 GiB RAM pricing.
 RATE = 5 / 3600
 cache = modal.Volume.from_name("cifar100-compile-cache", create_if_missing=True)
@@ -68,6 +80,7 @@ experiment_image = (
     )
     .add_local_file(CONTROL / "submission.py", "/control/submission.py")
     .add_local_file(PR5_CONTROL / "submission.py", "/pr5_control/submission.py")
+    .add_local_file(PR10_CONTROL / "submission.py", "/pr10_control/submission.py")
     .add_local_file(ROOT / "scripts/profile_speedrun.py", "/profile_speedrun.py")
     .add_local_file(
         ROOT / "scripts/diagnose_speedrun_muon.py", "/diagnose_speedrun_muon.py"
@@ -174,7 +187,9 @@ def experiment(items: list[dict], budget: float, profile: bool, diagnose_muon: b
             "--params",
             json.dumps(item.get("params", {})),
         ]
-        reference = "pr5_control" if item.get("reference") == "pr5" else "control"
+        reference = {"pr5": "pr5_control", "pr10": "pr10_control"}.get(
+            item.get("reference"), "control"
+        )
         args += (
             ["--submission-path", f"/{reference}"]
             if item.get("control")

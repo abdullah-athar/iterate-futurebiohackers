@@ -21,16 +21,16 @@ from benchmark.api import BuildContext, TrainingData
 
 # Override any value with --params, e.g. '{"epochs": 9, "widths": [128, 384, 768]}'.
 DEFAULTS = {
-    "epochs": 9.5,
-    "batch_size": 1024,
-    "lr": 9.0,  # per 1024 examples, decoupled from momentum (airbench convention)
+    "epochs": 8.0,
+    "batch_size": 512,
+    "lr": 18.0,  # per 1024 examples, decoupled from momentum (airbench convention)
     "momentum": 0.85,
-    "weight_decay": 0.012,  # per 1024 examples, decoupled from the learning rate
+    "weight_decay": 0.01425,  # per 1024 examples, decoupled from the learning rate
     "bias_scaler": 64.0,  # learning-rate multiplier for BatchNorm biases
     "label_smoothing": 0.3,
     "warmup": 0.23,  # fraction of steps spent ramping the learning rate up
     "final_lr": 0.07,  # learning-rate multiplier reached at the last step
-    "whiten_bias_epochs": 3,
+    "whiten_bias_epochs": 1.5,
     "translate": 2,
     "cutout": 0,
     "widths": [96, 256, 768],
@@ -39,7 +39,7 @@ DEFAULTS = {
     "train_resolution": 32,  # reduced resolution for the first training stage
     "resolution_switch": 0.5,  # fraction of steps before returning to 32 pixels
     "crop_mode": "masked",  # "indexed" preserves channels-last with one gather
-    "fused_sgd": False,
+    "fused_sgd": True,
     "compile_loss": False,
     "hard_fraction": 1.0,  # <1 enables a freshly trained small proxy
     "proxy_widths": [32, 64, 128],
