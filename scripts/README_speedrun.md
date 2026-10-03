@@ -58,10 +58,29 @@ also work from WSL.
 | `::env_check` | nvidia-smi (name, memory, power limit, MIG), torch/torchvision/CUDA versions, CPUs |
 | `::download_data` | fills the `cifar100-data` Volume (mounted at `/data`) |
 | `::smoke` | CPU + synthetic smoke test inside the Modal image, no GPU |
-| `::main --tag T --n N [--submission futurebiohackers or --submission-path P] [--params JSON] [--no-accuracy-target] [--seed S]` | one `benchmark.run`; results in `artifacts/speedrun_runs/<ts>_<T>/` |
-| `::sweep --tag T --n N --params-list '[{...}, {...}]' [--no-accuracy-target]` | one A100 container per params entry, in parallel; `<ts>_<T>_00/`, `_01/`, ... |
+| `::main --tag T --n N [--submission futurebiohackers or --submission-path P] [--params JSON] [--no-accuracy-target] [--seed S] [--build-timeout S] [--torch-logs recompiles]` | one `benchmark.run`; results in `artifacts/speedrun_runs/<ts>_<T>/` |
+| `::ab --tag T --n N --variants '[{...}, {...}]' [--control-params JSON] [--labels a,b] [--submission-paths '["..."]']` | control + variants **sequentially in one container on one card**, each its own `benchmark.run` (fresh build, nothing shared); comparison table + `ab_summary.{md,json}` in `<ts>_<T>/NN_<label>/`. Variants are parameter deltas merged over the control. The default way to compare speed. |
+| `::fetch --run-id ID` | copy `results/futurebiohackers/ID/` out of the `cifar100-results` Volume (no GPU), e.g. after a Modal timeout |
+| `::sweep --tag T --n N --params-list '[{...}, {...}]'` | one A100 container per params entry, in parallel, no PCIe guard; gated behind `SPEEDRUN_ALLOW_SWEEP=1` |
 
-- GPU is pinned to `A100-80GB` (plain `A100` can be a 40GB card), 4 CPUs, 8 h timeout.
+- GPU is pinned to `A100-80GB` (plain `A100` can be a 40GB card), 4 CPUs. Every GPU function
+  has a hard Modal timeout of 15 min (`SPEEDRUN_TIMEOUT_MIN`), so a hung run cannot burn more.
+  The launcher estimates the container time from the specs and refuses launches that cannot
+  fit; inside the container each variant has a deadline (the harness gets SIGINT and keeps
+  its finished trials) and variants that no longer fit are skipped, so the payload always
+  comes back. `--build-timeout` defaults to 300 s (the 5-minute rule for compile builds).
+- PCIe guard (`--require-pcie`, default on for `main` and `ab`): Modal's `A100-80GB` pool mixes
+  the judges' PCIe card (300 W) with SXM4 cards (500 W). The container checks nvidia-smi
+  before build; on a non-PCIe card it returns at once and the launcher retries, up to 3
+  retries, logging every attempt with the GPU name and Modal task id. GPU functions are
+  single-use containers, so a retry is never served by the container that just failed (it
+  can still land on the same host). `--no-require-pcie` disables the guard.
+- Each `benchmark.run` in an A/B gets its own empty `TORCHINDUCTOR_CACHE_DIR`, so compiled
+  variants report cold build times like the judges' container.
+- GPU budget: `artifacts/speedrun_runs/gpu_ledger.jsonl` records every container attempt (wall
+  time + 15 s start allowance, failed and timed-out calls included) and the launcher prints
+  `GPU used: X/90 min` before and after every call. `SPEEDRUN_GPU_BUDGET_MIN` (90) is a hard
+  stop; `SPEEDRUN_GPU_STOP_MIN` (60) is a checkpoint that needs `SPEEDRUN_GPU_CONTINUE=1`.
 - The image is built once (uv 0.10.8 + `uv sync --frozen` on the organizer lock); the
   speedrun code is mounted at start, so recipe edits never rebuild it.
 - Exit code 1 from `benchmark.run` means below target or incomplete, not a crash: read

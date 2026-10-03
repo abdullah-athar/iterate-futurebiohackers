@@ -38,8 +38,11 @@ DEFAULTS: dict = {
     # auto: bf16 autocast on Ampere or newer CUDA GPUs, fp16 autocast + GradScaler on
     # older CUDA GPUs (free Colab/Kaggle T4, P100), fp32 on CPU. Also bf16/fp16/fp32.
     "precision": "auto",
-    "use_compile": False,  # torch.compile the training step (experimental, GPU untested)
+    "bn_weight_decay": True,  # False: no weight decay on BatchNorm scale/shift (1-D params)
+    "use_compile": False,  # torch.compile the training forward/backward (compiled in build)
+    "compile_mode": "default",  # default, reduce-overhead, max-autotune, max-autotune-no-cudagraphs
 }
+COMPILE_MODES = ("default", "reduce-overhead", "max-autotune", "max-autotune-no-cudagraphs")
 PAD = 4  # random-crop padding in pixels
 WARMUP_STEPS = 3  # synthetic forward/backward/optimizer steps in build (autotuning only)
 TEST_IMAGES = 10_000  # size of the CIFAR-100 test split; only used to pick eval warmup shapes
@@ -63,6 +66,12 @@ def _config(parameters: dict) -> SimpleNamespace:
         raise ValueError("lr must be positive and warmup_fraction in [0, 1)")
     if cfg.precision not in ("auto", *AMP_DTYPES):
         raise ValueError(f"precision must be one of auto, {', '.join(AMP_DTYPES)}")
+    if cfg.compile_mode not in COMPILE_MODES:
+        raise ValueError(f"compile_mode must be one of {', '.join(COMPILE_MODES)}")
+    if not isinstance(cfg.use_compile, bool) or not isinstance(cfg.bn_weight_decay, bool):
+        raise ValueError("use_compile and bn_weight_decay must be JSON booleans")
+    if cfg.compile_mode != "default" and not cfg.use_compile:
+        raise ValueError("compile_mode has no effect without use_compile: true")
     return cfg
 
 
@@ -87,8 +96,16 @@ def _lr_at(step: int, total_steps: int, cfg: SimpleNamespace) -> float:
 
 def _make_optimizer(state) -> torch.optim.SGD:
     cfg = state.cfg
+    params = list(state.model.parameters())
+    if cfg.bn_weight_decay:
+        groups = [{"params": params}]
+    else:  # BatchNorm scale/shift are the only 1-D parameters (convs and the linear have no bias)
+        groups = [
+            {"params": [p for p in params if p.ndim > 1]},
+            {"params": [p for p in params if p.ndim <= 1], "weight_decay": 0.0},
+        ]
     return torch.optim.SGD(
-        state.model.parameters(),
+        groups,
         lr=0.0,  # set per step by _lr_at
         momentum=cfg.momentum,
         nesterov=cfg.momentum > 0,
@@ -181,7 +198,7 @@ def build(context: BuildContext):
         num_classes=context.num_classes,
         eval_batch_size=context.eval_batch_size,
         model=model,  # the eager module that train() returns
-        train_model=torch.compile(model) if cfg.use_compile else model,
+        train_model=torch.compile(model, mode=cfg.compile_mode) if cfg.use_compile else model,
         precision=precision,
         amp_dtype=AMP_DTYPES[precision],
         memory_format=torch.channels_last if cuda else torch.contiguous_format,

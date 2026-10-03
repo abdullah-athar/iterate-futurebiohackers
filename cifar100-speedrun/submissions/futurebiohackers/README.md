@@ -33,7 +33,9 @@ Pass with `--params '{"epochs": 10}'`. The defaults are the baseline; the offici
 | `label_smoothing` | 0.1 | cross-entropy label smoothing |
 | `warmup_fraction` | 0.15 | fraction of steps spent warming up to `lr` |
 | `precision` | `auto` | `auto`, `bf16`, `fp16` or `fp32` |
-| `use_compile` | false | wrap the training model in `torch.compile` |
+| `bn_weight_decay` | true | `false` removes weight decay from the BatchNorm scale/shift parameters |
+| `use_compile` | false | wrap the training model in `torch.compile` (compiled during the synthetic warmup in `build`; evaluation uses the eager module) |
+| `compile_mode` | `default` | `torch.compile` mode: `default`, `reduce-overhead`, `max-autotune`, `max-autotune-no-cudagraphs` |
 
 Unknown keys are rejected so typos cannot silently fall back to the defaults.
 
