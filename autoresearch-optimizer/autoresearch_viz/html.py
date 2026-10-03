@@ -6,7 +6,7 @@ import math
 from datetime import UTC, datetime
 from html import escape
 
-from .charts import BarGroup, RefLine, Series, fmt_num, grouped_hbars, stacked_hbars, step_chart
+from .charts import BarGroup, DagEdge, DagNode, RefLine, Series, dag_chart, fmt_num, grouped_hbars, stacked_hbars, step_chart
 from .load import STATUS_LABELS, STATUS_ORDER, STATUS_REJECTED_DUPLICATE, Run
 from .metrics import Summary, best_delta_text, best_so_far, per_instance, summarize
 
@@ -44,7 +44,14 @@ svg.chart{max-width:100%;height:auto;display:block}
 svg .grid{stroke:#eef2f7;stroke-width:1}svg .axis{stroke:#cbd5e1;stroke-width:1}
 svg .tick,svg .val,svg .seg{font-size:11px;fill:#64748b}svg .seg{fill:#fff;font-weight:600}svg .label{font-size:12px;fill:#334155}
 svg .ref{font-size:11px}svg .cat{font-size:12px;fill:#0f172a}
-svg [data-tip]{cursor:pointer}svg circle[data-tip]:hover{r:7}
+svg [data-tip]{cursor:pointer}svg.chart circle[data-tip]:hover{r:7}
+.linbar{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;margin:0 0 4px}.linbar .tabs{margin:0;align-items:center}.linbar .tabs>span{font-size:13px;color:var(--muted);margin-right:2px}
+.linzoom button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 10px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted);margin-left:4px}
+.linbox{overflow:auto;max-height:860px;border:1px solid var(--line);border-radius:10px;margin-top:6px}
+svg.lin{display:block}svg.lin .le{fill:none;stroke-width:1;opacity:.4}svg.lin .le.em{stroke-width:2.6;opacity:.9}
+svg.lin .ln{stroke-width:1}svg.lin .ln[data-hollow]{stroke-width:1.4}svg.lin .ln.ring{stroke-width:2.4}svg.lin .ln:hover{stroke-width:3.5}
+svg.lin .nl{font-size:10.5px;fill:#0f172a;font-weight:600;pointer-events:none}
+svg.lin.dim .le{opacity:.05}svg.lin.dim .ln,svg.lin.dim .nl{opacity:.2}svg.lin.dim .ln.hl{opacity:1}svg.lin.dim .le.hl{stroke-width:2.2;opacity:.95}
 table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
 th:first-child,td:first-child{text-align:left}td{white-space:nowrap}td:first-child{white-space:normal;min-width:240px}td:first-child .note{white-space:normal}th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
 td.l,th.l{text-align:left}tr.best td{background:#f0fdf4}td .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
@@ -68,6 +75,17 @@ const tip=document.getElementById('tip');
 document.querySelectorAll('[data-tip]').forEach(el=>{el.addEventListener('mousemove',e=>{tip.textContent=el.dataset.tip;tip.style.display='block';
  tip.style.left=Math.min(e.clientX+14,window.innerWidth-380)+'px';tip.style.top=(e.clientY+14)+'px';});el.addEventListener('mouseleave',()=>tip.style.display='none');});
 const sel=document.getElementById('runsel');if(sel){sel.addEventListener('change',()=>{document.querySelectorAll('.traj').forEach(p=>p.classList.toggle('on',p.dataset.key===sel.value));});}
+document.querySelectorAll('.lincolor button').forEach(b=>b.addEventListener('click',()=>{b.closest('.linrun').querySelectorAll('.ln').forEach(n=>{
+ n.setAttribute(n.dataset.hollow?'stroke':'fill',n.dataset['c'+b.dataset.key]);});}));
+document.querySelectorAll('.linzoom button').forEach(b=>b.addEventListener('click',()=>{const box=b.closest('.linrun');
+ const z=b.dataset.z==='1'?1:Math.max(.3,Math.min(5,(+box.dataset.z||1)*(+b.dataset.z)));box.dataset.z=z;
+ box.querySelectorAll('svg.lin').forEach(s=>{s.setAttribute('width',s.dataset.w*z);s.setAttribute('height',s.dataset.h*z);});}));
+document.querySelectorAll('svg.lin').forEach(svg=>{const up={},dn={},nodes={};
+ svg.querySelectorAll('.le').forEach(p=>{(up[p.dataset.t]=up[p.dataset.t]||[]).push(p);(dn[p.dataset.s]=dn[p.dataset.s]||[]).push(p);});
+ svg.querySelectorAll('.ln').forEach(n=>nodes[n.dataset.id]=n);
+ const walk=(id,m,k,seen)=>{(m[id]||[]).forEach(p=>{p.classList.add('hl');const o=p.dataset[k];if(!seen.has(o)){seen.add(o);if(nodes[o])nodes[o].classList.add('hl');walk(o,m,k,seen);}});};
+ svg.querySelectorAll('.ln').forEach(n=>{n.addEventListener('mouseenter',()=>{svg.classList.add('dim');n.classList.add('hl');walk(n.dataset.id,up,'s',new Set());walk(n.dataset.id,dn,'t',new Set());});
+  n.addEventListener('mouseleave',()=>{svg.classList.remove('dim');svg.querySelectorAll('.hl').forEach(x=>x.classList.remove('hl'));});});});
 }
 bind();
 """
@@ -339,6 +357,161 @@ def _trajectory_card(runs: list[Run], colors: dict[str, str]) -> str:
 
 TRAJECTORY_ROWS = 80
 
+LINEAGE_VIEWS = [("ideas", "ideas (seed hidden)"), ("evaluated", "evaluated only"), ("seed", "with seed")]
+LINEAGE_SCHEMES = [("status", "outcome"), ("verdict", "verdict"), ("mode", "mode")]
+BEST_PATH_COLOR = "#dc2626"
+
+
+def _lineage_layers(run: Run) -> dict[int, int]:
+    """Column per proposal: its swarm generation, pushed right of its parents (tree depth when there is no generation)."""
+    by_id = {e.id: e for e in run.entries}
+    layer: dict[int, int] = {}
+
+    def lay(e, stack: frozenset = frozenset()) -> int:
+        if e.id not in layer:
+            ps = [by_id[p] for p in e.parent_ids if p in by_id and p not in stack]
+            depth = 1 + max((lay(p, stack | {e.id}) for p in ps), default=-1)
+            layer[e.id] = max(e.generation if isinstance(e.generation, int) else depth, depth)
+        return layer[e.id]
+
+    for e in run.entries:
+        lay(e)
+    return layer
+
+
+def _lineage_svg(run: Run, view: str, layer: dict[int, int]) -> str:
+    by_id = {e.id: e for e in run.entries}
+    shown = [e for e in run.entries if (view == "seed" or not e.is_seed) and (view != "evaluated" or e.status != STATUS_REJECTED_DUPLICATE)]
+    shown_ids = {e.id for e in shown}
+    n_children = {e.id: 0 for e in run.entries}
+    dup_children = dict(n_children)
+    for e in run.entries:
+        for p in e.parent_ids:
+            if p in n_children:
+                n_children[p] += 1
+                dup_children[p] += e.status == STATUS_REJECTED_DUPLICATE
+    best = run.best
+    best_path: set[int] = set()
+    stack = [best.id] if best else []
+    while stack:
+        i = stack.pop()
+        if i in by_id and i not in best_path:
+            best_path.add(i)
+            stack.extend(by_id[i].parent_ids)
+    ranked = sorted((e for e in run.entries if e.scored), key=lambda e: (e.objective, e.id))
+    rank = {e.id: k / max(len(ranked) - 1, 1) for k, e in enumerate(ranked)}
+    nodes = []
+    for e in shown:
+        scored_parents = [by_id[p].objective for p in e.parent_ids if p in by_id and by_id[p].scored]
+        is_best = best is not None and e.id == best.id
+        lines = [f"#{e.id} · {e.mode or '?'}" + (f" · gen {e.generation}" if e.generation is not None else "")]
+        if e.scored:
+            lines.append(
+                f"objective {fmt_num(e.objective)}"
+                + (f" ({e.objective - min(scored_parents):+,.0f} vs best parent)" if scored_parents else "")
+                + (" · FINAL BEST" if is_best else " · new global best" if e.improved_global and not e.is_seed else "")
+            )
+        elif e.status == STATUS_REJECTED_DUPLICATE:
+            dup = e.novelty.get("duplicate_of")
+            lines.append("not evaluated: near-duplicate" + (f" of #{dup}" if dup is not None else ""))
+        lines.append(STATUS_LABELS.get(e.status, e.status) + (f" · verdict {e.verdict}" if e.verdict else ""))
+        lines.append(
+            ("parents " + ", ".join(f"#{p}" for p in e.parent_ids) if e.parent_ids else "root")
+            + f" · {n_children[e.id]} follow-up{'s' if n_children[e.id] != 1 else ''}"
+            + (f" ({dup_children[e.id]} duplicates hidden)" if view == "evaluated" and dup_children[e.id] else "")
+        )
+        lines.append(e.hypothesis)
+        global_best = e.improved_global and not e.is_seed
+        nodes.append(DagNode(
+            id=e.id,
+            layer=layer[e.id],
+            tip="\n".join(lines),
+            colors={
+                "status": STATUS_COLORS.get(e.status, "#64748b"),
+                "verdict": VERDICT_COLORS.get(e.verdict, STATUS_COLORS["seed"] if e.is_seed else "#64748b"),
+                "mode": MODE_COLORS.get(e.mode, "#64748b"),
+            },
+            radius=3.5 + 5.0 * (1 - rank[e.id]) if e.scored else 3.2,
+            hollow=not e.scored,
+            ring=BEST_PATH_COLOR if e.id in best_path and (global_best or is_best) else "#0f172a" if global_best else "",
+            label=f"★ #{e.id} best" if is_best else f"#{e.id}" if global_best else "",
+        ))
+    edges = [
+        DagEdge(p, e.id, BEST_PATH_COLOR if (p in best_path and e.id in best_path) else MODE_COLORS["merge"] if len(e.parent_ids) > 1 else "#94a3b8",
+                emphasis=p in best_path and e.id in best_path)
+        for e in shown for p in e.parent_ids if p in shown_ids
+    ]
+
+    def group_label(ids: list[int], singles: bool) -> str:
+        if singles:
+            return f"{len(ids)} one-off idea{'s' if len(ids) != 1 else ''} with no follow-ups"
+        roots = sorted(i for i in ids if not any(p in shown_ids for p in by_id[i].parent_ids))
+        scored = [by_id[i] for i in ids if by_id[i].scored and by_id[i].confirmed is not False]
+        top = min(scored, key=lambda e: (e.objective, e.id)) if scored else None
+        return (
+            f"{len(ids)} ideas from " + ", ".join(f"#{r}" for r in roots[:8]) + (" …" if len(roots) > 8 else "")
+            + (f" · best {fmt_num(top.objective)} (#{top.id})" if top else "")
+            + (" · contains the final best" if best and best.id in ids else "")
+        )
+
+    return dag_chart(nodes, edges, layer_label="gen" if any(e.generation is not None for e in run.entries) else "depth", group_label=group_label)
+
+
+def _lineage_card(runs: list[Run]) -> str:
+    schemes = {"status": STATUS_COLORS, "verdict": VERDICT_COLORS, "mode": MODE_COLORS}
+    blocks = []
+    for i, run in enumerate(runs):
+        layer = _lineage_layers(run)
+        present = {k: {getattr(e, k) for e in run.entries} for k in schemes}
+        legends = "".join(
+            f'<div class="panel {"on" if k == "status" else ""}" data-group="lincolor{i}" data-key="{k}">'
+            + _legend([(STATUS_LABELS.get(v, v) if k == "status" else v, c) for v, c in schemes[k].items() if v in present[k]])
+            + "</div>"
+            for k, _ in LINEAGE_SCHEMES
+        )
+        views = "".join(
+            f'<div class="panel {"on" if j == 0 else ""}" data-group="linview{i}" data-key="{k}">{_lineage_svg(run, k, layer)}</div>'
+            for j, (k, _) in enumerate(LINEAGE_VIEWS)
+        )
+        bar = (
+            f'<div class="linbar"><div class="tabs" data-group="linview{i}">'
+            + "".join(f'<button class="{"on" if j == 0 else ""}" data-key="{k}">{escape(t)}</button>' for j, (k, t) in enumerate(LINEAGE_VIEWS))
+            + f'</div><div class="tabs lincolor" data-group="lincolor{i}"><span>colour by</span>'
+            + "".join(f'<button class="{"on" if j == 0 else ""}" data-key="{k}">{escape(t)}</button>' for j, (k, t) in enumerate(LINEAGE_SCHEMES))
+            + '</div><div class="linzoom"><span class="muted" style="font-size:13px">zoom</span>'
+            '<button data-z="0.8">−</button><button data-z="1.25">+</button><button data-z="1">reset</button></div></div>'
+        )
+        blocks.append(
+            f'<div class="linrun panel {"on" if i == 0 else ""}" data-group="linrun" data-key="{escape(run.label, quote=True)}">'
+            + bar + legends + _LINEAGE_KEY + f'<div class="linbox">{views}</div></div>'
+        )
+    run_tabs = (
+        '<div class="tabs" data-group="linrun">'
+        + "".join(f'<button class="{"on" if i == 0 else ""}" data-key="{escape(r.label, quote=True)}">{escape(r.label)}</button>' for i, r in enumerate(runs))
+        + "</div>"
+    ) if len(runs) > 1 else ""
+    return (
+        "<section class='card'><h2>Idea lineage</h2><p class='lead'>Every proposal as a node, with an edge from each parent it was "
+        "built on (merges have several). Columns are generations. The seed is hidden by default, so ideas that started "
+        "independently from it form separate trees. Hover a node for its hypothesis and to trace its ancestors and descendants.</p>"
+        + run_tabs + "".join(blocks) + "</section>"
+    )
+
+
+def _key_icon(svg: str, text: str) -> str:
+    return f'<span><svg width="22" height="14" style="vertical-align:-3px;margin-right:6px">{svg}</svg>{escape(text)}</span>'
+
+
+_LINEAGE_KEY = (
+    '<div class="legend">'
+    + _key_icon('<circle cx="5" cy="7" r="3" fill="#94a3b8"/><circle cx="15" cy="7" r="6.5" fill="#94a3b8"/>', "size = objective rank (bigger is better)")
+    + _key_icon('<circle cx="11" cy="7" r="4" fill="#fff" stroke="#fbbf24" stroke-width="1.5"/>', "hollow = not evaluated")
+    + _key_icon('<circle cx="11" cy="7" r="5" fill="#16a34a" stroke="#0f172a" stroke-width="2.2"/>', "new global best")
+    + _key_icon(f'<line x1="0" y1="7" x2="22" y2="7" stroke="{BEST_PATH_COLOR}" stroke-width="3"/>', "path to the final best (★)")
+    + _key_icon(f'<line x1="0" y1="7" x2="22" y2="7" stroke="{MODE_COLORS["merge"]}" stroke-width="2"/>', "edge into a merge")
+    + "</div>"
+)
+
 
 def _live_card(runs: list[Run]) -> str:
     """Swarm progress from events.jsonl: current generation, agents back, evaluations, cost, recent events."""
@@ -399,6 +572,7 @@ def render_main(runs: list[Run], title: str) -> str:
         _baselines_card(runs),
         _instances_card(runs, colors),
         _outcomes_card(summaries, colors),
+        _lineage_card(runs),
         _trajectory_card(runs, colors),
         "<footer>Rendered by <code>python -m autoresearch_viz</code> from "
         + ", ".join(f"<code>{escape(str(r.path))}</code>" for r in runs) + "</footer>",
