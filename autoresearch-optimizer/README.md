@@ -31,66 +31,34 @@ works the same way). The loop owns evaluation and the ledger, so an agent can on
 
 ### How a run works
 
-`just autoresearch-swarm` starts **N headless Claude Code agents per generation on your laptop**.
-Each writes one solver and one hypothesis. **All solver CPU runs on Modal**: the agents' own
-self-tests and the official evaluation. Only the orchestrator writes `ledger.jsonl`.
-
-```mermaid
-flowchart TD
-    subgraph LAPTOP["Your laptop"]
-        CLI["just autoresearch-swarm --run artifacts/runs/NAME"]
-        ALLOC["Allocate N agents<br/>bandit over modes: tune · fix_losers · new_family · merge<br/>parents from the Pareto archive"]
-        subgraph AGENTS["N headless Claude Code agents, in parallel"]
-            READ["read STATUS.md + AGENT.md<br/>evidence, parent code, ledger, falsified ideas"]
-            WRITE["write candidate.py + hypothesis.txt"]
-            TRY["./try = self-test"]
-        end
-        GATE{"import guard +<br/>novelty gate"}
-        REC["record in ledger.jsonl<br/>verdict · Pareto archive · new best?"]
-        MORE{"time left for another<br/>generation?"}
-        DASH["autoresearch_viz serve<br/>live dashboard"]
-    end
-    subgraph MODAL["Modal CPUs: evaluation only"]
-        TRYEV["one split for ./try"]
-        EVAL["screen → validate → confirm<br/>1000 ms CPU per instance"]
-        HOLD["holdout on hidden seeds"]
-    end
-    CLI --> ALLOC --> READ --> WRITE --> TRY
-    TRY <-->|remote call| TRYEV
-    TRY -->|fix and retry| WRITE
-    WRITE -->|agent done or turn deadline| GATE
-    GATE -->|duplicate or disallowed import:<br/>rejected, not evaluated| REC
-    GATE -->|new idea| EVAL --> REC
-    REC --> MORE
-    MORE -->|yes: next generation sees all results| ALLOC
-    MORE -->|no| HOLD --> OUT["holdout.json + report.md"]
-    REC -.->|events.jsonl| DASH
-```
-
-What happens to one candidate inside the evaluation step, and the verdict it gets:
-
 ```mermaid
 flowchart LR
-    S["screen<br/>3 small instances"] -->|crash, over budget,<br/>or worse than baseline| RS["rejected_screen<br/>inconclusive"]
-    S --> V["validate<br/>5 medium instances<br/>= the objective"]
-    V -->|crash or over budget| F["failed<br/>inconclusive"]
-    V --> C["confirm<br/>5 fresh instances"]
-    C --> Q{"beats the global<br/>best on validate?"}
-    Q -->|no, but best on<br/>some instance| P["kept · partial"]
-    Q -->|no| X["evaluated · falsified"]
-    Q -->|yes| R{"not worse than the<br/>incumbent on confirm?"}
-    R -->|yes| SUP["kept · supported<br/>NEW BEST"]
-    R -->|no| U["evaluated · unconfirmed<br/>gain treated as noise"]
+    A["1. Decide what to ask for<br/>small tweak, fix weak spots,<br/>new approach, or combine two"]
+    B["2. Agents write ideas<br/>many Claude Code agents<br/>on your laptop, in parallel"]
+    C["3. Drop repeats<br/>ideas we've already tried<br/>are skipped"]
+    D["4. Test in the cloud<br/>each idea runs on Modal,<br/>1 second per test case"]
+    E["5. Keep real wins<br/>a new best must also win<br/>on fresh test cases"]
+    F["6. Final check<br/>score the best idea on<br/>test cases nobody saw"]
+    A --> B --> C --> D --> E
+    E -->|time left| A
+    E -->|time up| F
 ```
 
-Single-agent mode (one agent, e.g. this Claude Code session, driving the CLI by hand) is the same loop with one proposer:
+1. **Decide what to ask for.** The loop tracks which kinds of request have produced
+   improvements so far and asks for more of those.
+2. **Agents write ideas.** Each agent reads what has been tried, what worked and what failed.
+   It then writes one solver and a one-line hypothesis explaining why it should be better.
+3. **Drop repeats.** A solver that is basically a copy of an earlier one is thrown out
+   without being run.
+4. **Test in the cloud.** Every solver runs on Modal, with a fixed 1-second compute limit per
+   test case, so ideas compete on quality *within* the same budget.
+5. **Keep real wins.** A solver counts as the new best only if its win also holds on fresh
+   test cases, so lucky results are filtered out. Every result is logged, and the next round
+   sees everything.
+6. **Final check.** When time runs out, the best solver is scored on a hidden set of test
+   cases that the search never used.
 
-```mermaid
-flowchart LR
-    ST["status<br/>evidence + suggested mode"] --> W["write candidate.py"] --> T["try"]
-    T -->|fix| W
-    T --> SUB["submit<br/>gate → evaluate → record"] --> ST
-```
+You can watch all of this live in the dashboard (`just autoresearch-viz serve ...`).
 
 ### Budgets
 
