@@ -34,6 +34,17 @@ just sync           # pull organizer updates
 
 To submit, fork the upstream repo and open a PR that adds only `submissions/futurebiohackers/`.
 
+## Autoresearch optimizer
+
+[`autoresearch-optimizer/`](autoresearch-optimizer/README.md) is the shared workspace for our autoresearch optimizer, alongside the CIFAR-100 speedrun. It has its own Python 3.11 environment and folders for experiments, notebooks, local data, and results.
+
+```sh
+just autoresearch-setup  # install the workspace environment
+just autoresearch-smoke  # verify the Python environment
+```
+
+Start with the workspace [README](autoresearch-optimizer/README.md) and claim a workstream in [TASKS.md](autoresearch-optimizer/TASKS.md). Use feature branches and reviewed PRs to collaborate.
+
 ## Science skills
 
 Includes 40 [Google DeepMind science skills](https://github.com/google-deepmind/science-skills), from commit `68832757cbbf941c620b71df5756cf6e5cc287b0`.

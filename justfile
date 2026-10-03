@@ -1,4 +1,4 @@
-# CIFAR-100 speedrun commands. Run `just` to list them.
+# Team workspace commands. Run `just` to list them.
 # Override the team folder with TEAM=name just run.
 
 set working-directory := "cifar100-speedrun"
@@ -43,3 +43,13 @@ check:
 # Pull organizer updates into cifar100-speedrun/
 sync:
     cd "$(git rev-parse --show-toplevel)" && git subtree pull --prefix=cifar100-speedrun {{upstream}} main
+
+# Install the autoresearch optimizer's Python 3.11 environment
+[working-directory: justfile_directory() / "autoresearch-optimizer"]
+autoresearch-setup:
+    uv sync --frozen
+
+# Verify that the autoresearch workspace uses its own Python 3.11 environment
+[working-directory: justfile_directory() / "autoresearch-optimizer"]
+autoresearch-smoke:
+    uv run --frozen python -c 'import sys; from pathlib import Path; assert sys.version_info[:2] == (3, 11), sys.version; assert Path(sys.prefix).resolve() == (Path.cwd() / ".venv").resolve(), sys.prefix; print("Autoresearch optimizer ready: Python", sys.version.split()[0], "in", Path.cwd())'
