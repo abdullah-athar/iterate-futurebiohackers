@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 298.8,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T220626Z-3a0f7acb",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"g3_pair\": \"bottleneck384\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "g3-bottleneck384",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"g3_pair\": \"bottleneck384\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"g3_pair\": \"bottleneck384\"}",
+    "delta": {
+      "g3_pair": "bottleneck384"
+    },
+    "hypothesis": "group 3 bottleneck pair: 1x1 768->384, 3x3 384->384, 1x1 384->768",
+    "env": {},
+    "config": "futurebiohackers {\"g3_pair\": \"bottleneck384\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

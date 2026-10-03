@@ -1,0 +1,75 @@
+{
+  "round": "r22",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "g3lad-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "g3-inner512-e9.75",
+          "params": {
+            "g3_pair": "inner512",
+            "epochs": 9.75
+          },
+          "hypothesis": "inner512 pair (-0.35 pp / -0.31 s at 9.5 ep) with a quarter epoch back"
+        },
+        {
+          "label": "g3-inner512-e10.0",
+          "params": {
+            "g3_pair": "inner512",
+            "epochs": 10.0
+          },
+          "hypothesis": "inner512 pair with half an epoch back"
+        }
+      ]
+    },
+    {
+      "name": "g3lad-b",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "g3-inner512-e10.25",
+          "params": {
+            "g3_pair": "inner512",
+            "epochs": 10.25
+          },
+          "hypothesis": "inner512 pair with 0.75 epoch back (predicted equal-accuracy point)"
+        },
+        {
+          "label": "g3-inner512-e10.0-augoff0.5",
+          "params": {
+            "g3_pair": "inner512",
+            "epochs": 10.0,
+            "aug_off_last": 0.5
+          },
+          "hypothesis": "inner512 pair at 10 epochs with the no-augmentation finish (last 0.5 epoch) stacked"
+        }
+      ]
+    },
+    {
+      "name": "g3lad-c",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "g3-inner640-e9.75",
+          "params": {
+            "g3_pair": "inner640",
+            "epochs": 9.75
+          },
+          "hypothesis": "inner640 pair (-0.16 pp / -0.11 s at 9.5 ep) with a quarter epoch back"
+        },
+        {
+          "label": "g3-inner640-e10.0",
+          "params": {
+            "g3_pair": "inner640",
+            "epochs": 10.0
+          },
+          "hypothesis": "inner640 pair with half an epoch back"
+        }
+      ]
+    }
+  ]
+}

@@ -283,3 +283,7 @@
 {"time": "2026-10-03T22:54:32", "label": "r20/method-c (gpu-guard miss 7)", "gpu": "NVIDIA A100 80GB PCIe", "power": "300.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: GPU 'NVIDIA A100 80GB PCIe' is not 'NVIDIA A100-SXM4-80GB'"}
 {"time": "2026-10-03T22:55:49", "label": "r20/stackB-a", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 400.8, "gpu_minutes": 6.93, "note": ""}
 {"time": "2026-10-03T23:00:21", "label": "r20/method-c (FAILED RemoteError)", "gpu": "?", "power": null, "container_seconds": 348.82104325294495, "gpu_minutes": 6.06, "note": "local wall time of the failed call"}
+{"time": "2026-10-03T23:05:51", "label": "r21/g3pair-a (gpu-guard miss 1)", "gpu": "NVIDIA A100-SXM4-80GB", "power": "500.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: power limit 500.00 W is not 400 W"}
+{"time": "2026-10-03T23:05:52", "label": "r21/g3pair-b (gpu-guard miss 1)", "gpu": "NVIDIA A100-SXM4-80GB", "power": "500.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: power limit 500.00 W is not 400 W"}
+{"time": "2026-10-03T23:13:24", "label": "r21/g3pair-b", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 445.3, "gpu_minutes": 7.67, "note": ""}
+{"time": "2026-10-03T23:14:42", "label": "r21/g3pair-a", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 524.5, "gpu_minutes": 8.99, "note": ""}
