@@ -364,6 +364,11 @@ def compiled_profile(args, device) -> None:
     resolution schedule): one build, one prepare, one complete train() under torch.profiler."""
     params = json.loads(args.params)
     report: dict = {"params": params, "gpu": torch.cuda.get_device_name(0), "eager": False}
+    # Descriptive Inductor kernel names (triton_poi_fused_gelu_native_batch_norm_...) so the trace
+    # shows which ops each generated kernel fuses; the generated code is otherwise identical.
+    import torch._inductor.config as inductor_config
+
+    inductor_config.triton.unique_kernel_names = True
     module = load_submission(Path(args.submission_path).resolve())
     train = load_split(Path(args.data_root), train=True)
     holder: dict = {}
