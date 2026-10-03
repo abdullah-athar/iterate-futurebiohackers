@@ -2,7 +2,7 @@
 
 1. Default-path faithfulness: with default parameters the working-tree recipe must give a trial
    that is bit-identical (weights and predictions) to the reference recipe, by default the team
-   baseline on origin/speedrun-24px-9.5ep (candidate B). Shared parameters whose defaults differ are set to OUR defaults on
+   baseline on origin/speedrun-g3-512-10ep (PR #23, the current record). Shared parameters whose defaults differ are set to OUR defaults on
    both sides (and printed) and parameters only our file knows are turned off, so the comparison
    tests the code path rather than promoted values. The control also keeps the reference's step
    count and prints nothing on stderr.
@@ -20,7 +20,7 @@
 CPU, synthetic images, well under a minute. Run from the speedrun env with cwd cifar100-speedrun:
     uv run python ../scripts/check_variants.py [reference_submission_dir]
     scripts/wsl_speedrun.sh python ../scripts/check_variants.py          # Windows, via WSL
-The reference defaults to `git show origin/speedrun-24px-9.5ep:...submission.py`; set CHECK_VARIANTS_REF=<git
+The reference defaults to `git show origin/speedrun-g3-512-10ep:...submission.py`; set CHECK_VARIANTS_REF=<git
 ref> to compare against another commit (it must share the baseline's state layout).
 """
 
@@ -47,7 +47,7 @@ from benchmark.worker import load_submission, seed_everything
 TEAM_DIR = (
     Path(__file__).resolve().parents[1] / "cifar100-speedrun" / "submissions" / "futurebiohackers"
 )
-REFERENCE_REF = os.environ.get("CHECK_VARIANTS_REF", "origin/speedrun-24px-9.5ep")
+REFERENCE_REF = os.environ.get("CHECK_VARIANTS_REF", "origin/speedrun-g3-512-10ep")
 # The synthetic split has 64 images: batch 8 gives 8 steps per epoch, 16 in two epochs.
 BASE = {"widths": [32, 64, 64], "epochs": 2.0, "batch_size": 8, "compile": ""}
 # "Off" values for parameters only our file knows. The control turns every such parameter off

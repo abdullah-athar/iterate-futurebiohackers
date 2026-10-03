@@ -24,7 +24,7 @@ from benchmark.api import BuildContext, TrainingData
 
 # Override any value with --params, e.g. '{"epochs": 9, "widths": [128, 384, 768]}'.
 DEFAULTS = {
-    "epochs": 9.5,
+    "epochs": 10.0,
     "batch_size": 1024,
     "lr": 11.5,  # per 1024 examples, decoupled from momentum (airbench convention)
     "momentum": 0.85,
@@ -73,7 +73,7 @@ DEFAULTS = {
     # Group 3's residual pair (the two convs after conv1; the residual and the group output keep
     # widths[2] channels): "full" = two 3x3 convs at widths[2]; "inner512" / "inner640" = the
     # 3x3 pair through 512 / 640 channels; "bottleneck384" = 1x1 -> 384, 3x3 at 384, 1x1 back.
-    "g3_pair": "full",
+    "g3_pair": "inner512",
     # "max" is max(dim).values; adaptive_max_pool2d's backward uses slow atomics and
     # "amax" trains to NaN under torch.compile in torch 2.4.
     "global_pool": "max",
