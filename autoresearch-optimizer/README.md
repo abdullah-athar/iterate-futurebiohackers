@@ -26,20 +26,16 @@ Commit both `pyproject.toml` and `uv.lock` when changing dependencies.
 
 ## The autoresearch loop (`autoresearch/`)
 
-One loop, two ways to drive it, one ledger:
+The proposer is always a coding agent (Claude Code, Codex, ...); the loop owns evaluation and the ledger.
 
 ```sh
 cd autoresearch-optimizer && uv sync --frozen
 
-# API mode: an LLM proposes candidates (ANTHROPIC_API_KEY / GEMINI_API_KEY / OPENAI_API_KEY)
+# tell the agent: "read autoresearch/program.md and start a research run"
 uv run python -m autoresearch --run artifacts/runs/demo init --problem median_string
-uv run python -m autoresearch --run artifacts/runs/demo run --llm anthropic --steps 20   # or gemini | openai[:model] | mock
-uv run python -m autoresearch --run artifacts/runs/demo report --holdout
-
-# Agent mode: Claude Code / Antigravity / Devin / you are the proposer
-#   -> tell the agent: "read autoresearch/program.md and start a research run"
 uv run python -m autoresearch --run artifacts/runs/demo status          # evidence + suggested mode + parent file
 uv run python -m autoresearch --run artifacts/runs/demo submit --file cand.py --hypothesis "..." --mode fix_losers --parent 2
+uv run python -m autoresearch --run artifacts/runs/demo report --holdout
 uv run python -m autoresearch --run artifacts/runs/demo best --output median_string/solvers/discovered.py
 ```
 
@@ -55,14 +51,14 @@ Each maps to a known hard problem in LLM autoresearch; the point of the hackatho
 | --- | --- | --- |
 | Scalar scores are a poor gradient (GEPA) | The proposer sees a **per-instance diagnostics table**: score vs set-median baseline vs planted `best_known` vs best on the front, runtime, metric/noise metadata; it must write a falsifiable hypothesis before code. | `prompts.py`, `status` |
 | Good solvers get thrown away because they lose on aggregate | **Pareto-per-instance archive**: anything best on *some* instance is kept and offered for a `merge` with the leader. | `archive.py` |
-| Paying tokens + compute for re-proposed ideas (Shinka) | **Rejection sampling / novelty gate**: AST-normalise (strip docstrings, α-rename locals), reject ≥0.95 similar candidates *before* evaluation; the proposer is told why and re-asked. | `novelty.py` |
+| Paying tokens + compute for re-proposed ideas (Shinka) | **Rejection sampling / novelty gate**: AST-normalise (strip docstrings, α-rename locals), reject ≥0.95 similar candidates *before* evaluation; the proposer is told why. | `novelty.py` |
 | Is the improvement real, or selection on noise? | **Confirmation re-test**: a claimed new global best is re-run on a fresh-seed `confirm` set and only promoted if it is not worse than the incumbent there (verdict `unconfirmed` otherwise). Final numbers come from a `holdout` set the search never saw. | `loop.py::_confirm`, `benchmarks.py` |
 | Do cheap experiments predict expensive ones? | **Cascade** (small `screen` → medium `validate`, early-reject below baseline) and the report prints the **proxy fidelity** (Spearman ρ between screen and validate scores). | `loop.py::_cascade`, `report.py` |
 | Research taste: tune vs. investigate vs. abandon | **UCB bandit over prompt modes** (`tune`, `fix_losers`, `new_family`, `merge`) with a **plateau detector** that bans `tune` after N flat proposals. | `loop.py::choose_mode` |
 | Hypotheses that never get revised | Every submission gets a **verdict** (`supported` / `partial` / `falsified` / `unconfirmed` / `inconclusive` / `untested`); falsified ones are shown back to the proposer as "do not re-propose, build on why they failed". | `ledger.py`, `prompts.py` |
 | Memory decay over long runs | The append-only **ledger** is the memory; `status` replays it, runs are resumable, and any agent can pick up another agent's run. | `ledger.py` |
 | Reward hacking / untrustworthy evidence | Candidates return a string; the harness recomputes the score in a **separate subprocess with timeouts**; a static **import guard** blocks `os`/`subprocess`/benchmark-generator imports before evaluation; the ledger is written only by the loop. | `sandbox.py`, `guard.py` |
-| Research efficiency | Prompt/completion **tokens are recorded per proposal**; the report prints objective points per 1k tokens and per evaluated proposal. | `report.py` |
+| Research efficiency | Agent **tokens are recorded per proposal**; the report prints objective points per 1k tokens and per evaluated proposal. | `report.py` |
 
 Adding another problem = one class implementing `autoresearch/problem.py::Problem` (`describe`, `seed_source`, `evaluate(source, split)`), registered in `PROBLEMS`.
 

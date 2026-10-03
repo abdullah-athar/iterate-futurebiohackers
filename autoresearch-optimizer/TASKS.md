@@ -6,7 +6,7 @@ Claim a workstream by replacing `Unclaimed` with your name. Update the status an
 | --- | --- | --- | --- |
 | Benchmark and baseline | Choose the problem, data split, metric direction, compute budget, and a reproducible baseline command. | Team | Done: `median_string` benchmark with Set Median baseline |
 | Evaluation | Define candidate inputs and score outputs; report failures, elapsed time, and reproducibility metadata. | Team | Done: `median_string.Evaluator` with small/medium/hard tiers and JSON reports |
-| Search loop | Propose candidates, evaluate under the agreed budget, and retain the best valid result. | Abdullah + Devin | Done: `autoresearch/` (novelty gate, cascade, confirm re-test, Pareto archive, mode bandit; API + agent mode) |
+| Search loop | Propose candidates, evaluate under the agreed budget, and retain the best valid result. | Abdullah + Devin | Done: `autoresearch/` (novelty gate, cascade, confirm re-test, Pareto archive, mode bandit; coding agents as proposers) |
 | Experiment analysis | Compare against the baseline and summarize improvements, failure cases, and limitations. | Abdullah + Devin | In progress: `python -m autoresearch report --holdout` renders trajectory, front, verdicts, tokens, held-out |
 | Demo and submission | Prepare the live demo, short description, credits, and presentation. | Unclaimed | To do |
 

@@ -1,13 +1,12 @@
-"""Prompt construction for the proposer and parsing of its reply.
+"""Context shown to the proposing agent.
 
-The proposer must *reflect* before editing: it is shown per-instance diagnostics of the
-parent(s) and a digest of what has been tried, and must emit a one-line hypothesis plus
-a complete solver file. Prompt *modes* steer the kind of change requested.
+The proposer (a coding agent) must *reflect* before editing: it is shown per-instance
+diagnostics of the parent(s) and a digest of what has been tried, and must write a one-line
+hypothesis plus a complete solver file. Prompt *modes* steer the kind of change requested.
 """
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 
 from .archive import Archive
@@ -27,22 +26,6 @@ MODES: dict[str, str] = {
              "strengths into one solver (e.g. run both and keep the better, or use one's start with the "
              "other's local search). The result must beat both on their respective instances.",
 }
-
-SYSTEM = """\
-You are an algorithm researcher inside an automated research loop. Each turn you read the
-experimental evidence, state a falsifiable hypothesis, and return a complete solver file.
-Be concrete and economical: one clear idea per proposal. Never repeat an idea the ledger
-already shows was tried; the loop rejects near-duplicates without evaluating them.
-A claimed new best is re-tested on fresh instances before it is accepted, so prefer changes
-that generalise over ones that exploit a particular instance.
-
-Reply format (exactly):
-HYPOTHESIS: <one line: what you change, why, and on which instances you expect a lower score>
-```python
-<complete solver file defining solve(instance) -> str>
-```
-"""
-
 
 @dataclass
 class Context:
@@ -108,18 +91,6 @@ def build_user_prompt(problem_description: str, ctx: Context) -> str:
         parts += [f"## Note: no global improvement for {ctx.extra['plateau']} proposals — change direction.", ""]
     if ctx.rejection_note:
         parts += ["## Rejected", ctx.rejection_note, ""]
-    parts.append("Now reflect on the evidence and reply in the required format.")
+    parts.append("Now reflect on the evidence, write the complete solver to candidate.py and a one-line "
+                 "hypothesis (what you change, why, and on which instances you expect a lower score) to hypothesis.txt.")
     return "\n".join(parts)
-
-
-_HYP = re.compile(r"HYPOTHESIS:\s*(.+)")
-_CODE = re.compile(r"```(?:python)?\s*\n(.*?)```", re.DOTALL)
-
-
-def parse_proposal(text: str) -> tuple[str, str]:
-    hyp = _HYP.search(text)
-    blocks = _CODE.findall(text)
-    if not blocks:
-        raise ValueError("proposal contains no ```python code block")
-    source = max(blocks, key=len).strip() + "\n"
-    return (hyp.group(1).strip() if hyp else "(no hypothesis given)"), source

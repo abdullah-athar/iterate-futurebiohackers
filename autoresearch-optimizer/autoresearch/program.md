@@ -17,7 +17,7 @@ uv run python -m autoresearch --run artifacts/runs/<name> init --problem median_
    - Shows the global best, the Pareto front, the **suggested mode** (tune / fix_losers /
      new_family / merge), the parent file(s) to start from, a per-instance diagnostics table
      (score vs set-median baseline vs best_known planted score vs best on the front) and the
-     ledger of everything tried. Add `--prompt` to see the exact prompt an API-driven LLM gets.
+     ledger of everything tried.
 2. Read the parent source and the diagnostics. Decide **one** change and write it as a
    falsifiable hypothesis ("X because Y, expect lower score on Z").
    - Respect the mode. `new_family` means a different algorithm, not a tweak.

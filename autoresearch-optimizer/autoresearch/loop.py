@@ -26,17 +26,13 @@ from .ledger import (
     Entry,
     RunStore,
 )
-from .llm import LLM
 from .novelty import check_novelty
 from .problem import EvalResult, Problem, get_problem
 from .prompts import (
     MODES,
-    SYSTEM,
     Context,
-    build_user_prompt,
     format_diagnostics,
     format_digest,
-    parse_proposal,
 )
 from .sandbox import evaluate_in_subprocess
 
@@ -144,9 +140,6 @@ class ResearchRun:
         return Context(mode=mode, parents=parents, parent_sources=[self.store.read_candidate(p) for p in parents],
                        diagnostics=diag, digest=format_digest(entries), rejection_note=rejection_note, extra=extra)
 
-    def prompt(self, ctx: Context) -> tuple[str, str]:
-        return SYSTEM, build_user_prompt(self.problem.describe(), ctx)
-
     # ----- submission: novelty gate -> cascade -> archive update -> ledger ---------------------
     def submit(self, source: str, hypothesis: str, mode: str, parent_ids: list[int], proposer: str = "agent",
                prompt_tokens: int = 0, completion_tokens: int = 0) -> Entry:
@@ -238,40 +231,6 @@ class ResearchRun:
 
     def evaluate_holdout(self, entry: Entry) -> EvalResult:
         return evaluate_in_subprocess(self.problem_name, self.problem, self.store.read_candidate(entry), "holdout")
-
-    # ----- API-driven stepping -------------------------------------------------------------------
-    def step(self, llm: LLM, rng: random.Random, log=print) -> Entry:
-        rejection_note = ""
-        ctx = self.context(rng=rng)
-        tokens_in = tokens_out = 0
-        for attempt in range(self.config.max_novelty_attempts):
-            if rejection_note:
-                ctx = self.context(mode=ctx.mode, rng=rng, rejection_note=rejection_note)
-            system, user = self.prompt(ctx)
-            resp = llm.complete(system, user)
-            tokens_in += resp.prompt_tokens
-            tokens_out += resp.completion_tokens
-            try:
-                hypothesis, source = parse_proposal(resp.text)
-            except ValueError as e:
-                hypothesis, source = f"(unparseable reply: {e})", "def solve(instance):\n    raise RuntimeError('unparseable proposal')\n"
-            entry = self.submit(source, hypothesis, ctx.mode, [p.id for p in ctx.parents], proposer=llm.name,
-                                prompt_tokens=tokens_in, completion_tokens=tokens_out)
-            log(self.describe_entry(entry))
-            if entry.status not in (STATUS_REJECTED_DUPLICATE, STATUS_REJECTED_GUARD):
-                return entry
-            if entry.status == STATUS_REJECTED_GUARD:
-                rejection_note = f"Your previous proposal '{hypothesis}' was rejected unevaluated: {entry.note}."
-            else:
-                rejection_note = (f"Your previous proposal '{hypothesis}' was a near-duplicate of candidate "
-                                  f"#{entry.novelty['nearest_id']} (similarity {entry.novelty['max_similarity']}). "
-                                  f"Propose something materially different.")
-            tokens_in = tokens_out = 0
-        return entry
-
-    def run(self, llm: LLM, steps: int, seed: int = 0, log=print) -> list[Entry]:
-        rng = random.Random(seed)
-        return [self.step(llm, rng, log) for _ in range(steps)]
 
     @staticmethod
     def describe_entry(e: Entry) -> str:

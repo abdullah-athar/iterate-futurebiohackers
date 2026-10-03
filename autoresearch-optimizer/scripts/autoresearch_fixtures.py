@@ -1,4 +1,4 @@
-"""Canned proposals for the mock LLM: exercises duplicate rejection, failure, and improvement."""
+"""Fixture candidates for the tests: a near-duplicate of the seed, a syntax error, and two real solvers."""
 
 SEED_DUPLICATE = '''
 import random
@@ -93,10 +93,3 @@ def solve(instance):
                 break
     return cur
 '''
-
-PROPOSALS = [
-    ("Cosmetic rewrite of the seed (should be caught by the novelty gate)", SEED_DUPLICATE),
-    ("Start from positional majority consensus and local-search from 3 starts", CONSENSUS_LOCAL_SEARCH),
-    ("Syntax error on purpose to exercise failure handling", BROKEN),
-    ("Add insertion/deletion moves to the neighbourhood for Levenshtein instances", INDEL_MOVES),
-]

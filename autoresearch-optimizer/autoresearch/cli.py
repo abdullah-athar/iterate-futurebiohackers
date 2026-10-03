@@ -1,7 +1,6 @@
-"""Command-line interface.
+"""Command-line interface for agent mode.
 
-API mode:    init -> run --llm anthropic --steps 20 -> report --holdout
-Agent mode:  init -> (status -> write candidate.py -> submit) x N -> report --holdout
+init -> (status -> write candidate.py -> submit) x N -> report --holdout
 """
 
 from __future__ import annotations
@@ -12,7 +11,6 @@ import sys
 from pathlib import Path
 
 from .ledger import RunStore
-from .llm import make_llm
 from .loop import LoopConfig, ResearchRun
 from .prompts import MODES
 
@@ -42,11 +40,6 @@ def cmd_init(args) -> None:
 def cmd_status(args) -> None:
     run = _run(args)
     ctx = run.context(mode=args.mode, rng=random.Random(args.seed))
-    if args.prompt:
-        system, user = run.prompt(ctx)
-        print(system)
-        print(user)
-        return
     archive = run.archive()
     print(f"# Run {run.store.root} — problem {run.problem_name}")
     print(f"Global best: #{archive.global_best.id} objective={archive.global_best.objective:g} "
@@ -78,16 +71,6 @@ def cmd_submit(args) -> None:
     from .prompts import format_diagnostics
     for d in e.evals.values():
         print(format_diagnostics(EvalResult.from_dict(d), run.archive(), label=f"#{e.id} "))
-
-
-def cmd_run(args) -> None:
-    run = _run(args)
-    llm = make_llm(args.llm)
-    print(f"Running {args.steps} step(s) with {llm.name} on {run.store.root}")
-    run.run(llm, args.steps, seed=args.seed)
-    print("\n" + "=" * 80)
-    from .report import render
-    print(render(run))
 
 
 def cmd_report(args) -> None:
@@ -129,7 +112,6 @@ def main(argv=None) -> None:
     s = sub.add_parser("status", help="show archive, diagnostics, suggested mode (agent mode)")
     s.add_argument("--mode", choices=list(MODES))
     s.add_argument("--seed", type=int, default=None, help="RNG seed for parent selection")
-    s.add_argument("--prompt", action="store_true", help="print the exact proposer prompt instead")
     s.set_defaults(fn=cmd_status)
 
     s = sub.add_parser("submit", help="novelty-gate, evaluate and record a candidate (agent mode)")
@@ -141,12 +123,6 @@ def main(argv=None) -> None:
     s.add_argument("--prompt-tokens", type=int, default=0)
     s.add_argument("--completion-tokens", type=int, default=0)
     s.set_defaults(fn=cmd_submit)
-
-    s = sub.add_parser("run", help="API mode: let an LLM drive N steps")
-    s.add_argument("--llm", default="anthropic", help="anthropic|gemini|openai|mock[:model]")
-    s.add_argument("--steps", type=int, default=10)
-    s.add_argument("--seed", type=int, default=0)
-    s.set_defaults(fn=cmd_run)
 
     s = sub.add_parser("report", help="render report.md (optionally with held-out evaluation)")
     s.add_argument("--holdout", action="store_true")

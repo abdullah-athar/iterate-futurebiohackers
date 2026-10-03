@@ -72,7 +72,7 @@ autoresearch-eval *args:
 autoresearch *args:
     uv run python -m autoresearch "$@"
 
-# Run the autoresearch loop tests (novelty gate, parsing, mock research run)
+# Run the autoresearch loop tests (novelty gate, guard, agent-mode research run)
 [working-directory: justfile_directory() / "autoresearch-optimizer"]
 autoresearch-test:
     uv run python scripts/test_median_string.py

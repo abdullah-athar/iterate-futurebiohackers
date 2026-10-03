@@ -61,7 +61,7 @@ def render(run: ResearchRun, holdout: bool = False, holdout_front: bool = False)
            f"- run dir: `{run.store.root}`", f"- proposers: {', '.join(proposers)}",
            (f"- proposals: {len(proposals)} ({len(evaluated)} evaluated, {dups} rejected by novelty gate, "
             f"{guarded} rejected by import guard — neither evaluated)"),
-           f"- LLM tokens: {tokens:,} (prompt {sum(e.prompt_tokens for e in proposals):,} / completion {sum(e.completion_tokens for e in proposals):,})"]
+           f"- agent tokens: {tokens:,} (prompt {sum(e.prompt_tokens for e in proposals):,} / completion {sum(e.completion_tokens for e in proposals):,})"]
     if seed and best and seed.scored:
         gain = seed.objective - best.objective
         out.append(f"- objective ({run.problem.objective_split} split, lower is better): seed {seed.objective:g} → best {best.objective:g} "
