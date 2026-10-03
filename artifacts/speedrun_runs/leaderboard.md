@@ -1,8 +1,8 @@
 # CIFAR-100 speedrun leaderboard
 
-- Generated 2026-10-03 22:04 from `artifacts/speedrun_runs/registry.jsonl`: 259 variant rows, 92 control rows.
+- Generated 2026-10-03 22:06 from `artifacts/speedrun_runs/registry.jsonl`: 260 variant rows, 92 control rows.
 - k = 1 pp/s from `artifacts/speedrun_runs/k.json` (PROVISIONAL for the new baseline recipe merged from main on 3 Oct (64/256/768, 28 px first half, 9 epochs, 4.65 s): 1.0 pp/s until round r16/k4 (paired epochs ladder 8.5 / 9.0 / 9.5 / 10.0, n=8, SXM 400 W) replaces it. Expect an asymmetric rate around a knee, as measured on our previous network (r14/k3: 1.8 pp/s below 9.5 epochs, 0.3 pp/s above)., 2026-10-03T21:35:00)
-- GPU used: 1184.2/1263 min (ledger `artifacts/speedrun_runs/gpu_ledger.jsonl`: 250 containers, 128 guard misses, 32.3 min lost).
+- GPU used: 1194.6/1263 min (ledger `artifacts/speedrun_runs/gpu_ledger.jsonl`: 260 containers, 137 guard misses, 34.5 min lost).
 
 Score: `dtime_adj = dtime - dacc_pp / k` (seconds; dtime = variant minus control mean prepare+train time, dacc in accuracy percentage points, both from paired trials); lower is better. dtime_adj is recomputed from the current k for every row with paired data; rows without paired data sit at the bottom sorted by dtime. `!` marks nonfinite > 0 or a verdict that is not qualified/complete; `*` marks a dtime_adj computed from the row's own k_used (no k.json).
 
@@ -255,20 +255,21 @@ Score: `dtime_adj = dtime - dacc_pp / k` (seconds; dtime = variant minus control
 | 243 | ! stem-s2d | r14 | `{"stem":"space_to_depth"}` | stem A as specified: pixel_unshuffle(2), 2x2 whitening on... | 8/8 | 65.87 | 0.20 | -9.66 +- 0.10 | -2.88 | +10.92 | 2.15 | 107 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
 | 244 | cold4cpu-res24q | single | `{"resolution_schedule":[[24,0.25],[28,0.5]],"count_nonfinite":true}` |  | 2/2 | 75.03 | 0.52 |  |  |  | 4.31 | 339 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%); BUILD > 300 s (339 s cold) |
 | 245 | candA-24q28h-e9.25-seeds0 | single | `{"resolution_schedule":[[24,0.25],[28,0.5]],"epochs":9.25,"count_nonfinite":true}` |  | 40/40 | 75.04 | 0.27 |  |  |  | 4.39 | 280 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 246 | candA-24q28h-e9.25-seeds40 | single | `{"resolution_schedule":[[24,0.25],[28,0.5]],"epochs":9.25,"count_nonfinite":true}` |  | 40/40 | 75.16 | 0.22 |  |  |  | 4.51 | 300 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 247 | cold4cpu-main | single | `{}` |  | 2/2 | 75.16 | 0.06 |  |  |  | 4.67 | 255 cold |  | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 248 | ref-main | single | `{}` |  | 40/40 | 75.12 | 0.26 |  |  |  | 4.72 | 193 cold |  | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 249 | safety-e9.5-seeds40 | single | `{"epochs":9.5}` |  | 40/40 | 75.32 | 0.29 |  |  |  | 4.94 | 259 cold |  | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 250 | safety-e9.5-seeds0 | single | `{"epochs":9.5}` |  | 40/40 | 75.28 | 0.24 |  |  |  | 4.96 | 196 cold |  | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 251 | cold4cpu-safety-e9.5 | single | `{"epochs":9.5,"count_nonfinite":true}` |  | 2/2 | 75.32 | 0.10 |  |  |  | 4.98 | 209 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 252 | final-S3-e9.5-seeds0-400W | final | `{"widths":[64,256,768],"bias_scaler":16.0,"lr":12.0,"weight_decay":0.0168,"compile_loss":true,"fused_sgd":true,"epochs":9.5,"count_nonfinite":true}` |  | 40/40 | 75.33 | 0.26 |  |  |  | 5.09 | 170 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 253 | final-S3-e9.5-seeds40-400W | final | `{"widths":[64,256,768],"bias_scaler":16.0,"lr":12.0,"weight_decay":0.0168,"compile_loss":true,"fused_sgd":true,"epochs":9.5,"count_nonfinite":true}` |  | 40/40 | 75.28 | 0.26 |  |  |  | 5.14 | 197 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 254 | final2-defaults-400W | final | `{"count_nonfinite":true}` |  | 40/40 | 75.30 | 0.25 |  |  |  | 5.72 | 187 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 255 | final-S7-res24q-e8.75-400W | final | `{"bias_scaler":32.0,"label_smoothing":0.25,"lr":10.8,"bn_momentum":0.7,"jitter":0.3,"scaling_factor":0.1388888888888889,"train_resolution":24,"resolution_switch":0.25,"epochs":8.75,"count_nonfinite":true}` |  | 40/40 | 75.34 | 0.28 |  |  |  | 5.76 | 187 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 256 | final-S7-res24q-e9.0-400W | final | `{"bias_scaler":32.0,"label_smoothing":0.25,"lr":10.8,"bn_momentum":0.7,"jitter":0.3,"scaling_factor":0.1388888888888889,"train_resolution":24,"resolution_switch":0.25,"epochs":9.0,"count_nonfinite":true}` |  | 40/40 | 75.40 | 0.27 |  |  |  | 5.87 | 157 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 257 | defaults-torchlogs | r6 | `{}` | priority 1: do the 24->32 resolution switch or the first... | 3/3 | 75.51 | 0.21 |  |  |  | 5.99 | 44 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 258 | ref-sxm500-n40 | reference | `{}` | reference: current main recipe, cold build, official target | 40/40 | 75.19 | 0.25 |  |  |  | 6.94 | 95 cold |  | A100 SXM4 @ 500 W | QUALIFIED (>= 75%) |
-| 259 | ref-sxm400-n40 | reference | `{}` | reference: current main recipe, cold build, official target | 40/40 | 75.20 | 0.28 |  |  |  | 7.41 | 133 cold |  | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 246 | candB-24q28h-e9.5-seeds0 | single | `{"resolution_schedule":[[24,0.25],[28,0.5]],"epochs":9.5,"count_nonfinite":true}` |  | 40/40 | 75.18 | 0.25 |  |  |  | 4.51 | 275 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 247 | candA-24q28h-e9.25-seeds40 | single | `{"resolution_schedule":[[24,0.25],[28,0.5]],"epochs":9.25,"count_nonfinite":true}` |  | 40/40 | 75.16 | 0.22 |  |  |  | 4.51 | 300 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 248 | cold4cpu-main | single | `{}` |  | 2/2 | 75.16 | 0.06 |  |  |  | 4.67 | 255 cold |  | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 249 | ref-main | single | `{}` |  | 40/40 | 75.12 | 0.26 |  |  |  | 4.72 | 193 cold |  | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 250 | safety-e9.5-seeds40 | single | `{"epochs":9.5}` |  | 40/40 | 75.32 | 0.29 |  |  |  | 4.94 | 259 cold |  | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 251 | safety-e9.5-seeds0 | single | `{"epochs":9.5}` |  | 40/40 | 75.28 | 0.24 |  |  |  | 4.96 | 196 cold |  | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 252 | cold4cpu-safety-e9.5 | single | `{"epochs":9.5,"count_nonfinite":true}` |  | 2/2 | 75.32 | 0.10 |  |  |  | 4.98 | 209 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 253 | final-S3-e9.5-seeds0-400W | final | `{"widths":[64,256,768],"bias_scaler":16.0,"lr":12.0,"weight_decay":0.0168,"compile_loss":true,"fused_sgd":true,"epochs":9.5,"count_nonfinite":true}` |  | 40/40 | 75.33 | 0.26 |  |  |  | 5.09 | 170 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 254 | final-S3-e9.5-seeds40-400W | final | `{"widths":[64,256,768],"bias_scaler":16.0,"lr":12.0,"weight_decay":0.0168,"compile_loss":true,"fused_sgd":true,"epochs":9.5,"count_nonfinite":true}` |  | 40/40 | 75.28 | 0.26 |  |  |  | 5.14 | 197 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 255 | final2-defaults-400W | final | `{"count_nonfinite":true}` |  | 40/40 | 75.30 | 0.25 |  |  |  | 5.72 | 187 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 256 | final-S7-res24q-e8.75-400W | final | `{"bias_scaler":32.0,"label_smoothing":0.25,"lr":10.8,"bn_momentum":0.7,"jitter":0.3,"scaling_factor":0.1388888888888889,"train_resolution":24,"resolution_switch":0.25,"epochs":8.75,"count_nonfinite":true}` |  | 40/40 | 75.34 | 0.28 |  |  |  | 5.76 | 187 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 257 | final-S7-res24q-e9.0-400W | final | `{"bias_scaler":32.0,"label_smoothing":0.25,"lr":10.8,"bn_momentum":0.7,"jitter":0.3,"scaling_factor":0.1388888888888889,"train_resolution":24,"resolution_switch":0.25,"epochs":9.0,"count_nonfinite":true}` |  | 40/40 | 75.40 | 0.27 |  |  |  | 5.87 | 157 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 258 | defaults-torchlogs | r6 | `{}` | priority 1: do the 24->32 resolution switch or the first... | 3/3 | 75.51 | 0.21 |  |  |  | 5.99 | 44 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 259 | ref-sxm500-n40 | reference | `{}` | reference: current main recipe, cold build, official target | 40/40 | 75.19 | 0.25 |  |  |  | 6.94 | 95 cold |  | A100 SXM4 @ 500 W | QUALIFIED (>= 75%) |
+| 260 | ref-sxm400-n40 | reference | `{}` | reference: current main recipe, cold build, official target | 40/40 | 75.20 | 0.28 |  |  |  | 7.41 | 133 cold |  | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
 
 ## Controls (power limits seen: A100 SXM4 @ 400 W x89, A100 SXM4 @ 500 W x3)
 
@@ -371,15 +372,15 @@ Score: `dtime_adj = dtime - dacc_pp / k` (seconds; dtime = variant minus control
 
 | GPU @ power | containers | share | guard misses | GPU min |
 | --- | --- | --- | --- | --- |
-| A100 SXM4 @ 400 W | 125 | 50% | 19 | 1032.2 |
-| A100 PCIe @ 300 W | 62 | 25% | 61 | 15.2 |
-| A100 SXM4 @ 500 W | 30 | 12% | 26 | 39.9 |
+| A100 SXM4 @ 400 W | 126 | 48% | 19 | 1040.4 |
+| A100 PCIe @ 300 W | 69 | 27% | 68 | 17.0 |
+| A100 SXM4 @ 500 W | 32 | 12% | 28 | 40.4 |
 | A100 SXM4 @ ? | 23 | 9% | 22 | 15.7 |
 | A100 PCIe @ ? | 6 | 2% | 0 | 39.9 |
 | A100 (mixed) @ ? | 2 | 1% | 0 | 33.8 |
 | ? @ ? | 1 | 0% | 0 | 3.4 |
 | A100 PCIe / SXM4 @ ? | 1 | 0% | 0 | 4.0 |
 
-Guard misses: 128/250 containers (51%), 32.3 GPU min lost; ledger total 1184.2 min.
+Guard misses: 137/260 containers (53%), 34.5 GPU min lost; ledger total 1194.6 min.
 
 Pareto plot: `pareto.svg` (x = mean prepare+train s, y = mean accuracy %).

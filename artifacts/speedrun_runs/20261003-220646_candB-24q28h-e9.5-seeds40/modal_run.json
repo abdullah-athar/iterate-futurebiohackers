@@ -1,0 +1,39 @@
+{
+  "returncode": 0,
+  "wall_seconds": 486.0,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T205842Z-a876e135",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 40 --seed 40 --params '{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}'",
+  "spec": {
+    "label": "candB-24q28h-e9.5-seeds40",
+    "n": 40,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "40",
+      "--seed",
+      "40",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.25
+        ],
+        [
+          28,
+          0.5
+        ]
+      ],
+      "epochs": 9.5,
+      "count_nonfinite": true
+    },
+    "config": "futurebiohackers --n 40 --seed 40 --params {\"resolution_schedule\": [[24, 0.25], [28, 0.5]], \"epochs\": 9.5}"
+  },
+  "nonfinite": 0,
+  "build_mode": "cold"
+}
