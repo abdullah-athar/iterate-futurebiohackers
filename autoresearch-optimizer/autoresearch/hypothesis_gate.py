@@ -96,13 +96,15 @@ def _parse_decisions(text: str, labels: list[str]) -> list[GateVerdict]:
     return out
 
 
-def ask_claude(prompt: str, system: str, model: str, timeout_s: int) -> tuple[str, dict]:
+def ask_claude(prompt: str, system: str, model: str, timeout_s: int, effort: str | None = None) -> tuple[str, dict]:
     """One tool-less headless Claude Code call -> (reply text, usage).
 
     No tools and a short system prompt: the call only reads what is in `prompt`, so it skips the
     coding-agent instructions that otherwise make up most of the input tokens (~30k -> a few k)."""
     cmd = ["claude", "-p", prompt, "--output-format", "json", "--model", model, "--max-turns", "1",
            "--tools", "", "--system-prompt", system]
+    if effort:
+        cmd += ["--effort", effort]
     t0 = time.time()
     with tempfile.TemporaryDirectory(prefix="autoresearch-ask-") as cwd:
         proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout_s, stdin=subprocess.DEVNULL)

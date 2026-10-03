@@ -124,12 +124,15 @@ def write_workspace(run: ResearchRun, a: Assignment, gen: int, n: int, mix: str,
     try_sh.chmod(0o755)
 
 
-def run_claude(ws: Path, turn_s: int, model: str, max_budget_usd: float | None = None, prompt: str = PROMPT) -> dict:
+def run_claude(ws: Path, turn_s: int, model: str, max_budget_usd: float | None = None, prompt: str = PROMPT,
+               effort: str | None = None) -> dict:
     """Run one headless Claude Code session in `ws`; kill its process group at the deadline."""
     cmd = ["claude", "-p", prompt, "--output-format", "json", "--model", model,
            "--permission-mode", "acceptEdits", "--allowedTools", "Bash,Read,Edit,Write,Glob,Grep"]
     if max_budget_usd:
         cmd += ["--max-budget-usd", str(max_budget_usd)]
+    if effort:
+        cmd += ["--effort", effort]
     env = {k: v for k, v in os.environ.items() if not k.endswith("_SEED") or not k.startswith("AUTORESEARCH_")}
     t0 = time.time()
     with open(ws / "agent.json", "w") as out, open(ws / "agent.err", "w") as err:
@@ -189,7 +192,7 @@ def _first_line(text: str) -> str:
 
 
 def claude_proposer(model: str, turn_s: int, eval_backend: str, max_budget_usd: float | None, emit,
-                    hypothesis_first: bool = False, hyp_turn_s: int = 60, gate=None):
+                    hypothesis_first: bool = False, hyp_turn_s: int = 60, gate=None, effort: str | None = None):
     """propose_many backed by local headless Claude Code sessions (one thread each).
 
     With `hypothesis_first`, each agent's idea is first stated by one tool-less call over its
@@ -222,7 +225,7 @@ def claude_proposer(model: str, turn_s: int, eval_backend: str, max_budget_usd: 
 
         def one(a: Assignment) -> dict:
             ws, parent_src = workspace(a)
-            usage = run_claude(ws, turn_s, model, max_budget_usd)
+            usage = run_claude(ws, turn_s, model, max_budget_usd, effort=effort)
             return finish(a, ws, usage, _read_hypothesis(ws), parent_src)
 
         def hypothesis_only(a: Assignment) -> dict:
@@ -230,7 +233,7 @@ def claude_proposer(model: str, turn_s: int, eval_backend: str, max_budget_usd: 
             prompt = HYP_PROMPT.format(worker=a.worker, n=n, mix=mix, mode=a.mode,
                                        direction=a.direction or "your choice", status=(ws / "STATUS.md").read_text())
             try:
-                text, usage = ask_claude(prompt, HYP_SYSTEM, model, hyp_turn_s)
+                text, usage = ask_claude(prompt, HYP_SYSTEM, model, hyp_turn_s, effort)
                 hypothesis, usage["outcome"] = _first_line(text), "ok"
             except (subprocess.SubprocessError, OSError, ValueError) as e:
                 hypothesis, usage = "", {"model": model, "seconds": float(hyp_turn_s), "outcome": f"hyp_error: {e}"[:200]}
@@ -239,7 +242,7 @@ def claude_proposer(model: str, turn_s: int, eval_backend: str, max_budget_usd: 
             return {"assignment": a, "ws": ws, "parent_src": parent_src, "usage": usage, "hypothesis": hypothesis}
 
         def implement(h: dict) -> dict:
-            code = run_claude(h["ws"], turn_s, model, max_budget_usd, prompt=CODE_PROMPT)
+            code = run_claude(h["ws"], turn_s, model, max_budget_usd, prompt=CODE_PROMPT, effort=effort)
             return finish(h["assignment"], h["ws"], _merge_usage(h["usage"], code),
                           _read_hypothesis(h["ws"]) or h["hypothesis"], h["parent_src"])
 

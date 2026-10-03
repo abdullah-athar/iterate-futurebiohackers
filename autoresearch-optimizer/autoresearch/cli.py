@@ -116,7 +116,8 @@ def cmd_swarm(args) -> None:
         from .hypothesis_gate import claude_judge, lexical_judge
         gate = lexical_judge() if args.gate == "lexical" else claude_judge(args.gate_model)
     propose = swarm.claude_proposer(args.model, args.turn_s, args.eval, args.max_budget_usd, emit,
-                                    hypothesis_first=args.hypothesis_first, hyp_turn_s=args.hyp_turn_s, gate=gate)
+                                    hypothesis_first=args.hypothesis_first, hyp_turn_s=args.hyp_turn_s, gate=gate,
+                                    effort=args.effort)
     budget_ms = run.config.time_budget_ms
     evaluate = (swarm.modal_evaluator(run.problem_name, budget_ms) if args.eval == "modal"
                 else swarm.local_evaluator(run.problem_name, budget_ms))
@@ -194,6 +195,8 @@ def main(argv=None) -> None:
     s.add_argument("--eval", choices=["modal", "local"], default="modal")
     s.add_argument("--no-deploy", action="store_true", help="skip `modal deploy` of the eval app")
     s.add_argument("--max-budget-usd", type=float, help="per-session spend cap passed to claude")
+    s.add_argument("--effort", choices=["low", "medium", "high", "xhigh", "max"],
+                   help="Claude Code --effort for agent sessions (default: the model's own)")
     s.add_argument("--problem", default="median_string", help="problem for a new run")
     s.add_argument("--budget-ms", type=int, default=1000, help="CPU ms per instance for a new run")
     s.add_argument("--seed", type=int, default=0)
