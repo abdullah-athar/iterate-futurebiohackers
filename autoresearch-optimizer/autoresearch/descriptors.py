@@ -183,11 +183,18 @@ def _validate(d: Descriptor) -> str | None:
 _CACHE_LOCK = threading.Lock()
 
 
+def _read_cache(path: Path | None) -> dict:
+    if not path or not path.exists():
+        return {}
+    with _CACHE_LOCK:
+        return json.loads(path.read_text())
+
+
 def describe(source: str, vocab: Vocabulary, problem: str, *, model: str = "sonnet",
              cache_path: Path | None = None, use_cache: bool = True, retries: int = 2) -> Descriptor:
     """One structured `claude -p` call per program, cached by normalised-source fingerprint."""
     key = fingerprint(source)
-    cache = json.loads(cache_path.read_text()) if cache_path and cache_path.exists() else {}
+    cache = _read_cache(cache_path)
     if use_cache and key in cache:
         return Descriptor.from_dict(cache[key])
     prompt = PROMPT.format(problem=problem, vocab=vocab.prompt_block(), source=source)
@@ -210,10 +217,12 @@ def describe(source: str, vocab: Vocabulary, problem: str, *, model: str = "sonn
         raise RuntimeError(f"describe failed: {error}")
     if cache_path:
         with _CACHE_LOCK:  # re-read under the lock so concurrent describers don't drop each other's entries
-            cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+            cache = _read_cache(cache_path)
             cache[key] = d.to_dict()
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(json.dumps(cache, indent=1))
+            tmp = cache_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(cache, indent=1))
+            tmp.replace(cache_path)  # atomic: readers never see a half-written file
     return d
 
 
