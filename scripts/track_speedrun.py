@@ -9,7 +9,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "artifacts/runtime-optimization"
-VISUAL = ROOT / ".lavish"
+# Worktrees share the artifact directory; keep the existing review session live.
+CANONICAL_ROOT = OUT.resolve().parents[1]
+VISUAL = CANONICAL_ROOT / ".lavish"
 
 
 def describe_change(record):
@@ -29,10 +31,19 @@ def describe_change(record):
                         k.value: ast.literal_eval(v)
                         for k, v in zip(node.value.keys, node.value.values)
                         if isinstance(k, ast.Constant)
-                        and k.value in ("widths", "epochs")
+                        and k.value
+                        in (
+                            "widths",
+                            "epochs",
+                            "activation",
+                            "global_pool",
+                            "compile_forward_loss",
+                        )
                     }
                     p = {**values, **p}
     if record.get("control") or "Initial reproduction" in record["name"]:
+        if record.get("reference") == "pr5":
+            return "Frozen PR #5 validated control (96/256/768, 9.5 epochs)"
         return "Frozen PR #3 control"
     changes = []
     if p.get("hard_fraction", 1) < 1:
@@ -56,6 +67,16 @@ def describe_change(record):
         changes.append("Fused SGD")
     if p.get("compile_loss"):
         changes.append("Compiled loss")
+    if p.get("compile_forward_loss"):
+        changes.append("Compiled forward + loss together")
+    if p.get("global_pool") == "max":
+        changes.append("Ordinary full-map max pool (same values/gradients)")
+    if p.get("activation") == "silu":
+        changes.append("SiLU convolution blocks")
+    if p.get("optimizer") == "muon":
+        changes.append("Grouped Muon filter optimizer")
+    if p.get("brightness") or p.get("contrast"):
+        changes.append("Per-image training brightness/contrast jitter")
     if p.get("gelu_approximate") == "tanh":
         changes.append("Approximate GELU")
     if "batch_size" in p:
@@ -78,8 +99,9 @@ def describe_change(record):
 
 def refresh():
     records = {}
+    live_progress = []
     baseline = (
-        ROOT
+        CANONICAL_ROOT
         / "cifar100-speedrun/results/futurebiohackers/20261003T134539Z-13d43b3a/summary.json"
     )
     if baseline.exists():
@@ -90,7 +112,14 @@ def refresh():
         }
     for log in sorted(OUT.glob("*.log")):
         paired_control = None
+        pending = None
         for line in log.read_text(errors="replace").splitlines():
+            if line.startswith("TRIAL_PROGRESS "):
+                try:
+                    pending = json.loads(line.removeprefix("TRIAL_PROGRESS "))
+                except json.JSONDecodeError:
+                    pass
+                continue
             if not line.startswith('{"name":'):
                 continue
             try:
@@ -99,12 +128,16 @@ def refresh():
                 continue
             key = record.get("summary", {}).get("run_id", log.name + record["name"])
             record["stage"] = log.stem
+            if pending and pending["name"] == record["name"]:
+                pending = None
             if record.get("control") and record.get("summary", {}).get("complete"):
                 paired_control = record["summary"]
             if paired_control:
                 record["control_seconds"] = paired_control["mean_training_time"]
                 record["control_run_id"] = paired_control["run_id"]
             records[key] = record
+        if pending:
+            live_progress.append(f"{log.stem} / {pending['name']}: {pending['line']}")
     rows = []
     for key, record in sorted(records.items()):
         s = record.get("summary", {})
@@ -155,6 +188,10 @@ def refresh():
     rows.sort(key=lambda r: r["seconds"] if r["seconds"] is not None else float("inf"))
     status_file = OUT / "status.json"
     status = json.loads(status_file.read_text()) if status_file.exists() else {}
+    if live_progress:
+        status["current"] = (
+            status.get("current", "") + " Live: " + "; ".join(live_progress)
+        )
     billing = OUT / "billing-current.json"
     start = OUT / "billing-start.json"
     spend = (

@@ -10,7 +10,7 @@ from benchmark.worker import load_submission
 
 
 def main():
-    load_submission(Path("/root/speedrun/submissions/futurebiohackers"))
+    recipe = load_submission(Path("/root/speedrun/submissions/futurebiohackers"))
     kernels = importlib.import_module("benchmark._submission.kernels")
     for size in (24, 28, 32):
         for n in (1, 33, 1025):
@@ -38,9 +38,31 @@ def main():
                         actual, expected.flip(-1) if flip else expected, rtol=0, atol=0
                     )
                     assert actual.is_contiguous(memory_format=torch.channels_last)
+    pool_cases = 0
+    for size in (2, 3):
+        for n in (1, 33, 1024):
+            for channels_last in (False, True):
+                for ties in (False, True):
+                    x = torch.randn(
+                        n, 768, size, size, device="cuda", dtype=torch.float16
+                    )
+                    if ties:
+                        x.zero_()
+                    if channels_last:
+                        x = x.to(memory_format=torch.channels_last)
+                    x.requires_grad_()
+                    other = x.detach().clone().requires_grad_()
+                    expected = recipe.GlobalMaxPool("adaptive")(x)
+                    actual = recipe.GlobalMaxPool("max")(other)
+                    grad = torch.randn_like(expected)
+                    expected.backward(grad)
+                    actual.backward(grad)
+                    torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+                    torch.testing.assert_close(other.grad, x.grad, rtol=0, atol=0)
+                    pool_cases += 1
     torch.cuda.synchronize()
     Path(sys.argv[1]).write_text(
-        "36 crop/flip checks passed; both layouts, all resolutions.\n"
+        f"36 crop/flip checks and {pool_cases} exact max-pool forward/backward checks passed; both layouts, random and tied maxima.\n"
     )
 
 

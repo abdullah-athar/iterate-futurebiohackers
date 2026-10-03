@@ -38,9 +38,29 @@ def test_indexed_crop_matches_original(recipe, radius):
     assert actual.is_contiguous(memory_format=torch.channels_last)
 
 
+@pytest.mark.parametrize("size", [2, 3, 7])
+@pytest.mark.parametrize("ties", [False, True])
+def test_global_max_pool_matches_values_and_gradients(recipe, size, ties):
+    # Exact argmax tie handling matters: amax would distribute tied gradients.
+    x = torch.randn(3, 7, size, size).to(memory_format=torch.channels_last)
+    if ties:
+        x.zero_()
+    x.requires_grad_()
+    other = x.detach().clone().requires_grad_()
+    expected = recipe.GlobalMaxPool("adaptive")(x)
+    actual = recipe.GlobalMaxPool("max")(other)
+    grad = torch.randn_like(expected)
+    expected.backward(grad)
+    actual.backward(grad)
+    torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+    torch.testing.assert_close(other.grad, x.grad, rtol=0, atol=0)
+
+
 @pytest.mark.parametrize("resolution", [24, 28, 32])
-@pytest.mark.parametrize("hard_fraction", [0.5, 1.0])
-def test_transition_reset_and_evaluation(recipe, resolution, hard_fraction):
+@pytest.mark.parametrize(
+    "optimizer,hard_fraction", [("sgd", 0.5), ("sgd", 1.0), ("muon", 1.0)]
+)
+def test_transition_reset_and_evaluation(recipe, resolution, optimizer, hard_fraction):
     data = synthetic_split(train=True)
     original = data.images.clone()
     original_labels = data.labels.clone()
@@ -60,6 +80,12 @@ def test_transition_reset_and_evaluation(recipe, resolution, hard_fraction):
                 "pool_first": [False, True, True],
                 "compile_loss": True,
                 "fused_sgd": True,
+                "global_pool": "max",
+                "activation": "silu",
+                "compile_forward_loss": True,
+                "optimizer": optimizer,
+                "brightness": 0.14,
+                "contrast": 0.13,
             },
         )
     )
@@ -90,6 +116,10 @@ def test_transition_reset_and_evaluation(recipe, resolution, hard_fraction):
     for name, value in state.net.state_dict().items():
         torch.testing.assert_close(value, initialized[name], rtol=0, atol=0)
     assert not state.optimizer.state
+    if state.muon_optimizer is not None:
+        assert not state.muon_optimizer.state
+        assert state.muon_optimizer.steps == 0
+        assert state.muon_optimizer.last_normalized == 0
     assert all(p.grad is None for p in state.net.parameters())
     if state.proxy is not None:
         assert not state.proxy_optimizer.state
@@ -110,6 +140,11 @@ def test_transition_reset_and_evaluation(recipe, resolution, hard_fraction):
         {"train_resolution": 16},
         {"crop_mode": "wrong"},
         {"batch_size": 0},
+        {"global_pool": "wrong"},
+        {"activation": "wrong"},
+        {"optimizer": "wrong"},
+        {"optimizer": "muon", "hard_fraction": 0.5},
+        {"contrast": 1.5},
     ],
 )
 def test_invalid_parameters(recipe, params):

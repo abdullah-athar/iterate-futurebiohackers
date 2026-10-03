@@ -46,6 +46,20 @@ DEFAULTS = {
     "proxy_every": 4,  # proxy backward/update period; scores every batch
     "proxy_mode": "offline",  # airbench-style prepass, or online selection
     "gelu_approximate": "none",  # "tanh" uses a cheaper approximation
+    "activation": "silu",  # SiLU in convolution blocks, inspired by Hiverge
+    "global_pool": "max",  # full-spatial ordinary max pool avoids adaptive atomics
+    "compile_forward_loss": True,
+    "optimizer": "sgd",  # experimental grouped Muon on convolution filters
+    "muon_lr": 0.205,
+    "muon_momentum": 0.655,
+    "muon_sgd_momentum": 0.825,
+    "muon_bias_lr": 0.0573,
+    "muon_head_lr": 0.5415,
+    "muon_weight_decay": 1.0418e-6,  # per training example
+    "muon_loss_scale": 1.0,  # optional gradient scaling; SGD learning rates compensate
+    "muon_bn_eps": 1e-5,  # keep fp16 inverse-standard-deviation finite
+    "brightness": 0.0,  # per-image jitter in normalized training-image units
+    "contrast": 0.0,
     "autotune_backends": "ATEN,TRITON",  # ATen/cuDNN and Inductor Triton candidates
     "pool_first": [False, False, False],  # move selected group pools before conv1
     "scaling_factor": 1 / 9,
@@ -65,11 +79,11 @@ class BatchNorm(nn.BatchNorm2d):
         super().__init__(num_features, eps=1e-12, momentum=1 - momentum)
         self.weight.requires_grad = False
 
-    def activate(self, x, approximate, residual=None):
+    def activate(self, x, approximate, residual=None, kind="gelu"):
         x = self(x)
         if residual is not None:
             x = x + residual
-        return F.gelu(x, approximate=approximate)
+        return F.silu(x) if kind == "silu" else F.gelu(x, approximate=approximate)
 
 
 class Conv(nn.Conv2d):
@@ -83,7 +97,16 @@ class Conv(nn.Conv2d):
 
 
 class ConvGroup(nn.Module):
-    def __init__(self, channels_in, channels_out, depth, bn_momentum, gelu_approximate, pool_first):
+    def __init__(
+        self,
+        channels_in,
+        channels_out,
+        depth,
+        bn_momentum,
+        gelu_approximate,
+        pool_first,
+        activation,
+    ):
         super().__init__()
         self.conv1 = Conv(channels_in, channels_out)
         self.pool = nn.MaxPool2d(2)
@@ -94,15 +117,27 @@ class ConvGroup(nn.Module):
         self.conv3 = Conv(channels_out, channels_out) if depth == 3 else None
         self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
         self.approximate = gelu_approximate
+        self.activation = activation
 
     def forward(self, x):
         x = self.conv1(self.pool(x)) if self.pool_first else self.pool(self.conv1(x))
-        x = self.norm1.activate(x, self.approximate)
+        x = self.norm1.activate(x, self.approximate, kind=self.activation)
         if self.conv3 is None:
-            return self.norm2.activate(self.conv2(x), self.approximate)
+            return self.norm2.activate(self.conv2(x), self.approximate, kind=self.activation)
         x0 = x
-        x = self.norm2.activate(self.conv2(x), self.approximate)
-        return self.norm3.activate(self.conv3(x), self.approximate, x0)
+        x = self.norm2.activate(self.conv2(x), self.approximate, kind=self.activation)
+        return self.norm3.activate(self.conv3(x), self.approximate, x0, kind=self.activation)
+
+
+class GlobalMaxPool(nn.Module):
+    def __init__(self, implementation):
+        super().__init__()
+        self.implementation = implementation
+
+    def forward(self, x):
+        if self.implementation == "max":
+            return F.max_pool2d(x, x.shape[-2:])
+        return F.adaptive_max_pool2d(x, 1)
 
 
 class Net(nn.Module):
@@ -116,24 +151,45 @@ class Net(nn.Module):
         self.layers = nn.Sequential(
             nn.GELU(approximate=hyp["gelu_approximate"]),
             ConvGroup(
-                24, w1, depths[0], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][0]
+                24,
+                w1,
+                depths[0],
+                bn_momentum,
+                hyp["gelu_approximate"],
+                hyp["pool_first"][0],
+                hyp["activation"],
             ),
             ConvGroup(
-                w1, w2, depths[1], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][1]
+                w1,
+                w2,
+                depths[1],
+                bn_momentum,
+                hyp["gelu_approximate"],
+                hyp["pool_first"][1],
+                hyp["activation"],
             ),
             ConvGroup(
-                w2, w3, depths[2], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][2]
+                w2,
+                w3,
+                depths[2],
+                bn_momentum,
+                hyp["gelu_approximate"],
+                hyp["pool_first"][2],
+                hyp["activation"],
             ),
-            nn.AdaptiveMaxPool2d(1),
+            GlobalMaxPool(hyp["global_pool"]),
         )
         self.head = nn.Linear(w3, num_classes, bias=False)
         self.scaling_factor = hyp["scaling_factor"]
+        self.muon_head = hyp["optimizer"] == "muon"
 
     def reset(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d | nn.BatchNorm2d | nn.Linear):
                 m.reset_parameters()
         self.whiten.bias.data.zero_()
+        if self.muon_head:
+            self.head.weight.data.div_(self.head.weight.data.std())
 
     @torch.no_grad()
     def init_whiten(self, images, eps=5e-4):
@@ -151,7 +207,7 @@ class Net(nn.Module):
         b = self.whiten.bias
         x = F.conv2d(x, self.whiten.weight, b if whiten_bias_grad else b.detach())
         x = self.layers(x).flatten(1)
-        return self.head(x) * self.scaling_factor
+        return self.head(x) / x.size(-1) if self.muon_head else self.head(x) * self.scaling_factor
 
 
 class Classifier(nn.Module):
@@ -254,8 +310,20 @@ def build(context: BuildContext):
         raise ValueError("proxy_mode must be online or offline")
     if hyp["gelu_approximate"] not in ("none", "tanh"):
         raise ValueError("gelu_approximate must be none or tanh")
+    if hyp["activation"] not in ("gelu", "silu") or hyp["global_pool"] not in ("adaptive", "max"):
+        raise ValueError("activation must be gelu/silu and global_pool must be adaptive/max")
     if hyp["autotune_backends"] not in ("ATEN", "TRITON", "ATEN,TRITON"):
         raise ValueError("autotune_backends must be ATEN, TRITON, or ATEN,TRITON")
+    if hyp["optimizer"] not in ("sgd", "muon"):
+        raise ValueError("optimizer must be sgd or muon")
+    if hyp["optimizer"] == "muon" and hyp["hard_fraction"] < 1:
+        raise ValueError("Muon proxy selection has not been implemented")
+    if not 0 < hyp["muon_loss_scale"] <= 1:
+        raise ValueError("muon_loss_scale must be in (0, 1]")
+    if hyp["muon_bn_eps"] <= 0:
+        raise ValueError("muon_bn_eps must be positive")
+    if hyp["brightness"] < 0 or not 0 <= hyp["contrast"] < 1:
+        raise ValueError("brightness must be nonnegative and contrast in [0, 1)")
     if len(hyp["pool_first"]) != 3 or any(type(v) is not bool for v in hyp["pool_first"]):
         raise ValueError("pool_first must contain three booleans")
     device = context.device
@@ -275,14 +343,28 @@ def build(context: BuildContext):
     for m in net.modules():
         if isinstance(m, nn.BatchNorm2d):
             m.float()
+            if hyp["optimizer"] == "muon":
+                m.eps = hyp["muon_bn_eps"]
     train_net = torch.compile(net, mode=hyp["compile"]) if cuda and hyp["compile"] else net
 
     def loss_fn(outputs, labels):
-        return F.cross_entropy(
+        loss = F.cross_entropy(
             outputs.float(), labels, label_smoothing=hyp["label_smoothing"], reduction="sum"
         )
+        return loss * hyp["muon_loss_scale"] if hyp["optimizer"] == "muon" else loss
 
     loss_fn = torch.compile(loss_fn) if cuda and hyp["compile_loss"] else loss_fn
+
+    def forward_loss(inputs, labels, whiten_bias_grad):
+        return loss_fn(net(inputs, whiten_bias_grad), labels)
+
+    train_loss = (
+        torch.compile(forward_loss, mode=hyp["compile"], fullgraph=True)
+        if cuda and hyp["compile_forward_loss"] and hyp["compile"]
+        else forward_loss
+        if hyp["compile_forward_loss"]
+        else None
+    )
     float_state = [t for t in net.state_dict().values() if t.is_floating_point()]
     state = SimpleNamespace(
         hyp=hyp,
@@ -291,12 +373,23 @@ def build(context: BuildContext):
         net=net,
         train_net=train_net,
         loss_fn=loss_fn,
+        train_loss=train_loss,
         classifier=Classifier(net, dtype).to(device),
         float_state=float_state,
         ema=[t.clone() for t in float_state],
         proxy=None,
+        muon_optimizer=None,
         crop_kernel=crop_kernel,
     )
+    if hyp["optimizer"] == "muon":
+        from .muon import Muon, orthogonalize
+
+        state.muon_class = Muon
+        state.zeropower = (
+            torch.compile(orthogonalize, fullgraph=True)
+            if cuda and hyp["compile"]
+            else orthogonalize
+        )
     if hyp["hard_fraction"] < 1:
         proxy_hyp = {**hyp, "widths": hyp["proxy_widths"], "depths": [2, 2, 2]}
         proxy = Net(proxy_hyp, context.num_classes).to(
@@ -384,6 +477,15 @@ def prepare(state, data: TrainingData, seed: int) -> None:
     wd = hyp["weight_decay"] * batch_size / kilostep_scale
     lr_biases = lr * hyp["bias_scaler"]
     state.optimizer = _make_optimizer(net, lr, lr_biases, wd * hyp["hard_fraction"], hyp, device)
+    if hyp["optimizer"] == "muon":
+        filters = [p for p in net.parameters() if p.requires_grad and p.ndim == 4]
+        state.muon_optimizer = state.muon_class(
+            filters,
+            hyp["muon_lr"],
+            hyp["muon_momentum"],
+            hyp["muon_weight_decay"] * batch_size,
+            state.zeropower,
+        )
     if state.proxy is not None:
         state.proxy_optimizer = _make_optimizer(state.proxy, lr, lr_biases, wd, hyp, device)
 
@@ -396,6 +498,26 @@ def prepare(state, data: TrainingData, seed: int) -> None:
 
 def _make_optimizer(net, lr, lr_biases, wd, hyp, device):
     norm_biases = [p for name, p in net.named_parameters() if "norm" in name and p.requires_grad]
+    if hyp["optimizer"] == "muon":
+        wd = hyp["muon_weight_decay"] * min(hyp["batch_size"], 50_000)
+        groups = [
+            dict(
+                params=[net.whiten.bias],
+                lr=hyp["muon_bias_lr"] / hyp["muon_loss_scale"],
+                whiten=True,
+            ),
+            dict(params=norm_biases, lr=hyp["muon_bias_lr"] / hyp["muon_loss_scale"]),
+            dict(params=[net.head.weight], lr=hyp["muon_head_lr"] / hyp["muon_loss_scale"]),
+        ]
+        for group in groups:
+            group["weight_decay"] = wd / group["lr"]
+            group["initial_lr"] = group["lr"]
+        return torch.optim.SGD(
+            groups,
+            momentum=hyp["muon_sgd_momentum"],
+            nesterov=True,
+            fused=hyp["fused_sgd"] and device.type == "cuda",
+        )
     others = [p for name, p in net.named_parameters() if "norm" not in name and p.requires_grad]
     optimizer = torch.optim.SGD(
         [
@@ -457,6 +579,18 @@ def _fit(state, total_steps, proxy_only=False):
                     images = images.flip(-1)
                 if hyp["cutout"]:
                     images = batch_cutout(images, hyp["cutout"])
+                if hyp["brightness"] or hyp["contrast"]:
+                    brightness = (
+                        torch.rand(len(images), 1, 1, 1, device=images.device) * 2 - 1
+                    ) * hyp["brightness"]
+                    contrast = (
+                        1
+                        + (torch.rand(len(images), 1, 1, 1, device=images.device) * 2 - 1)
+                        * hyp["contrast"]
+                    )
+                    images = ((images + brightness) * contrast).to(
+                        state.dtype, memory_format=torch.channels_last
+                    )
                 current_resolution = resolution
             idx = order[i * batch_size : (i + 1) * batch_size]
             inputs, targets = images[idx], labels[idx]
@@ -494,9 +628,14 @@ def _fit(state, total_steps, proxy_only=False):
                     state.masks.append(chosen)
                     step += 1
                     continue
-            outputs = state.train_net(inputs, step < state.whiten_bias_steps)
-            loss = state.loss_fn(outputs, targets)
+            if state.train_loss is not None:
+                loss = state.train_loss(inputs, targets, step < state.whiten_bias_steps)
+            else:
+                outputs = state.train_net(inputs, step < state.whiten_bias_steps)
+                loss = state.loss_fn(outputs, targets)
             optimizer.zero_grad(set_to_none=True)
+            if state.muon_optimizer is not None:
+                state.muon_optimizer.zero_grad(set_to_none=True)
             loss.backward()
             if step < warmup_steps:
                 frac = step / warmup_steps
@@ -505,8 +644,18 @@ def _fit(state, total_steps, proxy_only=False):
                 frac = (step - warmup_steps) / max(1, total_steps - warmup_steps)
                 scale = (1 - frac) + hyp["final_lr"] * frac
             for group in optimizer.param_groups:
+                if state.muon_optimizer is not None:
+                    scale = (
+                        max(0.0, 1 - step / max(1, state.whiten_bias_steps))
+                        if group.get("whiten")
+                        else 1 - step / total_steps
+                    )
                 group["lr"] = group["initial_lr"] * scale
             optimizer.step()
+            if state.muon_optimizer is not None:
+                for group in state.muon_optimizer.param_groups:
+                    group["lr"] = group["initial_lr"] * (1 - step / total_steps)
+                state.muon_optimizer.step((step + 1) / total_steps)
             step += 1
             if hyp["ema_every"] and step % hyp["ema_every"] == 0:
                 _lookahead(state, ema_decay[step])

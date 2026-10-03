@@ -12,6 +12,7 @@ import json
 import subprocess
 import sys
 import tarfile
+import threading
 import time
 from pathlib import Path
 
@@ -24,6 +25,7 @@ data = modal.Volume.from_name("cifar100-data", create_if_missing=True)
 results = modal.Volume.from_name("cifar100-results", create_if_missing=True)
 OUTPUT = ROOT / "artifacts/runtime-optimization"
 CONTROL = OUTPUT / "control"
+PR5_CONTROL = OUTPUT / "pr5_control"
 if modal.is_local() and not CONTROL.exists():
     CONTROL.mkdir(parents=True)
     baseline = subprocess.check_output(
@@ -35,6 +37,17 @@ if modal.is_local() and not CONTROL.exists():
         cwd=ROOT,
     )
     (CONTROL / "submission.py").write_bytes(baseline)
+if modal.is_local() and not PR5_CONTROL.exists():
+    PR5_CONTROL.mkdir(parents=True)
+    baseline = subprocess.check_output(
+        [
+            "git",
+            "show",
+            "55d7931:cifar100-speedrun/submissions/futurebiohackers/submission.py",
+        ],
+        cwd=ROOT,
+    )
+    (PR5_CONTROL / "submission.py").write_bytes(baseline)
 # $5/hour conservatively exceeds current A100 + four CPUs + 32 GiB RAM pricing.
 RATE = 5 / 3600
 cache = modal.Volume.from_name("cifar100-compile-cache", create_if_missing=True)
@@ -54,7 +67,11 @@ experiment_image = (
         ignore=["**/.venv", "**/__pycache__", "data", "results", "**/.DS_Store"],
     )
     .add_local_file(CONTROL / "submission.py", "/control/submission.py")
+    .add_local_file(PR5_CONTROL / "submission.py", "/pr5_control/submission.py")
     .add_local_file(ROOT / "scripts/profile_speedrun.py", "/profile_speedrun.py")
+    .add_local_file(
+        ROOT / "scripts/diagnose_speedrun_muon.py", "/diagnose_speedrun_muon.py"
+    )
     .add_local_file(
         ROOT / "scripts/check_speedrun_kernels.py", "/check_speedrun_kernels.py"
     )
@@ -93,7 +110,7 @@ def screen_manifest():
     scaledown_window=2,
     volumes={"/data": data, "/results": results, "/compile": cache},
 )
-def experiment(items: list[dict], budget: float, profile: bool):
+def experiment(items: list[dict], budget: float, profile: bool, diagnose_muon: bool):
     started = time.monotonic()
     deadline = started + budget / RATE - 120
     session = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
@@ -116,7 +133,19 @@ def experiment(items: list[dict], budget: float, profile: bool):
     )
     if profile:
         subprocess.run(
-            [sys.executable, "/profile_speedrun.py", str(folder)],
+            [
+                sys.executable,
+                "/profile_speedrun.py",
+                str(folder),
+                f"{REMOTE}/submissions/futurebiohackers",
+            ],
+            cwd=REMOTE,
+            timeout=min(1000, deadline - time.monotonic()),
+            check=False,
+        )
+    if diagnose_muon:
+        subprocess.run(
+            [sys.executable, "/diagnose_speedrun_muon.py", str(folder)],
             cwd=REMOTE,
             timeout=min(1000, deadline - time.monotonic()),
             check=False,
@@ -145,28 +174,46 @@ def experiment(items: list[dict], budget: float, profile: bool):
             "--params",
             json.dumps(item.get("params", {})),
         ]
+        reference = "pr5_control" if item.get("reference") == "pr5" else "control"
         args += (
-            ["--submission-path", "/control"]
+            ["--submission-path", f"/{reference}"]
             if item.get("control")
             else ["--submission", "futurebiohackers"]
         )
         team_results = run_root / (
-            "control" if item.get("control") else "futurebiohackers"
+            reference if item.get("control") else "futurebiohackers"
         )
         old = set(team_results.glob("*"))
         print(f"EXPERIMENT {item['name']} {item.get('params', {})}", flush=True)
         with (folder / f"{item['name']}.log").open("w") as log:
+            process = subprocess.Popen(
+                args,
+                cwd=REMOTE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+
+            def relay(process=process, item=item, log=log):
+                for line in process.stdout:
+                    log.write(line)
+                    log.flush()
+                    if line.startswith("trial "):
+                        print(
+                            "TRIAL_PROGRESS "
+                            + json.dumps({"name": item["name"], "line": line.strip()}),
+                            flush=True,
+                        )
+
+            reader = threading.Thread(target=relay, daemon=True)
+            reader.start()
             try:
-                code = subprocess.run(
-                    args,
-                    cwd=REMOTE,
-                    stdout=log,
-                    check=False,
-                    stderr=subprocess.STDOUT,
-                    timeout=remaining,
-                ).returncode
+                code = process.wait(timeout=remaining)
             except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
                 code = 124
+            reader.join(timeout=10)
         new = set(team_results.glob("*")) - old
         summary_path = next(iter(new)) / "summary.json" if len(new) == 1 else None
         summary = (
@@ -206,7 +253,11 @@ def experiment(items: list[dict], budget: float, profile: bool):
 
 @app.local_entrypoint()
 def main(
-    stage: str = "screen", manifest: str = "", budget: float = 20, profile: bool = False
+    stage: str = "screen",
+    manifest: str = "",
+    budget: float = 20,
+    profile: bool = False,
+    diagnose_muon: bool = False,
 ):
     OUTPUT.mkdir(parents=True, exist_ok=True)
     journal = OUTPUT / "budget.json"
@@ -224,7 +275,7 @@ def main(
     ledger["spent_bound"] += budget
     ledger["runs"].append({"stage": stage, "reserved": budget})
     journal.write_text(json.dumps(ledger, indent=2))
-    cost, archive = experiment.remote(items, budget, profile)
+    cost, archive = experiment.remote(items, budget, profile, diagnose_muon)
     ledger = json.loads(journal.read_text())
     ledger["spent_bound"] -= budget - cost
     reservation = next(
