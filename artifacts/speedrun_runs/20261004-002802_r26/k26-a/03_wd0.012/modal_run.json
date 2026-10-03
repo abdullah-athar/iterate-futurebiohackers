@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 94.9,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T233348Z-fc1a3ad7",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"weight_decay\": 0.012}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "wd0.012",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"weight_decay\": 0.012}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"weight_decay\": 0.012}",
+    "delta": {
+      "weight_decay": 0.012
+    },
+    "hypothesis": "weight decay x0.7",
+    "env": {},
+    "config": "futurebiohackers {\"weight_decay\": 0.012}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
