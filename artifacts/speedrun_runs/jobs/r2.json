@@ -1,0 +1,40 @@
+{
+  "round": "r2",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "stack-256",
+      "variants": [
+        {"label": "w256-d323", "params": {"widths": [128, 256, 768], "depths": [3, 2, 3]}, "hypothesis": "both group-2 cuts: narrower (-1.16 s, +0.03 pp) and shallower (-0.87 s, -0.11 pp); expect ~-1.6 s if they compose"},
+        {"label": "w256-lr-jit", "params": {"widths": [128, 256, 768], "lr": 10.8, "jitter": 0.3}, "hypothesis": "narrow group 2 plus the two accuracy gainers (lr x1.2 +0.17 pp, jitter 0.3 +0.11 pp)"},
+        {"label": "w256-d323-lr-jit", "params": {"widths": [128, 256, 768], "depths": [3, 2, 3], "lr": 10.8, "jitter": 0.3}, "hypothesis": "full stack around the narrow, shallow group 2"}
+      ]
+    },
+    {
+      "name": "stack-320",
+      "variants": [
+        {"label": "w320-d323", "params": {"widths": [128, 320, 768], "depths": [3, 2, 3]}, "hypothesis": "accuracy-positive width change (+0.43 pp at equal time) plus the shallow group 2"},
+        {"label": "w320-lr-jit", "params": {"widths": [128, 320, 768], "lr": 10.8, "jitter": 0.3}, "hypothesis": "accuracy-maximising stack: +0.43 +0.17 +0.11 pp if additive, then trim epochs"},
+        {"label": "w320-d323-lr-jit", "params": {"widths": [128, 320, 768], "depths": [3, 2, 3], "lr": 10.8, "jitter": 0.3}, "hypothesis": "full stack around the 320-wide group 2"}
+      ]
+    },
+    {
+      "name": "stack-gainers",
+      "variants": [
+        {"label": "lr-jit", "params": {"lr": 10.8, "jitter": 0.3}, "hypothesis": "additivity check of the two accuracy gainers without architecture changes"},
+        {"label": "lr-jit-cut-mom", "params": {"lr": 10.8, "jitter": 0.3, "cutout": 4, "momentum": 0.8}, "hypothesis": "all four small accuracy gainers (+0.17, +0.11, +0.08, +0.11 pp)"},
+        {"label": "w256-d323-all4", "params": {"widths": [128, 256, 768], "depths": [3, 2, 3], "lr": 10.8, "jitter": 0.3, "cutout": 4, "momentum": 0.8}, "hypothesis": "narrow shallow group 2 with all four gainers"}
+      ]
+    },
+    {
+      "name": "stack-trim",
+      "variants": [
+        {"label": "w256-d323-lr-jit-e8", "params": {"widths": [128, 256, 768], "depths": [3, 2, 3], "lr": 10.8, "jitter": 0.3, "epochs": 8.0}, "hypothesis": "full stack trimmed by 0.5 epoch (k: -0.5 epoch ~ -0.4 s, -0.16 pp)"},
+        {"label": "w256-d323-lr-jit-e7.5", "params": {"widths": [128, 256, 768], "depths": [3, 2, 3], "lr": 10.8, "jitter": 0.3, "epochs": 7.5}, "hypothesis": "full stack trimmed by 1 epoch"},
+        {"label": "w320-d323-lr-jit-e8", "params": {"widths": [128, 320, 768], "depths": [3, 2, 3], "lr": 10.8, "jitter": 0.3, "epochs": 8.0}, "hypothesis": "320-wide full stack trimmed by 0.5 epoch"}
+      ]
+    }
+  ]
+}

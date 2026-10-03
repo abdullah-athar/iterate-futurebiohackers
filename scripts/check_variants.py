@@ -1,16 +1,17 @@
 """Variant-switch check for submissions/futurebiohackers. Not part of the submission.
 
-1. The default parameters must give a trial that is bit-identical (weights and predictions)
-   to a reference copy of the recipe (default: the committed HEAD version), so experimental
-   switches never change the control; its step count and its silence on stderr too.
-2. The vectorized crop must reproduce the masked crop exactly.
-3. Every experimental switch must run end to end with finite predictions, and the switches
-   with bookkeeping of their own must add up: the step schedule under data filtering, the
-   non-finite loss counter, and the per-trial Muon state.
+1. With default parameters the recipe must give a trial that is bit-identical (weights and
+   predictions) to the reference recipe: Abdullah's PR #5 file (origin/runtime-optimization),
+   the base our switches are ported onto. So experimental switches never change the control,
+   its step count, or its silence on stderr.
+2. Every experimental switch (ours and his) must run end to end on CPU with finite predictions;
+   the non-finite counter must report 0.
 
-CPU, synthetic images, about 30 s. Run from the speedrun env with cwd cifar100-speedrun:
+CPU, synthetic images, about 20 s. Run from the speedrun env with cwd cifar100-speedrun:
     uv run python ../scripts/check_variants.py [reference_submission_dir]
     scripts/wsl_speedrun.sh python ../scripts/check_variants.py          # Windows, via WSL
+The reference defaults to `git show origin/runtime-optimization:...submission.py`; set
+CHECK_VARIANTS_REF=<git ref> to compare against another commit.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from __future__ import annotations
 import contextlib
 import io
 import math
+import os
 import subprocess
 import sys
 import tempfile
@@ -34,29 +36,35 @@ from benchmark.worker import load_submission, seed_everything
 TEAM_DIR = (
     Path(__file__).resolve().parents[1] / "cifar100-speedrun" / "submissions" / "futurebiohackers"
 )
+REFERENCE_REF = os.environ.get("CHECK_VARIANTS_REF", "origin/runtime-optimization")
 # The synthetic split has 64 images: batch 8 gives 8 steps per epoch, 16 in two epochs.
 BASE = {"widths": [32, 64, 64], "epochs": 2.0, "batch_size": 8, "compile": ""}
-# Epoch 0 trains on everything and scores every example; epoch 1 keeps the 32 hardest (4 steps).
-FILTER = {"filter_start": 1, "filter_keep": 0.5}
 VARIANTS = {
-    "low_res26": {"low_res": 26, "low_res_epochs": 1},
-    "low_res28": {"low_res": 28, "low_res_epochs": 1},
-    # CPU never compiles; this exercises the per-resolution wrapper selection in _fit.
-    "low_res_compile": {"low_res": 28, "low_res_epochs": 1, "low_res_compile": "reduce-overhead"},
-    "crop_gather": {"crop_gather": True},
+    # ours: accuracy recovery and progressive resizing
     "jitter": {"jitter": 0.2},
-    "silu": {"activation": "silu"},
-    "relu": {"activation": "relu"},
-    "whiten_svd": {"whiten_svd": True},
-    "depths324": {"depths": [3, 2, 4]},
-    "depths332": {"depths": [3, 3, 2]},
     "count_nonfinite": {"count_nonfinite": True},
-    "filter": FILTER,
-    "muon": {"optimizer": "muon"},
-    "low_res_filter": {"low_res": 28, "low_res_epochs": 1, **FILTER},
-    "muon_filter_nonfinite": {"optimizer": "muon", "count_nonfinite": True, **FILTER},
+    "res24": {"train_resolution": 24, "resolution_switch": 0.5},
+    "res28_late": {"train_resolution": 28, "resolution_switch": 0.75},
+    "res24_reduce_overhead": {
+        "train_resolution": 24,
+        "resolution_switch": 0.5,
+        "low_res_compile": "reduce-overhead",
+    },
+    "cutout_translate": {"cutout": 4, "translate": 1},
+    "jitter_res24_nonfinite": {
+        "jitter": 0.3,
+        "train_resolution": 24,
+        "resolution_switch": 0.5,
+        "count_nonfinite": True,
+    },
+    # his (must keep running after the port)
+    "indexed_crop": {"crop_mode": "indexed"},
+    "depths233": {"depths": [2, 3, 3]},
+    "fused_sgd_cpu": {"fused_sgd": True},
+    "compile_loss_cpu": {"compile_loss": True},
+    "pool_first": {"pool_first": [False, False, True]},
+    "gelu_tanh": {"gelu_approximate": "tanh"},
 }
-FILTERED = ("filter", "low_res_filter", "muon_filter_nonfinite")
 results: list[bool] = []
 
 
@@ -85,15 +93,20 @@ def trial(module, params, seed=7):
 def reference_dir() -> Path:
     if len(sys.argv) > 1:
         return Path(sys.argv[1]).resolve()
-    folder = Path(tempfile.mkdtemp(prefix="submission-head-"))
-    source = subprocess.run(
-        ["git", "show", "HEAD:cifar100-speedrun/submissions/futurebiohackers/submission.py"],
-        cwd=TEAM_DIR,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
-    (folder / "submission.py").write_text(source, encoding="utf-8")
+    folder = Path(tempfile.mkdtemp(prefix="submission-ref-"))
+    for name in ("submission.py", "kernels.py"):
+        source = subprocess.run(
+            [
+                "git",
+                "show",
+                f"{REFERENCE_REF}:cifar100-speedrun/submissions/futurebiohackers/{name}",
+            ],
+            cwd=TEAM_DIR,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        (folder / name).write_text(source, encoding="utf-8")
     return folder
 
 
@@ -108,22 +121,14 @@ def main() -> int:
         and all(torch.equal(a.weights[k], b.weights[k]) for k in a.weights)
         and torch.equal(a.out, b.out)
     )
-    check("control path bit-identical to the reference recipe", same)
+    check(f"control path bit-identical to the reference recipe ({REFERENCE_REF})", same)
     count = len(synthetic_split(train=True).labels)
-    steps_per_epoch = count // BASE["batch_size"]
-    control_steps = math.ceil(BASE["epochs"] * steps_per_epoch)
+    control_steps = math.ceil(BASE["epochs"] * (count // BASE["batch_size"]))
     check(
-        f"control path: total_steps unchanged ({control_steps}) and equal to the steps taken",
-        a.state.total_steps == control_steps == b.state.total_steps == b.state.steps_taken,
+        f"control path: total_steps unchanged ({control_steps})",
+        a.state.total_steps == control_steps == b.state.total_steps,
     )
-    check("control path prints no NONFINITE_LOSSES line", "NONFINITE_LOSSES" not in b.stderr)
-
-    images = torch.randn(64, 3, 36, 36)
-    torch.manual_seed(1)
-    masked = new.batch_crop(images, 32)
-    torch.manual_seed(1)
-    gathered = new.batch_crop_gather(images, 32)
-    check("batch_crop_gather == batch_crop (same draws, same crops)", torch.equal(masked, gathered))
+    check("control path prints nothing on stderr", b.stderr.strip() == "")
 
     runs = {}
     for name, delta in VARIANTS.items():
@@ -134,32 +139,18 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             check(f"variant {name}: {type(exc).__name__}: {exc}", False)
 
-    for name in ("count_nonfinite", "muon_filter_nonfinite"):
+    for name in ("count_nonfinite", "jitter_res24_nonfinite"):
         if name in runs:
             run = runs[name]
             check(
                 f"{name}: train printed 'NONFINITE_LOSSES 0' to stderr and stored 0",
                 "NONFINITE_LOSSES 0" in run.stderr.splitlines() and run.state.nonfinite_losses == 0,
             )
-    filtered_steps = steps_per_epoch + round(FILTER["filter_keep"] * count) // BASE["batch_size"]
-    for name in FILTERED:
-        if name in runs:
-            state = runs[name].state
-            check(
-                f"{name}: total_steps from prepare ({state.total_steps}) == steps taken "
-                f"({state.steps_taken}) == {filtered_steps}, and every example was scored",
-                state.total_steps == state.steps_taken == filtered_steps > 0
-                and bool(torch.isfinite(state.scores).all()),
-            )
-    if "muon" in runs:
-        state = runs["muon"].state
-        filters = [p for p in state.net.parameters() if p.ndim == 4 and p.requires_grad]
-        muon_before = state.muon
-        populated = state.muon is not None and len(state.muon.state) == len(filters) > 0
-        new.prepare(state, synthetic_split(train=True), 8)
+    if "jitter" in runs:
+        state = runs["jitter"].state
         check(
-            "muon: one momentum buffer per conv filter after train; prepare re-creates it empty",
-            populated and state.muon is not muon_before and len(state.muon.state) == 0,
+            "jitter: per-trial generator exists and is re-seeded by prepare",
+            state.aug_generator is not None and state.aug_generator.initial_seed() == 7,
         )
     print(f"\n{sum(results)}/{len(results)} checks passed", flush=True)
     return 0 if all(results) else 1

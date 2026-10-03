@@ -99,7 +99,7 @@ GPU = os.environ.get("MODAL_GPU", "A100-80GB") or None  # empty: CPU-only
 # limit changes timings a lot and is recorded for every run (and can be required too).
 GPU_NAMES = {"sxm": "NVIDIA A100-SXM4-80GB", "pcie": "NVIDIA A100 80GB PCIe"}
 DEFAULT_REQUIRE_GPU = os.environ.get("MODAL_REQUIRE_GPU", "sxm")  # sxm | pcie | any
-DEFAULT_REQUIRE_POWER = os.environ.get("MODAL_REQUIRE_POWER", "any")  # 400 | 500 | 300 | any
+DEFAULT_REQUIRE_POWER = os.environ.get("MODAL_REQUIRE_POWER", "400")  # 400 | 500 | 300 | any
 GPU_ATTEMPTS = int(os.environ.get("MODAL_GPU_ATTEMPTS", "11"))  # one try + 10 retries, no fallback
 
 RUN_TIMEOUT = int(os.environ.get("MODAL_TIMEOUT_MIN", "20")) * 60  # hard cap per container
@@ -116,7 +116,8 @@ JOB_LIMIT_MIN = float(os.environ.get("MODAL_JOB_LIMIT_MIN", "20"))  # ask before
 # Cost model for the pre-launch estimate (deliberately on the high side, SXM 400 W).
 EST_TRIAL_S_PER_EPOCH = 1.0  # prepare + train seconds per epoch at the default width
 EST_BUILD_COLD_S = 230.0  # cold max-autotune build
-EST_BUILD_WARM_S = 70.0  # build with the warm cache
+EST_BUILD_WARM_S = 70.0  # build with the warm cache (observed 16-18 s on a cache hit)
+EST_BUILD_NEW_GRAPH_WARM_S = 110.0  # new graph, warm autotune/Triton caches (observed 38-55 s)
 EST_BUILD_LOW_RES_S = 70.0  # extra default-mode graph for progressive resizing
 EST_RUN_OVERHEAD_S = 25.0  # process start, dataset load, eval, result copy
 EST_CONTAINER_S = 40.0  # nvidia-smi, cache copy, data check
@@ -534,10 +535,12 @@ def _estimate_run_seconds(spec: dict, warm: bool, control_params: dict | None = 
     trial = EST_TRIAL_S_PER_EPOCH * epochs * width_scale + 0.3
     if params.get("compile", "max-autotune") == "":
         build = 20.0
-    elif warm and not any(k in params and params[k] != base.get(k) for k in GRAPH_KEYS):
-        build = EST_BUILD_WARM_S
-    else:
+    elif not warm:
         build = EST_BUILD_COLD_S
+    elif any(k in params and params[k] != base.get(k) for k in GRAPH_KEYS):
+        build = EST_BUILD_NEW_GRAPH_WARM_S
+    else:
+        build = EST_BUILD_WARM_S
     if params.get("low_res") and params.get("low_res_epochs"):
         build += EST_BUILD_LOW_RES_S
     return EST_RUN_OVERHEAD_S + build + int(spec.get("n", 1)) * trial
