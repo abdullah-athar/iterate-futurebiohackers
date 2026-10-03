@@ -62,7 +62,8 @@ def generate_planted_instance(
         name=name,
         strings=variants,
         alphabet=alphabet,
-        target_length=target_length,
+        # No length constraint: the optimal median can be shorter or longer than the planted sequence.
+        target_length=None,
         metric=metric,
         description=description or f"Planted motif (len={target_length}, k={num_strings}, mut={mutation_rate})",
         planted_consensus=planted,

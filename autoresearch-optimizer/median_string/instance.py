@@ -60,9 +60,8 @@ class ProblemInstance:
         """
         if not isinstance(candidate, str):
             return False, f"Candidate must be a string, got {type(candidate).__name__}."
-        if len(candidate) == 0:
-            return False, "Candidate string cannot be empty."
 
+        # The empty string is a valid consensus; its cost is the total read length.
         invalid_chars = set(candidate) - self.alphabet_set
         if invalid_chars:
             return False, f"Candidate contains characters not in alphabet '{self.alphabet}': {sorted(invalid_chars)}"

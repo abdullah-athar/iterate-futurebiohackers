@@ -64,10 +64,10 @@ SOLVER LEADERBOARD COMPARISON (Tier: small)
 =====================================================================================
 Rank | Solver                   | Score   | vs Baseline  | Record (W/T/L) | Time (s) | Valid
 --------------------------------------------------------------------------------------------
-1    | template                 | 51      | +13 (+20.3%) | 2/1/0          | 0.0520   | 3/3
-2    | set_median               | 64      | +0 (+0.0%)   | 0/3/0          | 0.0016   | 3/3
-3    | frequency_consensus      | 71      | -7 (-10.9%)  | 1/1/1          | 0.0010   | 3/3
-4    | random_baseline          | 137     | -73 (-114.1%) | 0/0/3          | 0.0230   | 3/3
+1    | template                 | 51      | +7 (+12.1%)  | 2/1/0          | 0.0529   | 3/3
+2    | set_median               | 58      | +0 (+0.0%)   | 0/3/0          | 0.0027   | 3/3
+3    | frequency_consensus      | 71      | -13 (-22.4%) | 1/1/1          | 0.0001   | 3/3
+4    | random_baseline          | 137     | -79 (-136.2%) | 0/0/3          | 0.0238   | 3/3
 =====================================================================================
 ```
 
@@ -105,7 +105,7 @@ class MyGeneticSolver(BaseSolver):
     def solve(self, instance: ProblemInstance) -> str:
         # instance.strings: list of sequences S
         # instance.alphabet: permitted chars (e.g. "ACGT")
-        # instance.target_length: target length or None
+        # instance.target_length: None for generated benchmarks (any length allowed)
         # instance.metric: "levenshtein" or "hamming"
         
         # Implement your search logic here:
@@ -157,7 +157,6 @@ print(f"Total score: {summary.total_score}, vs baseline: {summary.net_improvemen
 
 Every proposed candidate string must satisfy:
 1. **Alphabet compliance**: All characters in candidate must belong to `instance.alphabet`.
-2. **Length constraint**: If `instance.target_length` is specified, `len(candidate) == instance.target_length`.
-3. **Non-empty**: The candidate cannot be empty.
-4. **Primary Metric**: Total Steiner distance $\sum_{s \in S} d(\text{candidate}, s)$ across all instances (lower is better).
-5. **Secondary Metrics**: Improvement % over the Set Median baseline, win rate (W/T/L), and execution runtime.
+2. **Any length**: The candidate may be shorter or longer than the input strings, or empty. Generated benchmarks don't set `instance.target_length`; a custom instance can set it to require `len(candidate) == instance.target_length`.
+3. **Primary Metric**: Total Steiner distance $\sum_{s \in S} d(\text{candidate}, s)$ across all instances (lower is better).
+4. **Secondary Metrics**: Improvement % over the Set Median baseline, win rate (W/T/L), and execution runtime.

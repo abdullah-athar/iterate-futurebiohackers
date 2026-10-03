@@ -56,7 +56,41 @@ def test_validation():
     valid, msg = inst.validate_candidate("ACG")  # Length 3 instead of 4
     assert not valid
     assert "does not match target length" in msg
+
+    # Without target_length, any length is valid, including the empty string
+    free = ProblemInstance(name="free", strings=["ACGT", "AGCT"], alphabet="ACGT")
+    for candidate in ["", "A", "ACGTA"]:
+        valid, msg = free.validate_candidate(candidate)
+        assert valid, msg
     print("Validation test passed!")
+
+
+def test_variable_length_benchmarks():
+    print("Testing variable-length scoring...")
+    # Generated instances must not fix the consensus length
+    for tier in ("small", "medium", "hard"):
+        for inst in get_benchmark_suite(tier):
+            assert inst.target_length is None, inst.name
+
+    evaluator = Evaluator(default_tier="small")
+
+    # Empty consensus is valid and costs the total read length
+    summary = evaluator.evaluate_solver(lambda inst: "", benchmark="small", verbose=False)
+    assert summary.all_valid
+    assert summary.total_score == sum(len(s) for inst in get_benchmark_suite("small") for s in inst.strings)
+
+    # "AAC" (not an input read) beats every read: cost 3 vs set median cost 4
+    reads = ProblemInstance(name="aaa_acc_cac", strings=["AAA", "ACC", "CAC"], alphabet="ACGT")
+    summary = evaluator.evaluate_solver(lambda inst: "AAC", benchmark=[reads], verbose=False)
+    assert summary.all_valid
+    assert summary.total_score == 3
+    assert summary.total_baseline_score == 4
+
+    # A shorter-than-planted consensus is accepted (previously rejected by target_length)
+    inst = next(i for i in get_benchmark_suite("medium") if i.name == "dna_promoter_25bp")
+    summary = evaluator.evaluate_solver(lambda i: i.strings[0][:20], benchmark=[inst], verbose=False)
+    assert summary.all_valid
+    print("Variable-length test passed!")
 
 
 def test_solvers_and_evaluator():
@@ -84,5 +118,6 @@ def test_solvers_and_evaluator():
 if __name__ == "__main__":
     test_metrics()
     test_validation()
+    test_variable_length_benchmarks()
     test_solvers_and_evaluator()
     print("\nAll tests passed successfully!")
