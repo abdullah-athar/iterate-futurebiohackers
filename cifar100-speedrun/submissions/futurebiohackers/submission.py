@@ -39,6 +39,14 @@ DEFAULTS = {
     "bn_momentum": 0.6,
     "ema_every": 5,  # lookahead EMA period in steps; 0 disables it
     "compile": "max-autotune",  # torch.compile mode; "" runs eagerly
+    # Experimental switches (the defaults reproduce the recipe above exactly).
+    "depths": None,  # per-group convs, e.g. [3, 2, 4]; None uses "depth" for every group
+    "activation": "gelu",  # or "silu"
+    "whiten_svd": False,  # whitening basis from an SVD instead of eigh
+    "crop_gather": False,  # vectorized random crop (one gather, same shift distribution)
+    "low_res": 0,  # progressive resizing: train epochs with index < low_res_epochs at this size
+    "low_res_epochs": 0,
+    "jitter": 0.0,  # per-image brightness/contrast jitter strength (own RNG, seeded per trial)
 }
 
 
@@ -63,43 +71,61 @@ class Conv(nn.Conv2d):
         nn.init.dirac_(w[: w.size(1)])
 
 
+def _activation(name):
+    return {"gelu": nn.GELU, "silu": nn.SiLU}[name]()
+
+
 class ConvGroup(nn.Module):
-    def __init__(self, channels_in, channels_out, depth, bn_momentum):
+    """conv-pool-BN-act, then depth-1 more convs: a residual pair (depth 3), a plain conv
+    (depth 2), or a plain conv followed by a residual pair (depth 4)."""
+
+    def __init__(self, channels_in, channels_out, depth, bn_momentum, activation="gelu"):
         super().__init__()
+        if depth not in (2, 3, 4):
+            raise ValueError(f"depth must be 2, 3 or 4, got {depth}")
         self.conv1 = Conv(channels_in, channels_out)
         self.pool = nn.MaxPool2d(2)
         self.norm1 = BatchNorm(channels_out, bn_momentum)
         self.conv2 = Conv(channels_out, channels_out)
         self.norm2 = BatchNorm(channels_out, bn_momentum)
-        self.conv3 = Conv(channels_out, channels_out) if depth == 3 else None
-        self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
-        self.activ = nn.GELU()
+        self.conv3 = Conv(channels_out, channels_out) if depth >= 3 else None
+        self.norm3 = BatchNorm(channels_out, bn_momentum) if depth >= 3 else None
+        self.conv4 = Conv(channels_out, channels_out) if depth == 4 else None
+        self.norm4 = BatchNorm(channels_out, bn_momentum) if depth == 4 else None
+        self.activ = _activation(activation)
 
     def forward(self, x):
         x = self.activ(self.norm1(self.pool(self.conv1(x))))
         if self.conv3 is None:
             return self.activ(self.norm2(self.conv2(x)))
-        x0 = x
+        if self.conv4 is None:
+            x0 = x
+            x = self.activ(self.norm2(self.conv2(x)))
+            return self.activ(self.norm3(self.conv3(x)) + x0)
         x = self.activ(self.norm2(self.conv2(x)))
-        return self.activ(self.norm3(self.conv3(x)) + x0)
+        x0 = x
+        x = self.activ(self.norm3(self.conv3(x)))
+        return self.activ(self.norm4(self.conv4(x)) + x0)
 
 
 class Net(nn.Module):
     def __init__(self, hyp, num_classes):
         super().__init__()
         w1, w2, w3 = hyp["widths"]
-        depth, bn_momentum = hyp["depth"], hyp["bn_momentum"]
+        d1, d2, d3 = hyp["depths"] or [hyp["depth"]] * 3
+        bn_momentum, act = hyp["bn_momentum"], hyp["activation"]
         self.whiten = nn.Conv2d(3, 24, kernel_size=2, padding=0, bias=True)
         self.whiten.weight.requires_grad = False
         self.layers = nn.Sequential(
-            nn.GELU(),
-            ConvGroup(24, w1, depth, bn_momentum),
-            ConvGroup(w1, w2, depth, bn_momentum),
-            ConvGroup(w2, w3, depth, bn_momentum),
+            _activation(act),
+            ConvGroup(24, w1, d1, bn_momentum, act),
+            ConvGroup(w1, w2, d2, bn_momentum, act),
+            ConvGroup(w2, w3, d3, bn_momentum, act),
             nn.MaxPool2d(3),
         )
         self.head = nn.Linear(w3, num_classes, bias=False)
         self.scaling_factor = hyp["scaling_factor"]
+        self.whiten_svd = hyp["whiten_svd"]
 
     def reset(self):
         for m in self.modules():
@@ -113,7 +139,10 @@ class Net(nn.Module):
         patches = images.unfold(2, h, 1).unfold(3, w, 1).transpose(1, 3).reshape(-1, c, h, w)
         flat = patches.float().view(len(patches), -1)
         covariance = flat.T @ flat / len(flat)
-        eigenvalues, eigenvectors = torch.linalg.eigh(covariance, UPLO="U")
+        if self.whiten_svd:
+            eigenvectors, eigenvalues, _ = torch.linalg.svd(covariance)
+        else:
+            eigenvalues, eigenvectors = torch.linalg.eigh(covariance, UPLO="U")
         scaled = eigenvectors.T.reshape(-1, c, h, w) / torch.sqrt(
             eigenvalues.view(-1, 1, 1, 1) + eps
         )
@@ -177,6 +206,30 @@ def batch_crop(images, crop_size):
     return out
 
 
+def batch_crop_gather(images, crop_size):
+    """Same shift distribution (one randint draw) as batch_crop, done with a single gather
+    instead of 25 masked copies, each of which forces a GPU->CPU sync."""
+    n, c, h, w = images.shape
+    r = (w - crop_size) // 2
+    shifts = torch.randint(-r, r + 1, size=(n, 2), device=images.device)
+    offsets = torch.arange(crop_size, device=images.device)
+    rows = r + shifts[:, 0:1] + offsets  # (n, crop)
+    cols = r + shifts[:, 1:2] + offsets
+    index = (rows[:, :, None] * w + cols[:, None, :]).view(n, 1, crop_size * crop_size)
+    flat = images.reshape(n, c, h * w).gather(2, index.expand(n, c, -1))
+    return flat.view(n, c, crop_size, crop_size).contiguous(memory_format=torch.channels_last)
+
+
+def batch_jitter(images, strength, generator):
+    """Per-image contrast (x * c) and brightness (+ b) jitter, c in [1-s, 1+s], b in [-s, s]
+    in normalized units; drawn from `generator` so the global RNG stream is untouched."""
+    n = len(images)
+    uniform = torch.rand(2, n, device=images.device, generator=generator) * 2 - 1
+    contrast = (1 + strength * uniform[0]).to(images.dtype).view(-1, 1, 1, 1)
+    brightness = (strength * uniform[1]).to(images.dtype).view(-1, 1, 1, 1)
+    return images * contrast + brightness
+
+
 def batch_cutout(images, size):
     n, _, h, w = images.shape
     y = torch.randint(0, h - size + 1, size=(n, 1, 1, 1), device=images.device)
@@ -197,6 +250,9 @@ def build(context: BuildContext):
     unknown = set(hyp) - set(DEFAULTS)
     if unknown:
         raise ValueError(f"Unknown parameters: {sorted(unknown)}")
+    # The 2x2 whitening conv and three pools need (size - 1) // 8 >= 3 for the final 3x3 pool.
+    if hyp["low_res"] and (hyp["low_res"] - 1) // 8 < 3:
+        raise ValueError("low_res must be at least 25 (28 or 26 recommended)")
     device = context.device
     cuda = device.type == "cuda"
     dtype = torch.float16 if cuda else torch.float32
@@ -228,10 +284,12 @@ def build(context: BuildContext):
             torch.randint(0, 256, (count, 3, 32, 32), dtype=torch.uint8),
             torch.randint(0, context.num_classes, (count,)),
         )
-        for _ in range(2):
-            prepare(state, synthetic, seed=0)
-            state.whiten_bias_steps = 3
-            _fit(state, total_steps=6)
+        # Every training resolution gets its own compiled graph: warm each one up.
+        for resolution in _resolutions(hyp):
+            for _ in range(2):
+                prepare(state, synthetic, seed=0)
+                state.whiten_bias_steps = 3
+                _fit(state, total_steps=6, force_resolution=resolution)
         state.classifier.eval()
         with torch.inference_mode():
             for size in (context.eval_batch_size, 10_000 % context.eval_batch_size, 1):
@@ -256,6 +314,11 @@ def prepare(state, data: TrainingData, seed: int) -> None:
     del raw
     net.init_whiten(images[:5000])
     torch._foreach_copy_(state.ema, state.float_state)
+    # Extra augmentation randomness comes from its own generator, reseeded every trial, so
+    # the global stream (init, data order, flips, crops) stays identical to the base recipe.
+    state.aug_generator = (
+        torch.Generator(device=device).manual_seed(seed) if hyp["jitter"] else None
+    )
 
     # Alternating flip: flip a random half once, then mirror everything on odd epochs.
     images = batch_flip_lr(images)
@@ -294,7 +357,16 @@ def train(state) -> nn.Module:
     return state.classifier
 
 
-def _fit(state, total_steps):
+def _resolutions(hyp):
+    """Training resolutions in use: the low one first (if any), then the native 32."""
+    return ([hyp["low_res"]] if hyp["low_res"] and hyp["low_res_epochs"] else []) + [32]
+
+
+def _epoch_resolution(hyp, epoch):
+    return hyp["low_res"] if hyp["low_res"] and epoch < hyp["low_res_epochs"] else 32
+
+
+def _fit(state, total_steps, force_resolution=None):
     hyp, net, optimizer = state.hyp, state.net, state.optimizer
     labels, batch_size, steps_per_epoch = state.labels, state.batch_size, state.steps_per_epoch
     warmup_steps = int(total_steps * hyp["warmup"])
@@ -302,11 +374,22 @@ def _fit(state, total_steps):
     step = 0
     net.train()
     for epoch in range(math.ceil(total_steps / steps_per_epoch)):
-        images = batch_crop(state.images, 32) if hyp["translate"] else state.images
+        if hyp["translate"]:
+            crop = batch_crop_gather if hyp["crop_gather"] else batch_crop
+            images = crop(state.images, 32)
+        else:
+            images = state.images
         if epoch % 2 == 1:
             images = images.flip(-1)
         if hyp["cutout"]:
             images = batch_cutout(images, hyp["cutout"])
+        if hyp["jitter"]:
+            images = batch_jitter(images, hyp["jitter"], state.aug_generator)
+        resolution = force_resolution or _epoch_resolution(hyp, epoch)
+        if resolution != images.size(-1):
+            images = F.interpolate(
+                images, size=(resolution, resolution), mode="bilinear", antialias=True
+            ).contiguous(memory_format=torch.channels_last)
         order = torch.randperm(len(labels), device=labels.device)
         for i in range(steps_per_epoch):
             if step >= total_steps:

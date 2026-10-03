@@ -18,3 +18,9 @@
 {"time": "2026-10-03T15:08:52", "label": "ab-tweaks-a (pcie-guard attempt 7)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 4.7, "gpu_minutes": 0.33, "note": "aborted before build"}
 {"time": "2026-10-03T15:09:01", "label": "ab-tweaks-a (pcie-guard attempt 8)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 4.7, "gpu_minutes": 0.33, "note": "aborted before build"}
 {"time": "2026-10-03T15:13:38", "label": "pre-budget validation runs (env_check 19 s, template-n1 26 s, baseline-n2 147 s, 3 containers)", "gpu": "NVIDIA A100 80GB PCIe / SXM4", "container_seconds": 192.0, "gpu_minutes": 3.95, "note": "counted conservatively toward the 90-min budget"}
+{"time": "2026-10-03T15:54:39", "label": "phase0-noise (pcie-guard attempt 1)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build"}
+{"time": "2026-10-03T15:57:48", "label": "phase0-noise (FAILED ValueError)", "gpu": "?", "container_seconds": 189.5435311794281, "gpu_minutes": 3.41, "note": "local wall time of the failed call"}
+{"time": "2026-10-03T15:59:41", "label": "phase0-noise (pcie-guard attempt 1)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build"}
+{"time": "2026-10-03T15:59:44", "label": "phase0-noise (pcie-guard attempt 2)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build"}
+{"time": "2026-10-03T15:59:48", "label": "phase0-noise (pcie-guard attempt 3)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build"}
+{"time": "2026-10-03T15:59:51", "label": "phase0-noise (pcie-guard attempt 4)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build"}

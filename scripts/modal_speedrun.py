@@ -235,8 +235,9 @@ def _run(spec: dict, deadline: float | None) -> dict:
         for path in sorted(Path(result_dir).rglob("*")):
             if path.is_file() and "source" not in path.relative_to(result_dir).parts:
                 files[path.relative_to(result_dir).as_posix()] = path.read_bytes()
+    # The harness prints the Volume's realpath, not /results/...: keep <team>/<run_id> only.
     run.update(
-        result_rel=Path(result_dir).relative_to(RESULTS_ROOT).as_posix() if result_dir else None,
+        result_rel="/".join(Path(result_dir).parts[-2:]) if result_dir else None,
         files=files,
         command=shlex.join(cmd),
         spec=spec,
