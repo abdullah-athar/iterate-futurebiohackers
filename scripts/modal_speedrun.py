@@ -129,16 +129,24 @@ GRAPH_KEYS = {
     "widths",
     "depths",
     "depth",
-    "depth2_residual",
     "pool_first",
     "stem",
-    "conv1_stride",
-    "conv_kernels",
+    "inner_kernels",
     "gelu_approximate",
     "activation",
     "scaling_factor",
     "bn_momentum",
+    "bn_dtype",
+    "global_pool",
+    "optimizer",
+    "compile_step",
+    "compile_loss",
+    "label_smoothing",
     "batch_size",
+    "batch_schedule",
+    "resolution_schedule",
+    "train_resolution",
+    "resolution_switch",
     "compile",
 }  # low_res adds one extra default-mode graph on top (EST_BUILD_LOW_RES_S)
 
@@ -556,7 +564,7 @@ def _estimate_run_seconds(spec: dict, warm: bool, control_params: dict | None = 
         return 120.0
     params = json.loads(spec.get("params") or "{}")
     base = control_params or {}
-    epochs = float(params.get("epochs", base.get("epochs", 9.5)))
+    epochs = float(params.get("epochs", base.get("epochs", 9.0)))
     width_scale = 1.0
     if "widths" in params:
         widths = params["widths"]
@@ -572,13 +580,15 @@ def _estimate_run_seconds(spec: dict, warm: bool, control_params: dict | None = 
         build = EST_BUILD_WARM_S
     if params.get("low_res") and params.get("low_res_epochs"):
         build += EST_BUILD_LOW_RES_S
-    schedule = params.get("res_schedule")
-    if schedule:  # one default-mode graph per low resolution
-        build += EST_BUILD_LOW_RES_S * len(schedule)
-    elif "train_resolution" in params and params["train_resolution"] != base.get(
-        "train_resolution"
-    ):
-        build += EST_BUILD_LOW_RES_S
+    # The baseline recipe compiles one static graph per (batch, resolution) pair: every low
+    # resolution of resolution_schedule (default [[28, 0.5]]) and every extra batch size of
+    # batch_schedule adds graphs. Our older recipes used res_schedule / train_resolution.
+    schedule = params.get("resolution_schedule", params.get("res_schedule"))
+    if schedule is None and "train_resolution" in params:
+        schedule = [[params["train_resolution"], 1]] if params["train_resolution"] < 32 else []
+    low_res = len(schedule) if schedule is not None else 1  # the default has one 28 px stage
+    batches = 1 + len(params.get("batch_schedule") or [])
+    build += EST_BUILD_LOW_RES_S * (low_res * batches + (batches - 1))
     if params.get("hard_fraction", 1.0) < 1.0:
         build += 300.0  # PR #5's offline proxy prepass compiles and trains a second network
     return EST_RUN_OVERHEAD_S + build + int(spec.get("n", 1)) * trial
