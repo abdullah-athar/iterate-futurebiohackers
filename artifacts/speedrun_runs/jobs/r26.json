@@ -1,0 +1,89 @@
+{
+  "round": "r26",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "k26-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "lr10.5",
+          "params": {
+            "lr": 10.5
+          },
+          "hypothesis": "re-screen on the 512-pair record: lr x0.91"
+        },
+        {
+          "label": "lr12.5",
+          "params": {
+            "lr": 12.5
+          },
+          "hypothesis": "lr x1.09"
+        },
+        {
+          "label": "wd0.012",
+          "params": {
+            "weight_decay": 0.012
+          },
+          "hypothesis": "weight decay x0.7"
+        }
+      ]
+    },
+    {
+      "name": "k26-b",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "wd0.024",
+          "params": {
+            "weight_decay": 0.024
+          },
+          "hypothesis": "weight decay x1.4"
+        },
+        {
+          "label": "bias16",
+          "params": {
+            "bias_scaler": 16.0
+          },
+          "hypothesis": "BatchNorm-bias lr 16x instead of 32x"
+        },
+        {
+          "label": "bn0.7",
+          "params": {
+            "bn_momentum": 0.7
+          },
+          "hypothesis": "BatchNorm momentum 0.7 instead of 0.5"
+        }
+      ]
+    },
+    {
+      "name": "k26-c",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "ls0.2",
+          "params": {
+            "label_smoothing": 0.2
+          },
+          "hypothesis": "label smoothing 0.2"
+        },
+        {
+          "label": "ls0.3",
+          "params": {
+            "label_smoothing": 0.3
+          },
+          "hypothesis": "label smoothing 0.3"
+        },
+        {
+          "label": "warmup0.15",
+          "params": {
+            "warmup": 0.15
+          },
+          "hypothesis": "shorter lr warmup"
+        }
+      ]
+    }
+  ]
+}
