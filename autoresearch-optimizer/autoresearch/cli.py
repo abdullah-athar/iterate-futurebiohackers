@@ -208,7 +208,8 @@ def main(argv=None) -> None:
     s.add_argument("--budget-min", type=float, default=20, help="wall-clock budget for the whole run")
     s.add_argument("--turn-s", type=int, default=180, help="wall-clock limit per agent session")
     s.add_argument("--generations", type=int, help="stop after this many generations")
-    s.add_argument("--model", default="sonnet", help="Claude Code --model (alias or full id)")
+    s.add_argument("--model", default="sonnet", help="Claude Code --model (alias or full id); a comma-separated list is a per-generation schedule, "
+                        "the last model kept afterwards (e.g. sonnet,opus)")
     s.add_argument("--eval", choices=["modal", "local"], default="modal")
     s.add_argument("--no-deploy", action="store_true", help="skip `modal deploy` of the eval app")
     s.add_argument("--max-budget-usd", type=float, help="per-session spend cap passed to claude")

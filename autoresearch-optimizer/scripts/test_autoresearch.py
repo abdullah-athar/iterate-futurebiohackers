@@ -239,6 +239,25 @@ def test_swarm_hypothesis_first():
     print("  Swarm hypothesis-first test passed!")
 
 
+def test_swarm_model_schedule():
+    print("Testing the per-generation model schedule (--model sonnet,opus)...")
+    from autoresearch import swarm
+
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-swarm-sched-"))
+    real, seen = swarm.run_claude, []
+    try:
+        run = ResearchRun.create(RunStore(tmp / "run"), LoopConfig(problem="median_string"))
+        swarm.run_claude = lambda ws, turn_s, model, *a, **k: seen.append(model) or {"model": model, "seconds": 0.0, "outcome": "ok"}
+        propose = swarm.claude_proposer("sonnet,opus", 1, "local", None, lambda *a, **k: None)
+        for gen in (1, 2, 3):
+            propose(run, gen, [swarm.Assignment(0, "tune", [0])])
+        assert seen == ["sonnet", "opus", "opus"], seen  # the last model is kept after the schedule ends
+    finally:
+        swarm.run_claude = real
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Model schedule test passed!")
+
+
 def test_viz_lineage():
     print("Testing the dashboard's idea-lineage chart (merges, duplicates, disjoint trees)...")
     from autoresearch_viz.html import render
@@ -299,10 +318,14 @@ def test_viz_quality_efficiency():
         strong.label, cheap.label = "Strong", "Cheap"
         html = render([strong, cheap])
         card = html[html.index("<h2>Quality vs efficiency</h2>"):html.index("<h2>Research progress</h2>")]
-        assert "Quality · Strong wins" in card and "Efficiency · Cheap wins" in card
+        assert "Quality<span class='qe-win'> · Strong wins</span>" in card and "Efficiency<span class='qe-win'> · Cheap wins</span>" in card
         assert "+22.2% ★" in card and "$0.50 ★" in card and "20 ★" in card  # gain, cost, points per dollar (10 / 0.5)
         assert 'data-key="cost">vs cost</button>' in html
         assert "Cheap end · $0.50" in html and "Strong end · $2.00" in html, "each run's real end is marked on the cost axis"
+        # one show/hide button per run, and every bar row is tagged so the page can hide it and re-rank the rest
+        assert "<button class='on' aria-pressed='true' data-run='Strong'>" in html and "data-run='Cheap'>" in html
+        assert card.count('<g class="mb" data-run="Cheap"') >= 4 and "class='card qe-card' data-runs=" in html
+        assert "class='runtoggles'" not in render([strong])
         assert "<h2>Quality vs efficiency</h2>" not in render([strong]), "the card needs two runs"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -318,6 +341,7 @@ if __name__ == "__main__":
     test_hypothesis_gate()
     test_swarm()
     test_swarm_hypothesis_first()
+    test_swarm_model_schedule()
     test_viz_lineage()
     test_viz_quality_efficiency()
     print("\nAll autoresearch tests passed!")

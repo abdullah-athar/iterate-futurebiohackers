@@ -109,14 +109,15 @@ def step_chart(
     for i, s in enumerate(ends):
         x, y, text = X(s.end), 14 + 16 * i, f"{s.label} end · {fmt_num(s.end, x_unit)}"
         out.append(
-            f'<line x1="{x:.1f}" x2="{x:.1f}" y1="{y - 10}" y2="{mt + ph}" stroke="{s.color}" stroke-dasharray="5 4" '
-            f'stroke-width="1.5" data-tip="{escape(text, quote=True)}"/>'
+            f'<g data-run="{escape(s.label, quote=True)}"><line x1="{x:.1f}" x2="{x:.1f}" y1="{y - 10}" y2="{mt + ph}" stroke="{s.color}" '
+            f'stroke-dasharray="5 4" stroke-width="1.5" data-tip="{escape(text, quote=True)}"/>'
         )
         anchor, dx = ("end", -6) if x > ml + pw * 0.7 else ("start", 6)
-        out.append(f'<text class="end" x="{x + dx:.1f}" y="{y}" text-anchor="{anchor}">{escape(text)}</text>')
+        out.append(f'<text class="end" x="{x + dx:.1f}" y="{y}" text-anchor="{anchor}">{escape(text)}</text></g>')
     for s in series:
         if not s.points:
             continue
+        out.append(f'<g data-run="{escape(s.label, quote=True)}">')
         pts = sorted(s.points)
         d = f"M{X(pts[0][0]):.1f},{Y(pts[0][1]):.1f}"
         for (_x0, _y0), (x1, y1) in pairwise(pts):
@@ -128,6 +129,7 @@ def step_chart(
             out.append(
                 f'<circle cx="{X(x):.1f}" cy="{Y(y):.1f}" r="5" fill="{s.color}" stroke="#fff" stroke-width="1.5" data-tip="{escape(tip, quote=True)}"/>'
             )
+        out.append("</g>")
     out.append("</svg>")
     return "\n".join(out)
 
@@ -141,7 +143,10 @@ class BarGroup:
 
 
 def metric_bars(rows: list[tuple[str, float, str]], *, unit: str = "", higher_is_better: bool = True, width: int = 420) -> str:
-    """One bar per run from zero, `rows` = [(label, value, color)]; the winner's label and value are bold with a star."""
+    """One bar per run from zero, `rows` = [(label, value, color)]; the winner's label and value are bold with a star.
+
+    Each row is a `<g class="mb" data-run>` carrying its value, so the page's run toggles can hide a run and
+    re-rank, re-scale and re-stack the others (see `relayoutBars` in html.JS)."""
     vals = [v for _, v, _ in rows if v is not None and math.isfinite(v)]
     if not vals:
         return "<p class='muted'>—</p>"
@@ -149,20 +154,23 @@ def metric_bars(rows: list[tuple[str, float, str]], *, unit: str = "", higher_is
     ml, mr, row_h, mt = 92, 96, 26, 4
     pw = width - ml - mr
     hi = max(max(vals), 0) or 1
-    out = [f'<svg class="chart" viewBox="0 0 {width} {mt + row_h * len(rows) + 4}" role="img">',
+    out = [f'<svg class="chart mbars" viewBox="0 0 {width} {mt + row_h * len(rows) + 4}" role="img" data-w="{width}" '
+           f'data-ml="{ml}" data-pw="{pw}" data-rh="{row_h}" data-higher="{int(higher_is_better)}">',
            f'<line class="axis" x1="{ml}" x2="{ml}" y1="{mt}" y2="{mt + row_h * len(rows)}"/>']
     for i, (label, v, color) in enumerate(rows):
-        y = mt + i * row_h
-        if v is None or not math.isfinite(v):
-            out.append(f'<text class="cat" x="{ml - 8}" y="{y + 17}" text-anchor="end">{escape(label)}</text>')
+        ok = v is not None and math.isfinite(v)
+        out.append(f'<g class="mb" data-run="{escape(label, quote=True)}" data-v="{v if ok else "nan"}" '
+                   f'data-f="{escape(fmt_num(v, unit), quote=True) if ok else ""}" transform="translate(0,{mt + i * row_h})">')
+        if not ok:
+            out.append(f'<text class="cat" x="{ml - 8}" y="17" text-anchor="end">{escape(label)}</text></g>')
             continue
         win = v == best
         w = max(pw * max(v, 0) / hi, 2)
         weight = ' font-weight="700"' if win else ""
-        out.append(f'<text class="cat" x="{ml - 8}" y="{y + 17}" text-anchor="end"{weight}>{escape(label)}</text>')
-        out.append(f'<rect x="{ml}" y="{y + 5}" width="{w:.1f}" height="15" rx="3" fill="{color}" '
+        out.append(f'<text class="cat" x="{ml - 8}" y="17" text-anchor="end"{weight}>{escape(label)}</text>')
+        out.append(f'<rect x="{ml}" y="5" width="{w:.1f}" height="15" rx="3" fill="{color}" '
                    f'data-tip="{escape(f"{label}: {fmt_num(v, unit)}", quote=True)}"/>')
-        out.append(f'<text class="val" x="{ml + w + 6:.1f}" y="{y + 17}"{weight}>{fmt_num(v, unit)}{" ★" if win else ""}</text>')
+        out.append(f'<text class="val" x="{ml + w + 6:.1f}" y="17"{weight}>{fmt_num(v, unit)}{" ★" if win else ""}</text></g>')
     out.append("</svg>")
     return "\n".join(out)
 
@@ -207,9 +215,10 @@ def grouped_hbars(
             y = y0 + gi * (bar_h + gap)
             tip = g.tips.get(cat, f"{g.label}: {fmt_num(v)}")
             out.append(
-                f'<rect x="{ml}" y="{y:.1f}" width="{max(X(v) - ml, 1):.1f}" height="{bar_h}" fill="{g.color}" rx="2" data-tip="{escape(tip, quote=True)}"/>'
+                f'<g data-run="{escape(g.label, quote=True)}"><rect x="{ml}" y="{y:.1f}" width="{max(X(v) - ml, 1):.1f}" height="{bar_h}" '
+                f'fill="{g.color}" rx="2" data-tip="{escape(tip, quote=True)}"/>'
             )
-            out.append(f'<text class="val" x="{X(v) + 5:.1f}" y="{y + bar_h - 3:.1f}">{fmt_num(v)}</text>')
+            out.append(f'<text class="val" x="{X(v) + 5:.1f}" y="{y + bar_h - 3:.1f}">{fmt_num(v)}</text></g>')
         for mv, mlabel, mcolor in markers.get(cat, []):
             y_top, y_bot = y0 - 3, y0 + len(groups) * (bar_h + gap) - gap + 3
             out.append(

@@ -201,9 +201,14 @@ def claude_proposer(model: str, turn_s: int, eval_backend: str, max_budget_usd: 
 
     With `hypothesis_first`, each agent's idea is first stated by one tool-less call over its
     STATUS.md (a few k tokens instead of a coding session); `gate(new, prior)` drops ideas that
-    repeat an earlier one, and only the survivors get a coding session, told to implement it."""
+    repeat an earlier one, and only the survivors get a coding session, told to implement it.
+
+    `model` may be a comma-separated schedule, one model per generation with the last one kept
+    afterwards: "sonnet,opus" runs generation 1 on Sonnet and every later generation on Opus."""
+    schedule = [m.strip() for m in model.split(",") if m.strip()]
 
     def propose_many(run: ResearchRun, gen: int, assignments: list[Assignment]) -> list[dict]:
+        model = schedule[min(gen, len(schedule)) - 1]
         mix = ", ".join(f"{c} on {m}" for m, c in Counter(a.mode for a in assignments).items())
         agents_dir = run.store.root / "agents"
         agents_dir.mkdir(exist_ok=True)

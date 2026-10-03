@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from datetime import UTC, datetime
 from html import escape
@@ -65,13 +66,43 @@ select{font:inherit;padding:5px 8px;border-radius:8px;border:1px solid var(--lin
 .note-syn{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:13.5px}
 footer{color:var(--muted);font-size:12px;margin-top:30px}
 .qe{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:18px}.qe-grp{border:1px solid var(--line);border-radius:10px;padding:4px 14px 10px}
-.qe-fig{margin:8px 0 0}.qe-fig figcaption{display:flex;justify-content:space-between;gap:8px;font-size:13px}.qe-fig figcaption span{color:var(--muted);font-size:12px}
+.qe-fig{margin:8px 0 0}.qe-prop{margin-right:14px;white-space:nowrap}.qe-fig figcaption{display:flex;justify-content:space-between;gap:8px;font-size:13px}.qe-fig figcaption span{color:var(--muted);font-size:12px}
+.runtoggles{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--bg);padding:8px 0;margin:0 0 14px}
+.runtoggles>span{font-size:13px;color:var(--muted);margin-right:4px}
+.runtoggles button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px 5px 9px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted)}
+.runtoggles button .sw{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;opacity:.35}
+.runtoggles button.on{color:var(--ink);border-color:#94a3b8}.runtoggles button.on .sw{opacity:1}
+.runtoggles button:not(.on){text-decoration:line-through}
 .events{margin:0;padding-left:18px;font-size:12.5px;color:#334155}.events li{margin:2px 0}
-@media print{.tabs{display:none}.panel{display:block!important}}
+@media print{.tabs,.runtoggles{display:none}.panel{display:block!important}}
 """
 
 JS = """
+const HIDDEN=new Set();
+const escHtml=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function relayoutBars(){document.querySelectorAll('svg.mbars').forEach(svg=>{
+ const hi=svg.dataset.higher==='1',ml=+svg.dataset.ml,pw=+svg.dataset.pw,rh=+svg.dataset.rh;
+ const rows=[...svg.querySelectorAll('g.mb')].filter(g=>!HIDDEN.has(g.dataset.run));
+ const vs=rows.map(g=>+g.dataset.v).filter(Number.isFinite);
+ const best=vs.length?(hi?Math.max(...vs):Math.min(...vs)):NaN,top=vs.length?(Math.max(...vs,0)||1):1;
+ rows.forEach((g,i)=>{g.setAttribute('transform','translate(0,'+(4+i*rh)+')');const v=+g.dataset.v,r=g.querySelector('rect');if(!r)return;
+  const w=Math.max(pw*Math.max(v,0)/top,2),t=g.querySelector('.val'),win=v===best;r.setAttribute('width',w.toFixed(1));t.setAttribute('x',(ml+w+6).toFixed(1));
+  t.textContent=g.dataset.f+(win?' ★':'');[t,g.querySelector('.cat')].forEach(x=>x.setAttribute('font-weight',win?'700':'400'));});
+ svg.setAttribute('viewBox','0 0 '+svg.dataset.w+' '+(8+rh*rows.length));svg.querySelector('.axis').setAttribute('y2',4+rh*rows.length);
+ const w=rows.find(g=>+g.dataset.v===best);svg.dataset.winner=w?w.dataset.run:'';});
+ document.querySelectorAll('.qe-grp').forEach(grp=>{const svg=grp.querySelector('svg.mbars'),span=grp.querySelector('.qe-win');
+  if(span)span.textContent=svg&&svg.dataset.winner?' · '+svg.dataset.winner+' wins':'';});
+ document.querySelectorAll('.qe-card').forEach(c=>{const rs=JSON.parse(c.dataset.runs).filter(r=>!HIDDEN.has(r.l)),lead=c.querySelector('.qe-lead');
+  if(!rs.length){lead.innerHTML='No run shown';return;}const q=rs.reduce((a,b)=>b.best<a.best?b:a),cs=rs.filter(r=>r.cost);
+  let h='<b>'+escHtml(q.l)+'</b> finds the best solver ('+q.bestf+', '+q.gainf+' vs the seed)';
+  if(cs.length){const k=cs.reduce((a,b)=>b.cost<a.cost?b:a);h+='; <b>'+escHtml(k.l)+'</b> is the cheapest run ('+k.costf+', '+k.gainf+' vs the seed in '+k.secsf+')';}
+  lead.innerHTML=h;});}
+function applyRuns(){document.querySelectorAll('[data-run]').forEach(el=>{if(!el.closest('.runtoggles'))el.style.display=HIDDEN.has(el.dataset.run)?'none':'';});
+ document.querySelectorAll('.runtoggles button').forEach(b=>{const on=!HIDDEN.has(b.dataset.run);b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});relayoutBars();}
 function bind(){
+document.querySelectorAll('.runtoggles button').forEach(b=>b.addEventListener('click',()=>{const r=b.dataset.run;
+ if(HIDDEN.has(r))HIDDEN.delete(r);else if(document.querySelectorAll('.runtoggles button.on').length>1)HIDDEN.add(r);applyRuns();}));
+applyRuns();
 document.querySelectorAll('.tabs').forEach(t=>{t.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
  t.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
  const grp=t.dataset.group;document.querySelectorAll('.panel[data-group="'+grp+'"]').forEach(p=>p.classList.toggle('on',p.dataset.key===b.dataset.key));})); });
@@ -99,10 +130,14 @@ def _badge(text: str, color: str) -> str:
     return f'<span class="badge" style="background:{color}">{escape(text)}</span>'
 
 
-def _legend(items: list[tuple[str, str]]) -> str:
+def _legend(items: list[tuple[str, str]], runs: frozenset[str] = frozenset()) -> str:
+    """Colour key; items whose label is in `runs` follow the page's run toggles."""
+    def tag(label: str) -> str:
+        return f' data-run="{escape(label, quote=True)}"' if label in runs else ""
+
     return (
         '<div class="legend">'
-        + "".join(f'<span><span class="sw" style="background:{c}"></span>{escape(l)}</span>' for l, c in items)
+        + "".join(f'<span{tag(l)}><span class="sw" style="background:{c}"></span>{escape(l)}</span>' for l, c in items)
         + "</div>"
     )
 
@@ -186,7 +221,7 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
     return (
         '<section class="card"><h2>Research progress</h2><p class="lead">Best objective found so far. Dots mark proposals that set a new global best; hover for the hypothesis.</p>'
         f'<div class="tabs" data-group="x">{"".join(buttons)}</div>'
-        + _legend([(r.label, colors[r.label]) for r in runs])
+        + _legend([(r.label, colors[r.label]) for r in runs], frozenset(r.label for r in runs))
         + "".join(panels)
         + "</section>"
     )
@@ -226,17 +261,25 @@ def _quality_efficiency_card(summaries: list[Summary], colors: dict[str, str], r
     if cheap:
         lead += (f"; <b>{escape(cheap.label)}</b> is the cheapest run ({fmt_num(cheap.cost_usd, 'usd')}, "
                  f"{fmt_num(cheap.gain_vs_seed_pct, 'pct')} vs the seed in {fmt_num(cheap.seconds, 'seconds')})")
-    models = " · ".join(f"{escape(s.label)}: <code>{escape(r.proposals[0].proposer if r.proposals else '?')}</code>" for s, r in pairs)
+    models = "".join(f"<span class='qe-prop' data-run='{escape(s.label, quote=True)}'>{escape(s.label)}: <code>{escape(_proposers(r))}</code></span>"
+                     for s, r in pairs)
+    data = [{"l": s.label, "best": s.best_objective, "bestf": fmt_num(s.best_objective), "gainf": fmt_num(s.gain_vs_seed_pct, "pct"),
+             "cost": s.cost_usd or 0, "costf": fmt_num(s.cost_usd, "usd"), "secsf": fmt_num(s.seconds, "seconds")} for s, _ in pairs]
     return (
-        "<section class='card'><h2>Quality vs efficiency</h2>"
-        f"<p class='lead'>{lead}. A ★ marks the winner of each measure. Proposers: {models}.</p><div class='qe'>"
-        f"<div class='qe-grp'><h3>Quality · {escape(best_q.label)} wins</h3>"
+        f"<section class='card qe-card' data-runs='{escape(json.dumps(data), quote=True)}'><h2>Quality vs efficiency</h2>"
+        f"<p class='lead'><span class='qe-lead'>{lead}</span>. A ★ marks the winner of each measure among the runs shown. Proposers: {models}.</p><div class='qe'>"
+        f"<div class='qe-grp'><h3>Quality<span class='qe-win'> · {escape(best_q.label)} wins</span></h3>"
         + "".join(block(*q) for q in quality)
-        + f"</div><div class='qe-grp'><h3>Efficiency{(' · ' + escape(cheap.label) + ' wins') if cheap else ''}</h3>"
+        + f"</div><div class='qe-grp'><h3>Efficiency<span class='qe-win'>{(' · ' + escape(cheap.label) + ' wins') if cheap else ''}</span></h3>"
         + "".join(block(*e) for e in efficiency)
         + "</div></div><p class='muted' style='font-size:12.5px;margin:10px 0 0'>The 'vs cost' tab of <i>Research progress</i> "
         "shows the same trade-off over the run. With one run per flavour, differences of a few percent are within noise.</p></section>"
     )
+
+
+def _proposers(run: Run) -> str:
+    """The run's proposers in first-use order, e.g. 'claude-code:sonnet → claude-code:opus' for a model schedule."""
+    return " → ".join(dict.fromkeys(e.proposer for e in run.proposals)) or "?"
 
 
 def _baselines_card(runs: list[Run]) -> str:
@@ -271,7 +314,7 @@ def _scoreboard(summaries: list[Summary], colors: dict[str, str], runs: list[Run
     for s, run in zip(summaries, runs):
         gc = s.gap_closed_pct
         rows.append(
-            f"<tr class='{'best' if s is best_label else ''}'><td class='l'><span class='sw' style='background:{colors[s.label]}'></span><b>{escape(s.label)}</b>"
+            f"<tr class='{'best' if s is best_label else ''}' data-run='{escape(s.label, quote=True)}'><td class='l'><span class='sw' style='background:{colors[s.label]}'></span><b>{escape(s.label)}</b>"
             f"<span class='note' style='display:block;font-size:12px;color:#64748b'>{escape(run.describe())}</span></td>"
             f"<td>{fmt_num(s.best_objective)} <span class='muted'>({fmt_num(s.seed_objective)})</span></td>"
             f"<td><b>{fmt_num(s.gain_vs_baseline_pct, 'pct')}</b></td><td>{'—' if gc is None else f'{gc:.0f}%'}</td>"
@@ -289,7 +332,7 @@ def _scoreboard(summaries: list[Summary], colors: dict[str, str], runs: list[Run
             st = s.modes.get(m)
             cells.append("<td>—</td>" if not st else f"<td>{st.global_wins}+{st.instance_wins} / {st.tried}</td>")
         mode_rows.append(
-            f"<tr><td class='l'><span class='sw' style='background:{colors[s.label]}'></span>{escape(s.label)}</td>{''.join(cells)}</tr>"
+            f"<tr data-run='{escape(s.label, quote=True)}'><td class='l'><span class='sw' style='background:{colors[s.label]}'></span>{escape(s.label)}</td>{''.join(cells)}</tr>"
         )
     mode_table = (
         (
@@ -334,7 +377,8 @@ def _instances_card(runs: list[Run], colors: dict[str, str]) -> str:
         for r in rows
     }
     legend = _legend(
-        [(r.label, colors[r.label]) for r in runs] + [("baseline (dashed grey)", "#64748b"), ("planted reference (dashed green; a feasible answer, not a proven optimum)", "#16a34a")]
+        [(r.label, colors[r.label]) for r in runs] + [("baseline (dashed grey)", "#64748b"), ("planted reference (dashed green; a feasible answer, not a proven optimum)", "#16a34a")],
+        frozenset(r.label for r in runs),
     )
     return (
         "<section class='card'><h2>Per-instance results</h2><p class='lead'>Best score each flavour reached on every benchmark instance. Shorter bars are better; the Pareto archive keeps solvers that win on any single instance, not just the total.</p>"
@@ -602,14 +646,24 @@ def _live_card(runs: list[Run]) -> str:
         ]
         recent = "".join(f"<li><code>{escape(format_event(e))}</code></li>" for e in ev[-14:][::-1])
         cards.append(
-            f"<h3>{escape(run.label)}{' · LIVE' if not done else ''}</h3><div class='kpis'>"
+            f"<div data-run='{escape(run.label, quote=True)}'><h3>{escape(run.label)}{' · LIVE' if not done else ''}</h3><div class='kpis'>"
             + "".join(f"<div class='kpi'><div class='v'>{escape(v)}</div><div class='k'>{escape(k)}</div><div class='d'>{escape(d)}</div></div>"
                       for v, k, d in tiles)
-            + f"</div><ul class='events'>{recent}</ul>"
+            + f"</div><ul class='events'>{recent}</ul></div>"
         )
     if not cards:
         return ""
     return "<section class='card'><h2>Now</h2><p class='lead'>Swarm progress from <code>events.jsonl</code> (newest first).</p>" + "".join(cards) + "</section>"
+
+
+def _run_toggles(runs: list[Run], colors: dict[str, str]) -> str:
+    """One button per run: hides or shows that run in every chart, legend and table (at least one stays shown)."""
+    if len(runs) < 2:
+        return ""
+    return ("<div class='runtoggles' role='group' aria-label='Runs shown'><span>Show:</span>"
+            + "".join(f"<button class='on' aria-pressed='true' data-run='{escape(r.label, quote=True)}'>"
+                      f"<span class='sw' style='background:{colors[r.label]}'></span>{escape(r.label)}</button>" for r in runs)
+            + "</div>")
 
 
 def render_main(runs: list[Run], title: str) -> str:
@@ -619,6 +673,7 @@ def render_main(runs: list[Run], title: str) -> str:
     return "\n".join([
         f"<h1>{escape(title)}</h1><p class='sub'>problem: <b>{escape(problem)}</b> · {len(runs)} run{'s' if len(runs) != 1 else ''} · "
         f"updated {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}</p>",
+        _run_toggles(runs, colors),
         _live_card(runs),
         _kpis(summaries, runs),
         _quality_efficiency_card(summaries, colors, runs),

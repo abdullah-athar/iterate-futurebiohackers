@@ -263,16 +263,25 @@ autoresearch-optimizer/
   artifacts/        # local results, ignored by Git
 ```
 
+### Model schedule (`swarm --model sonnet,opus`)
+
+`--model` takes a comma-separated list, one model per generation, and keeps the last one after
+the list ends. `--model sonnet,opus` ("Sopus") lets the cheaper Sonnet find a good first minimum
+in generation 1, then hands every later generation to Opus to push it further. See
+[results/models4-sopus-1003.md](results/models4-sopus-1003.md).
+
 ## Visualise runs (`autoresearch_viz/`)
 
 A self-contained HTML dashboard: no network access is needed, so it also works offline in a demo.
 It shows:
+- with two or more runs, a "Show" row of buttons at the top that hides or shows each run in every
+  chart, legend and table; the ★ winners and the quality vs efficiency summary follow the runs shown;
 - a live "Now" panel: generation, agents back, elapsed time, cost, latest events;
 - with two or more runs (e.g. one per model), a quality vs efficiency card: gain over the seed on
   the objective and held-out splits next to total cost, wall clock and objective points per dollar,
   with the winner of each measure marked;
 - best objective against evaluations, agent tokens, wall clock and agent cost, with the hypothesis
-  behind every improvement;
+  behind every improvement; on the last three axes a dashed line marks where each run really stopped;
 - a scoreboard per run, including held-out gain;
 - per-instance bars;
 - the outcome mix of all proposals;
