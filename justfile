@@ -58,3 +58,10 @@ autoresearch-setup:
 [working-directory: justfile_directory() / "autoresearch-optimizer"]
 autoresearch-smoke:
     uv run --frozen python -c 'import sys; from pathlib import Path; assert sys.version_info[:2] == (3, 11), sys.version; assert Path(sys.prefix).resolve() == (Path.cwd() / ".venv").resolve(), sys.prefix; print("Autoresearch optimizer ready: Python", sys.version.split()[0], "in", Path.cwd())'
+
+# Evaluate median string solvers: just autoresearch-eval --compare all --tier small
+[working-directory: justfile_directory() / "autoresearch-optimizer"]
+[positional-arguments]
+autoresearch-eval *args:
+    uv run python scripts/evaluate_median_string.py "$@"
+
