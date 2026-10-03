@@ -55,6 +55,23 @@ accuracy-recovery recipe (75.27-75.41% in 5.59-5.67 s in those jobs):
 | wd 0.02 / lr 12.5 / BN momentum 0.6 / label smoothing 0.3 | 75.05-75.24% | 5.02-5.08 s |
 | lr 11.5, wd 0.017, BN 0.5 only (8.75 ep, original widths) | 75.48% | 5.63 s |
 
+Second round, paired 16-trial runs against the defaults above (75.24-75.37% in 5.01-5.13 s
+in those jobs):
+
+| Change on top of the defaults | Accuracy | Time |
+| --- | ---: | ---: |
+| `fused_sgd: true` | 75.29% | 4.91 s |
+| `crop_mode: "indexed"` | 75.32% | 4.99 s |
+| `resolution_switch: 0.3` | 75.17% | 4.90 s |
+| 8.0 epochs, label smoothing 0.2 (or warmup 0.18) | 75.16-75.17% | 4.81-4.83 s |
+| 8.0 epochs, lr 12 / BN-bias lr 48x / momentum 0.88 | 74.98-75.04% | 4.83 s |
+| `low_res_compile: "max-autotune"` | 75.22% | 5.00 s |
+| no brightness/contrast jitter | 75.17% | 5.01 s |
+| `depths: [2, 2, 3]` | 74.86% | 4.70 s |
+| widths 128/256/640 or 128/224/768 | 74.89-75.02% | 4.82-4.95 s |
+| `pool_first: [false, true, false]` | 73.35% | 4.58 s |
+| `gelu_approximate: "tanh"` | 75.24% | 5.32 s |
+
 ### Accuracy-recovery recipe (previous defaults)
 
 40 trials (seeds 0-39) with the official accuracy target and a cold `build`, on Modal
