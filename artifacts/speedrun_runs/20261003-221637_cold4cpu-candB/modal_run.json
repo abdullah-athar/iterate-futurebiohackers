@@ -1,0 +1,39 @@
+{
+  "returncode": 0,
+  "wall_seconds": 398.0,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T211009Z-611986df",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 2 --seed 0 --params '{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}'",
+  "spec": {
+    "label": "cold4cpu-candB",
+    "n": 2,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "2",
+      "--seed",
+      "0",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.25
+        ],
+        [
+          28,
+          0.5
+        ]
+      ],
+      "epochs": 9.5,
+      "count_nonfinite": true
+    },
+    "config": "futurebiohackers --n 2 --seed 0 --params {\"resolution_schedule\": [[24, 0.25], [28, 0.5]], \"epochs\": 9.5} [cpus 4]"
+  },
+  "nonfinite": 0,
+  "build_mode": "cold"
+}

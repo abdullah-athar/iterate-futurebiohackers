@@ -124,6 +124,30 @@ EST_BUILD_NEW_GRAPH_WARM_S = 190.0  # new graph or the first run after a tarball
 EST_BUILD_LOW_RES_S = 50.0  # per extra (batch, resolution) graph pair
 EST_RUN_OVERHEAD_S = 25.0  # process start, dataset load, eval, result copy
 EST_CONTAINER_S = 40.0  # nvidia-smi, cache copy, data check
+# Cold builds measured under the judges' four-CPU quota (`::main --cpus 4`), by number of
+# compiled max-autotune graphs: one graph per (batch, resolution) pair and whiten-bias flag.
+MEASURED_4CPU_BUILDS = {
+    4: [254.6, 208.8],  # main's defaults (28 px half, 9 ep); the same graphs at 9.5 ep
+    6: [339.3, 371.0],  # 24 px quarter + 28 px half (three resolutions) at 9.25 / 9.5 ep
+}
+
+
+def _graph_count(params) -> int:
+    """Compiled graphs of the baseline recipe for these --params: (resolutions x batches) pairs,
+    two whiten-bias flags each, plus the skip graphs when progressive depth is on."""
+    if isinstance(params, str):
+        params = json.loads(params or "{}")
+    schedule = params.get("resolution_schedule")
+    if schedule is None:
+        schedule = [[28, 0.5]]
+    resolutions = len({r for r, _ in schedule} | {32})
+    batches = 1 + len({b for b, _ in (params.get("batch_schedule") or [])})
+    graphs = 2 * resolutions * batches
+    if params.get("skip_residual_until", 0) and params.get("skip_residual_groups"):
+        graphs += 2 * batches  # skip graphs for the low-resolution pairs in the skip window
+    return graphs
+
+
 # Parameters that change the compiled graph (so the warm cache cannot help on first sight).
 GRAPH_KEYS = {
     "widths",
@@ -815,18 +839,26 @@ def _stats(run: dict, out: Path, environment: dict) -> dict:
     if row["deadline_hit"]:
         verdict += " (interrupted at the container deadline)"
     if build_time is not None and row["build_mode"] == "cold":
-        # Build clause (team policy, 3 Oct): the judges' four-CPU cold build is estimated as
-        # 1.8x the 20-CPU cold build (measured ratio range 1.1-1.8); a finalist passes below
-        # 400 s, an estimate above 350 s calls for one real `::main --cpus 4` measurement.
+        # Build clause (team policy, 4 Oct): no 4-CPU builds during screening. A finalist with
+        # no more compiled graphs than a configuration already measured under the judges'
+        # four-CPU quota passes; a real `::main --cpus 4` build is run only for a recipe about
+        # to be PR'd or submitted, or one with more graphs than the largest measured config.
         if (row.get("config") or "").endswith("[cpus 4]"):
-            flag = " FAILS THE BUILD CLAUSE" if build_time >= 400 else ""
+            flag = " FAILS THE BUILD CLAUSE (>= 400 s)" if build_time >= 400 else ""
             verdict += f"; 4-CPU cold build {build_time:.0f} s (measured){flag}"
         else:
-            estimate = 1.8 * build_time
-            if estimate >= 400:
-                verdict += f"; 4-CPU build estimate {estimate:.0f} s (1.8 x cold): MEASURE IT"
-            elif estimate > 350:
-                verdict += f"; 4-CPU build estimate {estimate:.0f} s (> 350: measure once before submitting)"
+            graphs = _graph_count(row.get("full_params") or row.get("params") or {})
+            largest = max(MEASURED_4CPU_BUILDS)
+            if graphs <= largest:
+                times = MEASURED_4CPU_BUILDS[min(g for g in MEASURED_4CPU_BUILDS if g >= graphs)]
+                verdict += (
+                    f"; build clause: {graphs} graphs <= {largest} measured at 4 CPUs "
+                    f"({'-'.join(f'{t:.0f}' for t in times)} s): passes"
+                )
+            else:
+                verdict += (
+                    f"; build clause: {graphs} graphs > {largest} measured at 4 CPUs: MEASURE"
+                )
     if row["nonfinite"]:
         verdict += f"; NON-FINITE LOSSES: {row['nonfinite']}"
     several = s["successful_trials"] > 1
