@@ -601,7 +601,7 @@ def _log_row(row: dict, tag: str) -> str:
     if row.get("paired"):
         p = row["paired"]
         extra = (
-            f" paired vs control (n={p['pairs']}): dacc {_pct(p['dacc'], 2):+} pp +- "
+            f" paired vs control (n={p['pairs']}): dacc {100 * p['dacc']:+.2f} pp +- "
             f"{_pct(p['dacc_se'], 2)}, dtime {p['dtime']:+.2f} s."
         )
     return (
@@ -626,7 +626,7 @@ def _table(rows: list[dict]) -> str:
             )
             continue
         p = r.get("paired") or {}
-        dacc = f"{_pct(p['dacc']):+} +- {_pct(p.get('dacc_se'))}" if p else "control"
+        dacc = f"{100 * p['dacc']:+.2f} +- {_pct(p.get('dacc_se'))}" if p else "control"
         dtime = f"{p['dtime']:+.2f}" if p else "control"
         lines.append(
             f"| {r['label']} | `{r['params']}` | {r['trials_ok']}/{r['n']} | "

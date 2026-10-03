@@ -1,0 +1,129 @@
+{
+  "params": {
+    "compile": ""
+  },
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "eager": true,
+  "build_s": 6.292,
+  "prepare_s": 0.134,
+  "prepare_pieces_s": {
+    "reset": 0.0625,
+    "h2d_normalize": 0.036,
+    "whitening_init": 0.0018,
+    "flip_pad": 0.0041,
+    "ema_copy": 0.0003
+  },
+  "batch_size": 1024,
+  "steps_per_epoch": 48,
+  "total_steps": 408,
+  "epochs": 8.5,
+  "epoch_s": [
+    0.987,
+    0.989
+  ],
+  "data_epoch_s": [
+    0.0056,
+    0.0069
+  ],
+  "steady_epoch_s": 0.989,
+  "projected_train_s": 8.41,
+  "fwd_ms_per_step": 6.897,
+  "bwd_ms_per_step": 13.22,
+  "opt_ms_per_step": 0.248,
+  "ema_ms_per_ema_step": 0.328,
+  "step_ms": 20.364,
+  "profiled_steps": 12,
+  "window_wall_s": 0.255,
+  "gpu_busy_s": 0.571,
+  "gpu_busy_fraction": 2.238,
+  "forward_split_s": {
+    "stem_whiten_gelu": 0.0008,
+    "group1": 0.0286,
+    "group2": 0.0323,
+    "group3": 0.018,
+    "head": 0.0001
+  },
+  "forward_split_fraction": {
+    "stem_whiten_gelu": 0.01,
+    "group1": 0.358,
+    "group2": 0.405,
+    "group3": 0.226,
+    "head": 0.001
+  },
+  "backward_kernels_s": 0.183,
+  "top_kernels": [
+    {
+      "name": "aten::convolution_backward",
+      "calls": 120,
+      "device_ms": 102.76,
+      "share": 0.18
+    },
+    {
+      "name": "aten::cudnn_convolution",
+      "calls": 120,
+      "device_ms": 47.73,
+      "share": 0.084
+    },
+    {
+      "name": "sm80_xmma_wgrad_implicit_gemm_indexed_f16f16_f16f32_f32_nhwckrsc_nhwc_",
+      "calls": 72,
+      "device_ms": 35.28,
+      "share": 0.062
+    },
+    {
+      "name": "void cutlass__5x_cudnn::Kernel<cutlass_tensorop_f16_s16816dgrad_optimi",
+      "calls": 72,
+      "device_ms": 34.78,
+      "share": 0.061
+    },
+    {
+      "name": "group2",
+      "calls": 12,
+      "device_ms": 32.3,
+      "share": 0.057
+    },
+    {
+      "name": "group1",
+      "calls": 12,
+      "device_ms": 28.61,
+      "share": 0.05
+    },
+    {
+      "name": "void cutlass__5x_cudnn::Kernel<cutlass_tensorop_f16_s16816fprop_optimi",
+      "calls": 60,
+      "device_ms": 27.47,
+      "share": 0.048
+    },
+    {
+      "name": "aten::max_pool2d_with_indices_backward",
+      "calls": 48,
+      "device_ms": 25.54,
+      "share": 0.045
+    },
+    {
+      "name": "void at::native::(anonymous namespace)::max_pool_backward_nhwc<c10::Ha",
+      "calls": 48,
+      "device_ms": 25.54,
+      "share": 0.045
+    },
+    {
+      "name": "_ZN17cutlass__5x_cudnn6KernelINS_4conv6kernel23ImplicitGemmConvolution",
+      "calls": 36,
+      "device_ms": 17.97,
+      "share": 0.031
+    },
+    {
+      "name": "group3",
+      "calls": 12,
+      "device_ms": 17.97,
+      "share": 0.031
+    },
+    {
+      "name": "aten::max_pool2d_with_indices",
+      "calls": 48,
+      "device_ms": 14.98,
+      "share": 0.026
+    }
+  ],
+  "eval_s": 0.109
+}
