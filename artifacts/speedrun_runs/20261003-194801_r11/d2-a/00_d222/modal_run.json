@@ -1,0 +1,36 @@
+{
+  "returncode": 1,
+  "wall_seconds": 126.0,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T184829Z-5eb32ea3",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"depths\": [2, 2, 2]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "d222",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"depths\": [2, 2, 2]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"depths\": [2, 2, 2]}",
+    "delta": {
+      "depths": [
+        2,
+        2,
+        2
+      ]
+    },
+    "hypothesis": "top priority: two convs per group (no residual pair) on the promoted recipe, as is",
+    "env": {},
+    "config": "futurebiohackers {\"depths\": [2, 2, 2]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

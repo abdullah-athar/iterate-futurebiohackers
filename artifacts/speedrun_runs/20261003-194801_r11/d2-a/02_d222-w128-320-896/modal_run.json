@@ -1,0 +1,41 @@
+{
+  "returncode": 1,
+  "wall_seconds": 211.4,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T185207Z-bbbc2634",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"depths\": [2, 2, 2], \"widths\": [128, 320, 896]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "d222-w128-320-896",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"depths\": [2, 2, 2], \"widths\": [128, 320, 896]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"depths\": [2, 2, 2], \"widths\": [128, 320, 896]}",
+    "delta": {
+      "depths": [
+        2,
+        2,
+        2
+      ],
+      "widths": [
+        128,
+        320,
+        896
+      ]
+    },
+    "hypothesis": "depth 2 everywhere with wider channels to recover capacity",
+    "env": {},
+    "config": "futurebiohackers {\"depths\": [2, 2, 2], \"widths\": [128, 320, 896]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

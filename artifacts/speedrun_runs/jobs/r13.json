@@ -1,0 +1,26 @@
+{
+  "round": "r13",
+  "n": 8,
+  "seed": 0,
+  "control": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "compile_loss": true, "fused_sgd": true, "epochs": 9.5},
+  "jobs": [
+    {
+      "name": "s3-cuts-a",
+      "control_index": 1,
+      "variants": [
+        {"label": "S3-d223", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "compile_loss": true, "fused_sgd": true, "epochs": 9.5, "depths": [2, 2, 3]}, "hypothesis": "on the S3 stack: drop the residual pair in groups 1 and 2 (r11: -0.88 s / -0.55 pp on the promoted recipe)"},
+        {"label": "S3-w64-192-768", "params": {"widths": [64, 192, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "compile_loss": true, "fused_sgd": true, "epochs": 9.5}, "hypothesis": "group 2 at 192 channels on the S3 stack"},
+        {"label": "S3-poolfirst-g2", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "compile_loss": true, "fused_sgd": true, "epochs": 9.5, "pool_first": [false, true, false]}, "hypothesis": "PR #5's pool-before-conv1 in group 2: its conv1 runs at 7x7 instead of 15x15"}
+      ]
+    },
+    {
+      "name": "s3-cuts-b",
+      "control_index": 1,
+      "variants": [
+        {"label": "S3-poolfirst-g3", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "compile_loss": true, "fused_sgd": true, "epochs": 9.5, "pool_first": [false, false, true]}, "hypothesis": "pool-before-conv1 in group 3: its conv1 (256->768) runs at 3x3 instead of 7x7"},
+        {"label": "S3-d223-e10.5", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "compile_loss": true, "fused_sgd": true, "epochs": 10.5, "depths": [2, 2, 3]}, "hypothesis": "depth cut with one more epoch to buy accuracy back"},
+        {"label": "S3-w64-192-768-e10.0", "params": {"widths": [64, 192, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "compile_loss": true, "fused_sgd": true, "epochs": 10.0}, "hypothesis": "narrower group 2 with half an epoch bought back"}
+      ]
+    }
+  ]
+}
