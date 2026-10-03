@@ -1,0 +1,29 @@
+{
+  "returncode": 0,
+  "wall_seconds": 232.0,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T204712Z-20f3f2d8",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 2 --seed 0 --params '{\"count_nonfinite\": true, \"epochs\": 9.5}'",
+  "spec": {
+    "label": "cold4cpu-safety-e9.5",
+    "n": 2,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "2",
+      "--seed",
+      "0",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 9.5}"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 9.5}",
+    "delta": {
+      "epochs": 9.5,
+      "count_nonfinite": true
+    },
+    "config": "futurebiohackers --n 2 --seed 0 --params {\"epochs\": 9.5} [cpus 4]"
+  },
+  "nonfinite": 0,
+  "build_mode": "cold"
+}

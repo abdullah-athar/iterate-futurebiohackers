@@ -117,11 +117,11 @@ GPU_CHECKPOINTS = [
 ]
 JOB_LIMIT_MIN = float(os.environ.get("MODAL_JOB_LIMIT_MIN", "20"))  # ask before a bigger job
 # Cost model for the pre-launch estimate (deliberately on the high side, SXM 400 W).
-EST_TRIAL_S_PER_EPOCH = 1.0  # prepare + train seconds per epoch at the default width
-EST_BUILD_COLD_S = 230.0  # cold max-autotune build
-EST_BUILD_WARM_S = 70.0  # build with the warm cache (observed 16-18 s on a cache hit)
-EST_BUILD_NEW_GRAPH_WARM_S = 110.0  # new graph, warm autotune/Triton caches (observed 38-55 s)
-EST_BUILD_LOW_RES_S = 70.0  # extra default-mode graph for progressive resizing
+EST_TRIAL_S_PER_EPOCH = 0.65  # 0.52 s/epoch measured on 64/256/768 at 400 W, +25%
+EST_BUILD_COLD_S = 230.0  # cold max-autotune build (192 s measured, 20 CPUs)
+EST_BUILD_WARM_S = 45.0  # build with the warm cache (cache hit: 33-36 s)
+EST_BUILD_NEW_GRAPH_WARM_S = 190.0  # new graph or the first run after a tarball miss: 115-190 s
+EST_BUILD_LOW_RES_S = 50.0  # per extra (batch, resolution) graph pair
 EST_RUN_OVERHEAD_S = 25.0  # process start, dataset load, eval, result copy
 EST_CONTAINER_S = 40.0  # nvidia-smi, cache copy, data check
 # Parameters that change the compiled graph (so the warm cache cannot help on first sight).
@@ -148,6 +148,8 @@ GRAPH_KEYS = {
     "train_resolution",
     "resolution_switch",
     "compile",
+    "inductor_tuning",  # coordinate-descent tuning re-autotunes every kernel
+    "autotune_backends",  # a different candidate set changes the autotune results
 }  # low_res adds one extra default-mode graph on top (EST_BUILD_LOW_RES_S)
 
 _LOCK = threading.Lock()  # ledger, registry and LOG.md appends from parallel jobs
@@ -633,7 +635,7 @@ def _estimate_run_seconds(spec: dict, warm: bool, control_params: dict | None = 
     width_scale = 1.0
     if "widths" in params:
         widths = params["widths"]
-        width_scale = max(0.5, sum(widths) / (128 + 384 + 576))
+        width_scale = max(0.5, sum(widths) / (64 + 256 + 768))
     trial = EST_TRIAL_S_PER_EPOCH * epochs * width_scale + 0.3
     if params.get("compile", "max-autotune") == "":
         build = 20.0
@@ -1300,6 +1302,20 @@ def _regenerate_leaderboard() -> None:
         print(f"leaderboard failed: {exc}", flush=True)
 
 
+def _recipe_keys() -> set[str]:
+    """Keys of the submission's DEFAULTS; build() rejects anything else as unknown."""
+    source = (SPEEDRUN / "submissions" / TEAM / "submission.py").read_text(encoding="utf-8")
+    block = source.split("DEFAULTS = {", 1)[1].split("\n}", 1)[0]
+    return set(re.findall(r'^\s*"([a-z0-9_]+)":', block, re.M))
+
+
+def _check_params(params: dict, where: str) -> None:
+    """Fail before any container starts when a --params key is not in the recipe's DEFAULTS."""
+    unknown = sorted(set(params) - _recipe_keys())
+    if unknown:
+        raise SystemExit(f"{where}: unknown recipe parameters {unknown} (not in DEFAULTS)")
+
+
 def _recipe_supports(key: str) -> bool:
     """Whether the submission's DEFAULTS mention a parameter (the harness rejects unknown keys)."""
     source = SPEEDRUN / "submissions" / TEAM / "submission.py"
@@ -1402,6 +1418,7 @@ def main(*argv: str):
         else:
             args += ["--params", json.dumps(params, sort_keys=True)]
     n = int(args[args.index("--n") + 1])
+    _check_params(params, "--params")
     spec = {
         "label": opts["tag"],
         "n": n,
@@ -1477,6 +1494,9 @@ def _plan(jobs: list[dict], cfg: dict, allow_big: bool) -> float:
         if len(job["variants"]) > 3:
             raise SystemExit(f"job {job['name']}: at most 3 variants per container")
         n = int(job.get("n", cfg["n"]))
+        _check_params(cfg["control"], f"job {job['name']}: control")
+        for v in job["variants"]:
+            _check_params(v["params"], f"job {job['name']}: variant {v.get('label', '?')}")
         specs = [
             _make_spec(
                 "x",
