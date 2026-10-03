@@ -4,7 +4,7 @@ Three 1-generation smoke runs, 2 Sonnet agents each (`--turn-s 120 --eval local 
 Costs are Claude Code's `total_cost_usd` per agent. One run per row, so scores are noisy: these
 runs check the mechanics and the cost per phase, not solver quality.
 
-| Run | Hypothesis step | Gate (Haiku) | Coding session | Total per agent | Best (validate) | Holdout best (seed 1024, baseline 1147) |
+| Run | Hypothesis step | Gate (Haiku) | Coding session | Total per agent | Best (validate) | Holdout best (seed solver 1024, set median 1147) |
 |---|---|---|---|---|---|---|
 | `smoke-tcava-1003-185121`, no gate | — | — | $0.11 | **$0.11** | 512 | 935 |
 | `hypfirst-tcava-1003-201223`, hypothesis as an agent session | $0.08 (97k input tokens) | $0.005 | $0.18 (resumed session) | $0.26 | 515 | 940 |
@@ -41,7 +41,7 @@ run one after the other: `cmp12-nogate-1003-2019` and `cmp12-gate-1003-2019`. On
 | **Total cost** | **$2.63** | **$3.55 (+35%)** |
 | Wall clock | 3 min 0 s | 7 min 36 s |
 | Best (validate) | 511 | 511 |
-| Holdout best (seed 1024, baseline 1147) | 927 | 921 |
+| Holdout best (seed solver 1024, set median 1147) | 927 | 921 |
 
 The gate stopped 3 ideas, below the ~18% break-even, so it cost more than it saved. Two things
 made it more expensive than in the smoke runs: the hypothesis call grows with the ledger in
