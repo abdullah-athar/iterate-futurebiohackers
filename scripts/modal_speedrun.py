@@ -1323,7 +1323,7 @@ def _split_launcher_flags(argv: tuple[str, ...]) -> tuple[dict, list[str]]:
         "require_gpu": DEFAULT_REQUIRE_GPU,
         "require_power": DEFAULT_REQUIRE_POWER,
         "warm": False,
-        "count_nonfinite": False,
+        "count_nonfinite": True,  # every run reports NONFINITE_LOSSES (--no-count-nonfinite to skip)
         "round": "single",
         "cpus": "0",  # --cpus 4: emulate the judges' four-CPU quota (hard limit + affinity)
     }
@@ -1345,6 +1345,8 @@ def _split_launcher_flags(argv: tuple[str, ...]) -> tuple[dict, list[str]]:
             opts["warm"] = True
         elif arg == "--count-nonfinite":
             opts["count_nonfinite"] = True
+        elif arg == "--no-count-nonfinite":
+            opts["count_nonfinite"] = False
         else:
             rest.append(arg)
     opts["cpus"] = int(opts["cpus"])
