@@ -246,8 +246,12 @@ def is_control(row: dict) -> bool:
     return bool(v)
 
 
+ROUND_K: dict[str, float] = {}  # rounds measured on an earlier base keep that base's k
+
+
 def build_entry(row: dict, k_current: float | None) -> dict:
-    """Normalise one registry row and recompute dtime_adj from the current k."""
+    """Normalise one registry row and recompute dtime_adj from the current k (or the k of the
+    row's round when k.json lists it under "previous")."""
     paired = row.get("paired") if isinstance(row.get("paired"), dict) else None
 
     def pv(key: str) -> float | None:
@@ -255,7 +259,10 @@ def build_entry(row: dict, k_current: float | None) -> dict:
 
     dacc, dacc_se, dtime, dtime_se = pv("dacc"), pv("dacc_se"), pv("dtime"), pv("dtime_se")
     k_used = num(row.get("k_used"))
-    if k_current is not None:
+    k_round = ROUND_K.get(str(row.get("round")))
+    if k_round is not None:
+        k_eff, k_src = k_round, "k.json(previous)"
+    elif k_current is not None:
         k_eff, k_src = k_current, "k.json"
     elif k_used is not None and k_used > 0:
         k_eff, k_src = k_used, "k_used"
@@ -804,6 +811,9 @@ def main(argv: list[str] | None = None) -> int:
 
     now = datetime.now().astimezone()
     k, k_data = load_k(args.k_file)
+    previous = k_data.get("previous") if isinstance(k_data, dict) else None
+    if isinstance(previous, dict) and num(previous.get("k")):
+        ROUND_K.update({str(r): float(previous["k"]) for r in previous.get("rounds", [])})
     rows = read_jsonl(args.registry, "registry")
     ledger = read_jsonl(args.ledger, "ledger")
     entries = [build_entry(r, k) for r in rows]

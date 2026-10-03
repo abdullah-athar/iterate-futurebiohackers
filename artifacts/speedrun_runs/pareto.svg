@@ -2,7 +2,7 @@
 <title>CIFAR-100 speedrun: accuracy vs prepare+train time</title>
 <rect width="800" height="500" fill="#fcfcfb"/>
 <text x="62" y="24" font-size="14" font-weight="600" fill="#0b0b0b">CIFAR-100 speedrun: mean accuracy vs mean prepare+train time</text>
-<text x="776" y="24" text-anchor="end" font-size="10" fill="#898781">2026-10-03 17:56; k = 0.445 pp/s</text>
+<text x="776" y="24" text-anchor="end" font-size="10" fill="#898781">2026-10-03 17:58; k = 1 pp/s</text>
 <circle cx="68" cy="44" r="5" fill="#2a78d6"/>
 <text x="78" y="48" fill="#52514e">round calib</text>
 <circle cx="168.0" cy="44" r="5" fill="#eb6834"/>
@@ -142,10 +142,6 @@
 <circle cx="355.5" cy="254.6" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="355.5" cy="254.6" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
 </g>
-<g><title>e9.0 (variant, round r3): 75.34 % acc, 6.35 s; dacc +0.36 +- 0.11 pp; dtime +0.35 s; dtime_adj -0.47 s; QUALIFIED (&gt;= 75%); on the Pareto frontier</title>
-<circle cx="304.1" cy="191.1" r="12" fill="#000" fill-opacity="0"/>
-<circle cx="304.1" cy="191.1" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
-</g>
 <g><title>ls0.25 (variant, round r1): 75.33 % acc, 7.44 s; dacc +0.21 +- 0.09 pp; dtime +0.00 s; dtime_adj -0.47 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="616.7" cy="193.0" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="616.7" cy="193.0" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
@@ -222,6 +218,10 @@
 <circle cx="474.7" cy="263.0" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="474.7" cy="263.0" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>e9.0 (variant, round r3): 75.34 % acc, 6.35 s; dacc +0.36 +- 0.11 pp; dtime +0.35 s; dtime_adj -0.01 s; QUALIFIED (&gt;= 75%); on the Pareto frontier</title>
+<circle cx="304.1" cy="191.1" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="304.1" cy="191.1" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>final0.15 (variant, round r1): 75.13 % acc, 6.99 s; dacc +0.00 +- 0.12 pp; dtime -0.01 s; dtime_adj -0.01 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="487.0" cy="232.4" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="487.0" cy="232.4" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
@@ -242,6 +242,10 @@
 <circle cx="474.6" cy="254.4" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="474.6" cy="254.4" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>e8.0 (variant, round r3): 74.63 % acc, 5.69 s; dacc -0.35 +- 0.13 pp; dtime -0.31 s; dtime_adj +0.04 s; BELOW 75%; on the Pareto frontier</title>
+<circle cx="115.1" cy="327.9" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="115.1" cy="327.9" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>no-cudagraphs (variant, round r1): 75.13 % acc, 7.39 s; dacc +0.00 +- 0.00 pp; dtime +0.05 s; dtime_adj +0.05 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="602.0" cy="232.9" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="602.0" cy="232.9" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
@@ -249,10 +253,6 @@
 <g><title>w96-320-640 (variant, round r1): 74.75 % acc, 6.16 s; dacc -0.37 +- 0.08 pp; dtime -0.76 s; dtime_adj +0.08 s; BELOW 75%</title>
 <circle cx="250.4" cy="304.3" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="250.4" cy="304.3" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
-</g>
-<g><title>e9.5 (variant, round r3): 75.25 % acc, 6.68 s; dacc +0.27 +- 0.14 pp; dtime +0.68 s; dtime_adj +0.08 s; QUALIFIED (&gt;= 75%)</title>
-<circle cx="399.2" cy="209.2" r="12" fill="#000" fill-opacity="0"/>
-<circle cx="399.2" cy="209.2" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>silu (variant, round r1): 75.00 % acc, 7.24 s; dacc -0.13 +- 0.18 pp; dtime -0.21 s; dtime_adj +0.09 s; BELOW 75%</title>
 <circle cx="557.7" cy="258.0" r="12" fill="#000" fill-opacity="0"/>
@@ -294,13 +294,13 @@
 <circle cx="591.5" cy="226.4" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="591.5" cy="226.4" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>e9.5 (variant, round r3): 75.25 % acc, 6.68 s; dacc +0.27 +- 0.14 pp; dtime +0.68 s; dtime_adj +0.41 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="399.2" cy="209.2" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="399.2" cy="209.2" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>ema10 (variant, round r1): 75.11 % acc, 7.33 s; dacc -0.18 +- 0.14 pp; dtime +0.01 s; dtime_adj +0.42 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="584.5" cy="235.0" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="584.5" cy="235.0" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
-</g>
-<g><title>e8.0 (variant, round r3): 74.63 % acc, 5.69 s; dacc -0.35 +- 0.13 pp; dtime -0.31 s; dtime_adj +0.48 s; BELOW 75%; on the Pareto frontier</title>
-<circle cx="115.1" cy="327.9" r="12" fill="#000" fill-opacity="0"/>
-<circle cx="115.1" cy="327.9" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>w64-384-576 (variant, round r1): 74.37 % acc, 5.82 s; dacc -0.94 +- 0.11 pp; dtime -1.58 s; dtime_adj +0.54 s; BELOW 75%</title>
 <circle cx="153.8" cy="377.1" r="12" fill="#000" fill-opacity="0"/>
