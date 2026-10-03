@@ -1,0 +1,22 @@
+{
+  "round": "r24",
+  "n": 40,
+  "seed": 40,
+  "control": {},
+  "jobs": [
+    {
+      "name": "paired40-s40",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "g3-inner512-e10.0-s40",
+          "params": {
+            "g3_pair": "inner512",
+            "epochs": 10.0
+          },
+          "hypothesis": "paired n=40 on seeds 40-79 in ONE container: 512 pair at 10 epochs vs candidate B"
+        }
+      ]
+    }
+  ]
+}
