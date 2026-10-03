@@ -1,0 +1,35 @@
+{
+  "returncode": 0,
+  "wall_seconds": 438.6,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T172759Z-b5d57a63",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 40 --params '{\"bias_scaler\": 32.0, \"bn_momentum\": 0.7, \"count_nonfinite\": true, \"epochs\": 8.75, \"jitter\": 0.3, \"label_smoothing\": 0.25, \"lr\": 10.8, \"resolution_switch\": 0.25, \"scaling_factor\": 0.1388888888888889, \"train_resolution\": 24}'",
+  "spec": {
+    "label": "final-S7-res24q-e8.75-400W",
+    "n": 40,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "40",
+      "--params",
+      "{\"bias_scaler\": 32.0, \"bn_momentum\": 0.7, \"count_nonfinite\": true, \"epochs\": 8.75, \"jitter\": 0.3, \"label_smoothing\": 0.25, \"lr\": 10.8, \"resolution_switch\": 0.25, \"scaling_factor\": 0.1388888888888889, \"train_resolution\": 24}"
+    ],
+    "params": "{\"bias_scaler\": 32.0, \"bn_momentum\": 0.7, \"count_nonfinite\": true, \"epochs\": 8.75, \"jitter\": 0.3, \"label_smoothing\": 0.25, \"lr\": 10.8, \"resolution_switch\": 0.25, \"scaling_factor\": 0.1388888888888889, \"train_resolution\": 24}",
+    "delta": {
+      "bias_scaler": 32.0,
+      "label_smoothing": 0.25,
+      "lr": 10.8,
+      "bn_momentum": 0.7,
+      "jitter": 0.3,
+      "scaling_factor": 0.1388888888888889,
+      "train_resolution": 24,
+      "resolution_switch": 0.25,
+      "epochs": 8.75,
+      "count_nonfinite": true
+    },
+    "config": "futurebiohackers --n 40 --params {\"bias_scaler\": 32.0, \"label_smoothing\": 0.25, \"lr\": 10.8, \"bn_momentum\": 0.7, \"jitter\": 0.3, \"scaling_factor\": 0.1388888888888889, \"train_resolution\": 24, \"resolution_switch\": 0.25, \"epochs\": 8.75}"
+  },
+  "nonfinite": 0,
+  "build_mode": "cold"
+}

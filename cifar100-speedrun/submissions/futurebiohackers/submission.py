@@ -2,8 +2,9 @@
 
 Adapted from Keller Jordan's airbench (https://github.com/KellerJordan/cifar10-airbench),
 Copyright (c) 2024 Keller Jordan, released under the MIT License. Changes: 100-class
-head with a wider last block, label smoothing 0.3, a 9.5-epoch schedule, the
-harness build/prepare/train split, and no test-time augmentation.
+head, 96/256/768 blocks with global max pooling, label smoothing 0.25, an 8.75-epoch
+schedule whose first quarter trains on 24x24 crops, per-image brightness/contrast
+jitter, the harness build/prepare/train split, and no test-time augmentation.
 
 Untimed build() compiles the network and warms up every kernel on synthetic data.
 Timed prepare() resets all learned state, moves the images to the GPU, normalizes
@@ -22,13 +23,13 @@ from benchmark.api import BuildContext, TrainingData
 
 # Override any value with --params, e.g. '{"epochs": 9, "widths": [128, 384, 768]}'.
 DEFAULTS = {
-    "epochs": 9.5,
+    "epochs": 8.75,
     "batch_size": 1024,
-    "lr": 9.0,  # per 1024 examples, decoupled from momentum (airbench convention)
+    "lr": 10.8,  # per 1024 examples, decoupled from momentum (airbench convention)
     "momentum": 0.85,
     "weight_decay": 0.012,  # per 1024 examples, decoupled from the learning rate
-    "bias_scaler": 64.0,  # learning-rate multiplier for BatchNorm biases
-    "label_smoothing": 0.3,
+    "bias_scaler": 32.0,  # learning-rate multiplier for BatchNorm biases
+    "label_smoothing": 0.25,
     "warmup": 0.23,  # fraction of steps spent ramping the learning rate up
     "final_lr": 0.07,  # learning-rate multiplier reached at the last step
     "whiten_bias_epochs": 3,
@@ -37,8 +38,8 @@ DEFAULTS = {
     "widths": [96, 256, 768],
     "depth": 3,  # convs per group; the third adds a residual connection
     "depths": None,  # optional per-group depths, e.g. [2, 3, 3]
-    "train_resolution": 32,  # reduced resolution for the first training stage
-    "resolution_switch": 0.5,  # fraction of steps before returning to 32 pixels
+    "train_resolution": 24,  # reduced resolution for the first training stage
+    "resolution_switch": 0.25,  # fraction of steps before returning to 32 pixels
     "crop_mode": "masked",  # "indexed" preserves channels-last with one gather
     "fused_sgd": False,
     "compile_loss": False,
@@ -49,12 +50,12 @@ DEFAULTS = {
     "gelu_approximate": "none",  # "tanh" uses a cheaper approximation
     "autotune_backends": "ATEN,TRITON",  # ATen/cuDNN and Inductor Triton candidates
     "pool_first": [False, False, False],  # move selected group pools before conv1
-    "scaling_factor": 1 / 9,
-    "bn_momentum": 0.6,
+    "scaling_factor": 1.25 / 9,  # logit scale (airbench uses 1/9)
+    "bn_momentum": 0.7,
     "ema_every": 5,  # lookahead EMA period in steps; 0 disables it
     "compile": "max-autotune",  # torch.compile mode; "" runs eagerly
-    # Accuracy-recovery and resizing switches (defaults reproduce the recipe above exactly).
-    "jitter": 0.0,  # per-image brightness/contrast jitter strength (own RNG, seeded per trial)
+    # Accuracy-recovery and resizing switches.
+    "jitter": 0.3,  # per-image brightness/contrast jitter strength (own RNG, seeded per trial)
     "low_res_compile": "default",  # torch.compile mode of the separate static low-res graph
     "count_nonfinite": False,  # count non-finite step losses on the GPU; train() prints the total
 }
