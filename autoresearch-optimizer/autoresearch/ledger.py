@@ -47,6 +47,8 @@ class Entry:
     elapsed: float = 0.0
     note: str = ""
     timestamp: float = field(default_factory=time.time)
+    generation: int | None = None      # swarm generation (None in single-agent mode)
+    usage: dict[str, Any] = field(default_factory=dict)   # agent cost_usd, num_turns, seconds, model, outcome
 
     def eval_result(self, split: str) -> EvalResult | None:
         d = self.evals.get(split)

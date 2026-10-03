@@ -62,17 +62,18 @@ def test_agent_run():
         assert seed_entry.confirmed is True and "confirm" in seed_entry.evals
         proposals = [
             (mp.SEED_DUPLICATE, "cosmetic rewrite of the seed", "tune"),
-            (mp.CONSENSUS_LOCAL_SEARCH, "consensus start + local search from 3 starts", "tune"),
+            (mp.CONSENSUS_LOCAL_SEARCH, "consensus start + full re-scoring local search", "tune"),
+            (mp.FAST_DESCENT, "steepest descent with incremental DP over sub/ins/del", "tune"),
             (mp.BROKEN, "syntax error", "fix_losers"),
         ]
         entries = [run.submit(src, hyp, mode, [run.archive().global_best.id], proposer="test")
                    for src, hyp, mode in proposals]
         statuses = [e.status for e in entries]
-        assert statuses[0] == STATUS_REJECTED_DUPLICATE, statuses  # cosmetic seed rewrite caught
-        assert statuses[1] == STATUS_KEPT, statuses  # consensus start improves
-        assert statuses[2] == STATUS_REJECTED_SCREEN, statuses  # syntax error caught
+        # duplicate caught; slow solver over the 1000 ms budget; fast solver kept; syntax error caught
+        assert statuses == [STATUS_REJECTED_DUPLICATE, "failed", STATUS_KEPT, STATUS_REJECTED_SCREEN], statuses
+        assert "over budget" in entries[1].note, entries[1].note
         assert all(e.verdict for e in entries), [e.verdict for e in entries]
-        assert entries[1].confirmed is True and entries[1].verdict == "supported"
+        assert entries[2].confirmed is True and entries[2].verdict == "supported"
         archive = Archive.build(run.entries(), run.problem.objective_split)
         assert archive.global_best is not None and archive.global_best.objective < seed_entry.objective
         assert len(archive.front) >= 1

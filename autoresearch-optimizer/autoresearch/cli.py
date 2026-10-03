@@ -73,6 +73,28 @@ def cmd_submit(args) -> None:
         print(format_diagnostics(EvalResult.from_dict(d), run.archive(), label=f"#{e.id} "))
 
 
+def cmd_try(args) -> None:
+    """Evaluate a solver file on one split and print diagnostics; never touches the ledger."""
+    from .guard import check_imports
+    from .problem import get_problem
+    from .prompts import format_diagnostics
+    from .sandbox import get_evaluate
+
+    store = RunStore(args.run)
+    cfg = store.config() if store.exists else {}
+    name = cfg.get("problem", "median_string")
+    budget = args.budget_ms or cfg.get("time_budget_ms", LoopConfig.time_budget_ms)
+    problem = get_problem(name)
+    source = Path(args.file).read_text()
+    violations = check_imports(source, problem.allowed_imports)
+    if violations:
+        sys.exit("disallowed in candidate: " + ", ".join(violations))
+    res = get_evaluate()(name, problem, source, args.split, budget)
+    print(format_diagnostics(res, label=f"try {args.file}: "))
+    print(f"(budget {budget} ms CPU per instance; cpu_ms per instance: "
+          + ", ".join(f"{i.name}={i.cpu_ms:g}" for i in res.instances) + ")")
+
+
 def cmd_report(args) -> None:
     run = _run(args)
     from .report import render
@@ -123,6 +145,12 @@ def main(argv=None) -> None:
     s.add_argument("--prompt-tokens", type=int, default=0)
     s.add_argument("--completion-tokens", type=int, default=0)
     s.set_defaults(fn=cmd_submit)
+
+    s = sub.add_parser("try", help="evaluate a solver file on one split without recording it")
+    s.add_argument("--file", required=True)
+    s.add_argument("--split", default="validate", choices=["screen", "validate"])
+    s.add_argument("--budget-ms", type=int, help="CPU budget per instance (default: the run's, else 1000)")
+    s.set_defaults(fn=cmd_try)
 
     s = sub.add_parser("report", help="render report.md (optionally with held-out evaluation)")
     s.add_argument("--holdout", action="store_true")

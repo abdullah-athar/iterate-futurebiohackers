@@ -62,6 +62,9 @@ def render(run: ResearchRun, holdout: bool = False, holdout_front: bool = False)
            (f"- proposals: {len(proposals)} ({len(evaluated)} evaluated, {dups} rejected by novelty gate, "
             f"{guarded} rejected by import guard — neither evaluated)"),
            f"- agent tokens: {tokens:,} (prompt {sum(e.prompt_tokens for e in proposals):,} / completion {sum(e.completion_tokens for e in proposals):,})"]
+    cost = sum(e.usage.get("cost_usd", 0.0) for e in proposals)
+    if cost:
+        out.append(f"- agent cost: ${cost:.2f} over {sum(1 for e in proposals if e.usage)} agent sessions")
     if seed and best and seed.scored:
         gain = seed.objective - best.objective
         out.append(f"- objective ({run.problem.objective_split} split, lower is better): seed {seed.objective:g} → best {best.objective:g} "

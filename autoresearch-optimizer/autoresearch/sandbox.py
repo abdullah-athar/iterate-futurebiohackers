@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,14 @@ from pathlib import Path
 from .problem import EvalResult, Problem
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def get_evaluate():
+    """Evaluation backend: local subprocess, or Modal when AUTORESEARCH_EVAL=modal."""
+    if os.environ.get("AUTORESEARCH_EVAL") == "modal":
+        from .modal_eval import remote_evaluate
+        return remote_evaluate
+    return evaluate_in_subprocess
 
 
 def load_solve_function(source: str):

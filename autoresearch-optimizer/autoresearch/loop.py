@@ -26,7 +26,7 @@ from .ledger import (
     Entry,
     RunStore,
 )
-from .novelty import check_novelty
+from .novelty import NoveltyVerdict, check_novelty
 from .problem import EvalResult, Problem, get_problem
 from .prompts import (
     MODES,
@@ -34,7 +34,29 @@ from .prompts import (
     format_diagnostics,
     format_digest,
 )
-from .sandbox import evaluate_in_subprocess
+from .sandbox import get_evaluate
+
+
+def evaluate_candidate(problem_name: str, source: str, budget_ms: int | None, evaluate=None) -> dict[str, dict]:
+    """Cascade: cheap splits first, stop when one fails or is worse than baseline; once the objective
+    split passes, also run the fresh-instance confirm split. Pure (no ledger access), so it runs
+    the same in agent mode and on remote workers. `evaluate(problem_name, problem, source, split,
+    budget_ms) -> EvalResult` defaults to `sandbox.get_evaluate()`."""
+    evaluate = evaluate or get_evaluate()
+    problem = get_problem(problem_name)
+    evals: dict[str, dict] = {}
+    for split in problem.splits:
+        if split == "holdout" or split == problem.confirm_split:
+            continue
+        res = evaluate(problem_name, problem, source, split, budget_ms)
+        evals[split] = res.to_dict()
+        if not res.ok or (split != problem.objective_split and res.score > res.baseline):
+            return evals
+        if split == problem.objective_split:
+            break
+    if problem.confirm_split:
+        evals[problem.confirm_split] = evaluate(problem_name, problem, source, problem.confirm_split, budget_ms).to_dict()
+    return evals
 
 
 @dataclass
@@ -61,7 +83,7 @@ class ResearchRun:
 
     # ----- lifecycle -------------------------------------------------------------------
     @classmethod
-    def create(cls, store: RunStore, config: LoopConfig, seed_source: str | None = None) -> ResearchRun:
+    def create(cls, store: RunStore, config: LoopConfig, seed_source: str | None = None, evaluate=None) -> ResearchRun:
         if store.exists:
             raise FileExistsError(f"run already exists at {store.root}")
         store.create(config.to_dict())
@@ -70,10 +92,11 @@ class ResearchRun:
         entry = Entry(id=0, parent_ids=[], mode="seed", hypothesis="Seed solver (starting point)", status=STATUS_SEED,
                       proposer="seed")
         entry.source_path = store.write_candidate(0, source)
-        run._cascade(entry, source)
+        entry.evals = evaluate_candidate(run.problem_name, source, config.time_budget_ms, evaluate)
+        run._apply_cascade(entry)
         if entry.scored:
             entry.improved_global = True
-            entry.confirmed = run._confirm(entry, source)
+            entry.confirmed = run._confirmed(entry, None)
         store.append(entry)
         return run
 
@@ -141,38 +164,52 @@ class ResearchRun:
         return Context(mode=mode, parents=parents, parent_sources=[self.store.read_candidate(p) for p in parents],
                        diagnostics=diag, digest=format_digest(entries), rejection_note=rejection_note, extra=extra)
 
-    # ----- submission: novelty gate -> cascade -> archive update -> ledger ---------------------
+    # ----- submission: guard + novelty gate -> evaluation -> archive update -> ledger -----------------
     def submit(self, source: str, hypothesis: str, mode: str, parent_ids: list[int], proposer: str = "agent",
-               prompt_tokens: int = 0, completion_tokens: int = 0) -> Entry:
+               prompt_tokens: int = 0, completion_tokens: int = 0, evaluate=None) -> Entry:
+        """Agent mode: check, evaluate and record one candidate (single process)."""
         t0 = time.perf_counter()
-        entries = self.entries()
-        archive = self.archive(entries)
+        pre = self.precheck(source)
+        evals = {} if pre[0] or pre[1].is_duplicate else evaluate_candidate(
+            self.problem_name, source, self.config.time_budget_ms, evaluate)
+        return self.record(source, hypothesis, mode, parent_ids, proposer, evals, pre,
+                           elapsed=time.perf_counter() - t0, prompt_tokens=prompt_tokens,
+                           completion_tokens=completion_tokens)
+
+    def precheck(self, source: str, extra_prior: list[tuple[int, str]] = ()) -> tuple[list[str], NoveltyVerdict]:
+        """Import guard + novelty gate against every recorded candidate (and `extra_prior`)."""
+        violations = check_imports(source, self.problem.allowed_imports)
+        prior = [(e.id, self.store.read_candidate(e)) for e in self.entries() if e.source_path]
+        return violations, check_novelty(source, prior + list(extra_prior), self.config.novelty_threshold)
+
+    def record(self, source: str, hypothesis: str, mode: str, parent_ids: list[int], proposer: str,
+               evals: dict[str, dict], pre: tuple[list[str], NoveltyVerdict], **fields) -> Entry:
+        """Turn precheck + evaluation results into a ledger entry. The only place proposals are written."""
+        archive = self.archive()
         cid = self.store.next_id()
         entry = Entry(id=cid, parent_ids=parent_ids, mode=mode, hypothesis=hypothesis, status="pending",
-                      proposer=proposer, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
+                      proposer=proposer, **fields)
         entry.source_path = self.store.write_candidate(cid, source)
-
-        violations = check_imports(source, self.problem.allowed_imports)
-        prior = [(e.id, self.store.read_candidate(e)) for e in entries if e.source_path]
-        verdict = check_novelty(source, prior, self.config.novelty_threshold)
-        entry.novelty = verdict.to_dict()
+        violations, novelty = pre
+        entry.novelty = novelty.to_dict()
         if violations:
             entry.status = STATUS_REJECTED_GUARD
             entry.verdict = VERDICT_UNTESTED
             entry.note = "disallowed in candidate: " + ", ".join(violations) + "; not evaluated"
-        elif verdict.is_duplicate:
+        elif novelty.is_duplicate:
             entry.status = STATUS_REJECTED_DUPLICATE
             entry.verdict = VERDICT_UNTESTED
-            entry.note = f"near-duplicate of #{verdict.nearest_id} (similarity {verdict.max_similarity:.3f}); not evaluated"
+            entry.note = f"near-duplicate of #{novelty.nearest_id} (similarity {novelty.max_similarity:.3f}); not evaluated"
         else:
-            self._cascade(entry, source)
+            entry.evals = evals
+            self._apply_cascade(entry)
             if entry.scored:
                 improved_global, improved_instances = archive.improvement_of(entry)
                 best = archive.global_best.objective
                 entry.note = (f"objective {entry.objective:g} vs best {best:g} "
                               f"({100 * (best - entry.objective) / max(best, 1):+.1f}%)")
                 if improved_global:
-                    entry.confirmed = self._confirm(entry, source, incumbent=archive.global_best)
+                    entry.confirmed = self._confirmed(entry, archive.global_best)
                     if entry.confirmed is False:
                         improved_global = False
                         inc = archive.global_best.eval_result(self.problem.confirm_split)
@@ -192,17 +229,15 @@ class ResearchRun:
                     entry.verdict = VERDICT_FALSIFIED
             else:
                 entry.verdict = VERDICT_INCONCLUSIVE
-        entry.elapsed = time.perf_counter() - t0
         self.store.append(entry)
         return entry
 
-    def _cascade(self, entry: Entry, source: str) -> None:
-        """Evaluate split by split; stop early when a split fails or is worse than baseline."""
+    def _apply_cascade(self, entry: Entry) -> None:
+        """Set objective/status from the cascade evals (see `evaluate_candidate`)."""
         for split in self.problem.splits:
-            if split == "holdout" or split == self.problem.confirm_split:
+            if split == "holdout" or split == self.problem.confirm_split or split not in entry.evals:
                 continue
-            res = evaluate_in_subprocess(self.problem_name, self.problem, source, split, self.config.time_budget_ms)
-            entry.evals[split] = res.to_dict()
+            res = entry.eval_result(split)
             if not res.ok:
                 entry.status = STATUS_FAILED if split == self.problem.objective_split else STATUS_REJECTED_SCREEN
                 entry.objective = float("inf")
@@ -217,22 +252,21 @@ class ResearchRun:
                 entry.objective = res.score
                 return
 
-    def _confirm(self, entry: Entry, source: str, incumbent: Entry | None = None) -> bool | None:
-        """Re-test a claimed new global best on fresh instances: confirmed unless it scores worse there."""
+    def _confirmed(self, entry: Entry, incumbent: Entry | None) -> bool | None:
+        """A claimed new global best is confirmed unless it scores worse than the incumbent on fresh instances."""
         split = self.problem.confirm_split
         if not split:
             return None
-        res = evaluate_in_subprocess(self.problem_name, self.problem, source, split, self.config.time_budget_ms)
-        entry.evals[split] = res.to_dict()
-        if not res.ok:
+        res = entry.eval_result(split)
+        if res is None or not res.ok:
             return False
         ref = incumbent.eval_result(split) if incumbent else None
         # a tie on fresh instances is not evidence of overfitting; only a regression refutes the gain
         return ref is None or not ref.ok or res.score <= ref.score
 
     def evaluate_holdout(self, entry: Entry) -> EvalResult:
-        return evaluate_in_subprocess(self.problem_name, self.problem, self.store.read_candidate(entry), "holdout",
-                                      self.config.time_budget_ms)
+        return get_evaluate()(self.problem_name, self.problem, self.store.read_candidate(entry), "holdout",
+                              self.config.time_budget_ms)
 
     @staticmethod
     def describe_entry(e: Entry) -> str:
