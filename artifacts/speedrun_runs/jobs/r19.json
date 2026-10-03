@@ -1,0 +1,318 @@
+{
+  "round": "r19",
+  "n": 8,
+  "seed": 0,
+  "control": {
+    "resolution_schedule": [
+      [
+        24,
+        0.5
+      ]
+    ],
+    "epochs": 9.5
+  },
+  "jobs": [
+    {
+      "name": "k19-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "warmup0.15",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "warmup": 0.15
+          },
+          "hypothesis": "shorter lr warmup on the 24 px half schedule"
+        },
+        {
+          "label": "warmup0.3",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "warmup": 0.3
+          },
+          "hypothesis": "longer lr warmup"
+        },
+        {
+          "label": "final0.03",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "final_lr": 0.03
+          },
+          "hypothesis": "deeper final lr decay"
+        }
+      ]
+    },
+    {
+      "name": "k19-b",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "final0.15",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "final_lr": 0.15
+          },
+          "hypothesis": "shallower final lr decay"
+        },
+        {
+          "label": "ema4",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "ema_every": 4
+          },
+          "hypothesis": "lookahead every 4 steps (same per-event decay)"
+        },
+        {
+          "label": "ema8",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "ema_every": 8
+          },
+          "hypothesis": "lookahead every 8 steps"
+        }
+      ]
+    },
+    {
+      "name": "k19-c",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "ls0.2",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "label_smoothing": 0.2
+          },
+          "hypothesis": "label smoothing 0.2 (untested on this recipe)"
+        },
+        {
+          "label": "translate1",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "translate": 1
+          },
+          "hypothesis": "1-pixel translation: weaker augmentation for the short schedule"
+        },
+        {
+          "label": "translate3",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "translate": 3
+          },
+          "hypothesis": "3-pixel translation"
+        }
+      ]
+    },
+    {
+      "name": "k19-d",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "wd0.012",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "weight_decay": 0.012
+          },
+          "hypothesis": "weight decay x0.7 (x1.4 was flat; try the other direction)"
+        },
+        {
+          "label": "lr10.3",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "lr": 10.3
+          },
+          "hypothesis": "lr x0.9: the long 24 px phase may prefer a lower lr (higher was -0.2 pp)"
+        },
+        {
+          "label": "scale1.5",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "scaling_factor": 0.16666666666666666
+          },
+          "hypothesis": "logit scale 1.5/9 (untested here)"
+        }
+      ]
+    },
+    {
+      "name": "k19-e",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "whiten5",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "whiten_bias_epochs": 5
+          },
+          "hypothesis": "whitening bias trains 5 epochs (1 lost 0.08 pt in the README)"
+        },
+        {
+          "label": "jitter0.1",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "color_jitter": [
+              0.1,
+              0.1
+            ]
+          },
+          "hypothesis": "weaker brightness/contrast jitter"
+        },
+        {
+          "label": "cutout4",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "cutout": 4
+          },
+          "hypothesis": "cutout 4 px (likely negative on a 9.5-epoch schedule; closes the question)"
+        }
+      ]
+    },
+    {
+      "name": "k19-f",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "bsched512",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "batch_schedule": [
+              [
+                512,
+                0.5
+              ]
+            ]
+          },
+          "hypothesis": "batch 512 during the 24 px half (more, cheaper updates early), 1024 after; lr unchanged (sum loss)"
+        },
+        {
+          "label": "bsched512-lr14",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "batch_schedule": [
+              [
+                512,
+                0.5
+              ]
+            ],
+            "lr": 14.0
+          },
+          "hypothesis": "batch 512 during the 24 px half with lr 14"
+        },
+        {
+          "label": "aten-only",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "autotune_backends": "ATEN"
+          },
+          "hypothesis": "ATen/cuDNN-only autotuning: shorter cold build (measured separately), train-time cost read here"
+        }
+      ]
+    }
+  ]
+}
