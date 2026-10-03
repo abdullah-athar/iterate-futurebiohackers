@@ -1,54 +1,73 @@
 # futurebiohackers: faster CIFAR-100 training
 
-This is a convolutional image classifier based on Keller Jordan's
+A convolutional image classifier based on Keller Jordan's
 [airbench](https://github.com/KellerJordan/cifar10-airbench), trained from scratch.
-The selected model uses three convolution blocks with 96, 256 and 768 channels.
-It makes the first two blocks smaller, where images are largest and processing is
-expensive, and gives the final block more capacity to distinguish the 100 classes.
+Three convolution groups with 128, 256 and 768 channels; the first group has two
+convolutions, the others three with a residual connection. Training runs for
+8.25 epochs at batch 1024 with Nesterov SGD (lr 11.5, weight decay 0.017 per 1024
+examples), label smoothing 0.3, BatchNorm momentum 0.5 and a lookahead weight
+average. Normalization and patch whitening of the training images run inside the
+timer.
 
-Training uses 9.5 epochs, batches of 1024 images, half precision, channels-last
-memory layout, Nesterov SGD and label smoothing. A moving average stabilizes the
-weights. Training-image normalization and patch whitening happen inside the timer.
-The final spatial pooling now covers the whole feature map, so experimental
-smaller-crop training also works.
+Implementation details that change the time but not the model:
+
+- BatchNorm runs in fp16 like the rest of the network (`bn_dtype: "half"`).
+- The forward pass and loss compile as one graph (`compile_step`), with static
+  shapes so no recompilation happens inside a trial.
+- Random crops use one gather per epoch (`crop_mode: "indexed"`) instead of 25
+  masked copies, which also avoids host syncs.
+- The final global pool is `max(dim).values`. `adaptive_max_pool2d` backward uses
+  an atomic kernel (about 0.3 s per trial in the profile), and `amax` trains to
+  NaN under `torch.compile` in torch 2.4.
 
 ## Development results
 
-All **40 fresh trials** of the selected 9.5-epoch recipe completed successfully:
+40 random seeds (drawn like the organizer seed file), both recipes back to back
+in one Modal A100-SXM4-80GB container, 75% target enforced:
 
-| Recipe | Trials | Mean accuracy | Mean preparation + training |
-| --- | ---: | ---: | ---: |
-| Original 128/384/576 model, 8.5 epochs | 3 | 75.480% | 7.458 s |
-| Selected 96/256/768 model, 9.5 epochs | 40 | 75.2495% | 6.859 s |
+| Recipe | Mean accuracy | Mean preparation + training | Qualified |
+| --- | ---: | ---: | --- |
+| This recipe | 75.094% (sd 0.25) | 5.627 s (sd 0.015) | yes |
+| PR #9 defaults | 75.169% (sd 0.24) | 5.816 s (sd 0.016) | yes |
 
-Both runs shared one Modal A100 SXM allocation. The selected recipe was **8.0%
-faster** than the paired control. Its accuracy standard deviation was 0.264
-percentage points, and its time standard deviation was 0.029 seconds. The new
-recipe used seeds 20000–20039; the control used the first three of those seeds.
-No trials were discarded. This is development validation; official judging still
-requires an A100 80GB PCIe and the organizer's private 40 seeds.
+This recipe is 3.2% faster than PR #9 on the same GPU and seeds. Its accuracy
+margin is thin: across all 65 trials run so far it averages about 75.12%, so a
+different 40-seed draw falls below 75% with an estimated 2-3% probability.
+Official judging uses an A100 80GB PCIe (300 W), which will be slower than these
+SXM (400 W) timings.
 
-The under-three-second target has not been reached. The original recipe in PR #3
-previously reached 75.29% in 8.11 s across 40 trials on another Modal allocation.
-
-The 8.5-epoch version of the new architecture initially looked promising over
-three trials, but a fresh 40-trial run averaged 74.902% in 5.772 s and missed the
-accuracy gate. Extending training to 9.5 epochs recovered the accuracy margin.
-The failed check remains in the experiment log.
-
-Run the selected defaults from the repository root with `just modal 40`.
-The successful 40-trial result is `20261003T155840Z-bee7f356`; its paired control
-is `20261003T155703Z-6e4f0e48`.
+Run the defaults from the repository root with `just modal 40`.
 
 ## Experiments and progress
+
+Tested in same-GPU comparisons against a control (4-10 trials each) and left off
+by default:
+
+| Option | Result |
+| --- | --- |
+| `fused_sgd: true` | 1.6% faster at equal accuracy (5 trials); 40-seed check pending |
+| `resolution_schedule: [[28, 0.5]]` | 28 px for the first half: about 3% better than cutting epochs |
+| `widths: [64, 256, 768]`, depths 3, 9 epochs | 8.4% faster than PR #9 at -0.06 pt (5 trials) |
+| `inductor_tuning` | coordinate-descent tuning: 0.5% faster, within noise |
+| `optimizer: "muon"` (hiverge-style, batched) | 3.5 points less accurate at 8 epochs |
+| `activation: "silu"` | 2% faster, 0.4 points less accurate |
+| `color_jitter` | no accuracy gain on CIFAR-100 |
+| `stem: "patch4s2"` (4x4 stride-2 whitening) | 2-3 points less accurate |
+| `inner_kernels: [3, 3, 1]` (1x1 convs in group 3) | 1.9 points less accurate |
+| `bn_recal_batches` | no gain |
+| `ema_every: 0` | 0.6 points less accurate |
+
+Per-layer cuDNN throughput at batch 1024 ranges from 23-34% of A100 fp16 peak for
+the first 31x31 convolution to 78-89% for the 768-channel convolutions at 3x3.
+Convolutions are about 65% of GPU time and Inductor's BatchNorm/activation kernels
+about 22%.
 
 `--params` exposes smaller early crops (24 or 28 pixels followed by 32), different
 block widths/depths, proxy-based hard-example selection, alternative pooling and
 optimizer settings, and an optional Triton crop/flip kernel. These experiments are
-turned off in the selected defaults. The 28px, nine-epoch candidate missed
-the target over five fresh trials; proxy selection and fused optimizer settings
-also failed to improve the qualifying result. The unsuccessful experimental
-BN/GELU fusion was excluded from the submitted source.
+turned off in the selected defaults. In PR #5's tests, proxy-based selection did
+not improve the qualifying result, and the unsuccessful experimental BN/GELU
+fusion was excluded from the submitted source.
 
 `scripts/modal_experiments.py` runs bounded comparisons through the unchanged
 competition harness and reserves spending against a $50 cap.
