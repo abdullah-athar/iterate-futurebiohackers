@@ -1,0 +1,28 @@
+{
+  "returncode": 0,
+  "wall_seconds": 515.9,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T210617Z-7f3d046b",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 40 --seed 40 --params '{\"count_nonfinite\": true}'",
+  "spec": {
+    "label": "ref-main-seeds40",
+    "n": 40,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "40",
+      "--seed",
+      "40",
+      "--params",
+      "{\"count_nonfinite\": true}"
+    ],
+    "params": "{\"count_nonfinite\": true}",
+    "delta": {
+      "count_nonfinite": true
+    },
+    "config": "futurebiohackers --n 40 --seed 40"
+  },
+  "nonfinite": 0,
+  "build_mode": "cold"
+}
