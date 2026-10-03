@@ -32,6 +32,19 @@ submitted recipe.
 
 ### Current defaults (stacked on the accuracy-recovery recipe)
 
+Latest defaults add `fused_sgd: true` and `crop_mode: "indexed"`. Paired 40-trial runs with
+random seed starts on HF `a100-large`, against the previous defaults (first table below):
+
+| Seed start | Latest defaults | Previous defaults | + 8.0 ep, LS 0.2, warmup 0.18 (rejected) |
+| --- | ---: | ---: | ---: |
+| 858286965 | 75.23% in 4.944 s | 75.24% in 5.119 s | 75.09% in 4.790 s |
+| 336260690 | 75.26% in 5.018 s | 75.25% in 5.196 s | 75.02% in 4.869 s |
+
+About 0.18 s faster at equal accuracy. The 8-epoch variant is a further ~0.15 s but its
+margin over 75% is too thin to ship.
+
+Previous defaults (before fused SGD and indexed crop):
+
 Paired 40-trial runs with random seed starts, same Hugging Face Jobs container
 (`a100-large`, A100-SXM4-80GB), current defaults against the accuracy-recovery recipe below
 (`scripts/hf_ab.sh`). The HF card is faster than Modal's, so compare rows within a job only.

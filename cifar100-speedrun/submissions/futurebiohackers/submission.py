@@ -40,8 +40,8 @@ DEFAULTS = {
     "depths": [2, 3, 3],  # per-group convs; None uses depth for every group
     "train_resolution": 24,  # reduced resolution for the first training stage
     "resolution_switch": 0.25,  # fraction of steps before returning to 32 pixels
-    "crop_mode": "masked",  # "indexed" preserves channels-last with one gather
-    "fused_sgd": False,
+    "crop_mode": "indexed",  # "indexed" preserves channels-last with one gather
+    "fused_sgd": True,
     "compile_loss": True,
     "hard_fraction": 1.0,  # <1 enables a freshly trained small proxy
     "proxy_widths": [32, 64, 128],
