@@ -81,6 +81,8 @@ VARIANTS = {
     "compile_loss_cpu": {"compile_loss": True},
     "pool_first": {"pool_first": [False, False, True]},
     "gelu_tanh": {"gelu_approximate": "tanh"},
+    "depth2_residual": {"depths": [2, 2, 2], "depth2_residual": True},
+    "depth2_residual_mixed": {"depths": [2, 3, 2], "depth2_residual": True},
 }
 results: list[bool] = []
 

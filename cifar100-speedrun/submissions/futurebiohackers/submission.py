@@ -50,6 +50,7 @@ DEFAULTS = {
     "gelu_approximate": "none",  # "tanh" uses a cheaper approximation
     "autotune_backends": "ATEN,TRITON",  # ATen/cuDNN and Inductor Triton candidates
     "pool_first": [False, False, False],  # move selected group pools before conv1
+    "depth2_residual": False,  # depth-2 groups keep a skip connection over their second conv
     "scaling_factor": 1.25 / 9,  # logit scale (airbench uses 1/9)
     "bn_momentum": 0.7,
     "ema_every": 5,  # lookahead EMA period in steps; 0 disables it
@@ -104,7 +105,16 @@ class Conv(nn.Conv2d):
 
 
 class ConvGroup(nn.Module):
-    def __init__(self, channels_in, channels_out, depth, bn_momentum, gelu_approximate, pool_first):
+    def __init__(
+        self,
+        channels_in,
+        channels_out,
+        depth,
+        bn_momentum,
+        gelu_approximate,
+        pool_first,
+        depth2_residual=False,
+    ):
         super().__init__()
         self.conv1 = Conv(channels_in, channels_out)
         self.pool = nn.MaxPool2d(2)
@@ -115,12 +125,14 @@ class ConvGroup(nn.Module):
         self.conv3 = Conv(channels_out, channels_out) if depth == 3 else None
         self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
         self.approximate = gelu_approximate
+        self.depth2_residual = depth2_residual  # depth 2: skip connection over conv2
 
     def forward(self, x):
         x = self.conv1(self.pool(x)) if self.pool_first else self.pool(self.conv1(x))
         x = self.norm1.activate(x, self.approximate)
         if self.conv3 is None:
-            return self.norm2.activate(self.conv2(x), self.approximate)
+            residual = x if self.depth2_residual else None
+            return self.norm2.activate(self.conv2(x), self.approximate, residual)
         x0 = x
         x = self.norm2.activate(self.conv2(x), self.approximate)
         return self.norm3.activate(self.conv3(x), self.approximate, x0)
@@ -134,16 +146,17 @@ class Net(nn.Module):
         bn_momentum = hyp["bn_momentum"]
         self.whiten = nn.Conv2d(3, 24, kernel_size=2, padding=0, bias=True)
         self.whiten.weight.requires_grad = False
+        skip = hyp["depth2_residual"]
         self.layers = nn.Sequential(
             nn.GELU(approximate=hyp["gelu_approximate"]),
             ConvGroup(
-                24, w1, depths[0], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][0]
+                24, w1, depths[0], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][0], skip
             ),
             ConvGroup(
-                w1, w2, depths[1], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][1]
+                w1, w2, depths[1], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][1], skip
             ),
             ConvGroup(
-                w2, w3, depths[2], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][2]
+                w2, w3, depths[2], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][2], skip
             ),
             nn.AdaptiveMaxPool2d(1),
         )
@@ -351,6 +364,8 @@ def build(context: BuildContext):
         raise ValueError("gelu_approximate must be none or tanh")
     if hyp["autotune_backends"] not in ("ATEN", "TRITON", "ATEN,TRITON"):
         raise ValueError("autotune_backends must be ATEN, TRITON, or ATEN,TRITON")
+    if type(hyp["depth2_residual"]) is not bool:
+        raise ValueError("depth2_residual must be a boolean")
     if len(hyp["pool_first"]) != 3 or any(type(v) is not bool for v in hyp["pool_first"]):
         raise ValueError("pool_first must contain three booleans")
     if hyp["jitter"] < 0:
