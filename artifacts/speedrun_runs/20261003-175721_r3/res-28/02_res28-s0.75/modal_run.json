@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 97.1,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T170235Z-7e63f788",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 8.5, \"resolution_switch\": 0.75, \"train_resolution\": 28}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "res28-s0.75",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 8.5, \"resolution_switch\": 0.75, \"train_resolution\": 28}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 8.5, \"resolution_switch\": 0.75, \"train_resolution\": 28}",
+    "delta": {
+      "train_resolution": 28,
+      "resolution_switch": 0.75
+    },
+    "hypothesis": "28 px for three quarters",
+    "config": "futurebiohackers {\"resolution_switch\": 0.75, \"train_resolution\": 28}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

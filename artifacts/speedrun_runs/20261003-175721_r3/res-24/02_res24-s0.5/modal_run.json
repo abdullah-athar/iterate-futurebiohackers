@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 83.8,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T170243Z-484c0e06",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 8.5, \"resolution_switch\": 0.5, \"train_resolution\": 24}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "res24-s0.5",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 8.5, \"resolution_switch\": 0.5, \"train_resolution\": 24}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 8.5, \"resolution_switch\": 0.5, \"train_resolution\": 24}",
+    "delta": {
+      "train_resolution": 24,
+      "resolution_switch": 0.5
+    },
+    "hypothesis": "24 px for the first half (his 28 px/9 epochs attempt missed the target over 5 trials)",
+    "config": "futurebiohackers {\"resolution_switch\": 0.5, \"train_resolution\": 24}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

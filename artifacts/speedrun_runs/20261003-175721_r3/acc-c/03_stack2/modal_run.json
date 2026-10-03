@@ -1,0 +1,32 @@
+{
+  "returncode": 0,
+  "wall_seconds": 77.4,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T170315Z-7f3fa9f0",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"bias_scaler\": 32.0, \"count_nonfinite\": true, \"epochs\": 8.5, \"label_smoothing\": 0.25}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "stack2",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"bias_scaler\": 32.0, \"count_nonfinite\": true, \"epochs\": 8.5, \"label_smoothing\": 0.25}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"bias_scaler\": 32.0, \"count_nonfinite\": true, \"epochs\": 8.5, \"label_smoothing\": 0.25}",
+    "delta": {
+      "bias_scaler": 32.0,
+      "label_smoothing": 0.25
+    },
+    "hypothesis": "the two strongest gainers together: additivity test",
+    "config": "futurebiohackers {\"bias_scaler\": 32.0, \"label_smoothing\": 0.25}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

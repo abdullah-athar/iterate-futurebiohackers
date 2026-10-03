@@ -987,6 +987,12 @@ def _job_specs(job: dict, cfg: dict) -> list[dict]:
     labels = [s["label"] for s in specs]
     if len(set(labels)) != len(labels):
         raise RuntimeError(f"{name}: variant labels must be unique: {labels}")
+    # Later runs in a container are 0.05-0.1 s slower (the card heats up), so a job may put the
+    # control in the middle ("control_index": 1) instead of first.
+    position = int(job.get("control_index", 0))
+    if job.get("control", True) and 0 < position < len(specs):
+        control = specs.pop(0)
+        specs.insert(position, control)
     return specs
 
 
@@ -1025,7 +1031,7 @@ def _finish_job(job: dict, cfg: dict, payload: dict) -> dict:
             continue
         _save_run(run, sub)
         rows.append(_stats(run, sub, payload["environment"]))
-    control = rows[0] if rows and rows[0]["label"] == "control" else None
+    control = next((row for row in rows if row["label"] == "control"), None)
     for row in rows:
         if control is not None and row is not control:
             row["paired"] = _paired(control, row)
