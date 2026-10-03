@@ -114,8 +114,14 @@ class Conv(nn.Conv2d):
 
     def reset_parameters(self):
         super().reset_parameters()
+        # Same result as nn.init.dirac_(w[:cin]) without its per-channel Python loop
+        # (one kernel launch per channel, about 60 ms per reset across the network).
         w = self.weight.data
-        nn.init.dirac_(w[: w.size(1)])
+        cin, (kh, kw) = w.size(1), w.shape[2:]
+        n = min(w.size(0), cin)
+        w[:cin].zero_()
+        idx = torch.arange(n, device=w.device)
+        w[idx, idx, kh // 2, kw // 2] = 1
 
 
 class ConvGroup(nn.Module):
@@ -450,10 +456,18 @@ def build(context: BuildContext):
     if compiled and hyp["compile_step"]:
         forward_loss = torch.compile(forward_loss, mode=hyp["compile"], dynamic=False)
     float_state = [t for t in net.state_dict().values() if t.is_floating_point()]
+    # Bilinear 32 -> r resize as two matmuls (A x A^T); F.interpolate on 50k fp16
+    # channels-last images takes about 65 ms, the matmuls about 2 ms.
+    resize = {}
+    for resolution, _ in hyp["resolution_schedule"]:
+        eye = torch.eye(32).view(1, 1, 32, 32)
+        matrix = F.interpolate(eye, size=(resolution, 32), mode="bilinear", align_corners=False)
+        resize[resolution] = matrix[0, 0].to(device, dtype)
     state = SimpleNamespace(
         hyp=hyp,
         device=device,
         dtype=dtype,
+        resize=resize,
         net=net,
         train_net=train_net,
         loss_fn=loss_fn,
@@ -533,7 +547,8 @@ def prepare(state, data: TrainingData, seed: int) -> None:
     images = batch_flip_lr(images)
     state.small_images = {}
     for resolution, _ in hyp["resolution_schedule"]:
-        small = F.interpolate(images, size=(resolution,) * 2, mode="bilinear", align_corners=False)
+        matrix = state.resize[resolution]
+        small = torch.matmul(torch.matmul(matrix, images), matrix.T)
         if hyp["translate"]:
             small = F.pad(small, (hyp["translate"],) * 4, "reflect")
         state.small_images[resolution] = small.to(memory_format=torch.channels_last)
