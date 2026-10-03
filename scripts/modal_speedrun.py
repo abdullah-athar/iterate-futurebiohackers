@@ -68,6 +68,7 @@ import socket
 import statistics
 import subprocess
 import sys
+import tarfile
 import tempfile
 import threading
 import time
@@ -91,6 +92,8 @@ REMOTE_PROFILER = "/root/profile_recipe.py"
 DATA_ROOT = "/data"
 RESULTS_ROOT = "/results"
 CACHE_ROOT = "/cache"  # Volume with the warm torch.compile caches
+CACHE_TAR = f"{CACHE_ROOT}/inductor.tar.gz"  # the whole cache as ONE file (see _warm_cache_start)
+CACHE_TAR_MAX_BYTES = 2_500_000_000
 LOCAL_CACHE = "/root/inductor-cache"  # per-container copy of the warm cache
 TEAM = os.environ.get("TEAM", "futurebiohackers")
 GPU = os.environ.get("MODAL_GPU", "A100-80GB") or None  # empty: CPU-only
@@ -244,31 +247,50 @@ def _ensure_data() -> None:
 
 
 def _warm_cache_start() -> None:
-    """Copy the shared compile cache into the container (local disk is faster than the Volume)."""
-    source, local = Path(CACHE_ROOT) / "inductor", Path(LOCAL_CACHE)
+    """Unpack the shared compile cache (ONE tarball in the Volume) onto local disk.
+
+    The cache holds tens of thousands of small Triton files; copying them one by one from a
+    Modal Volume took longer than the training runs, so the Volume keeps a single tar.gz.
+    """
+    local = Path(LOCAL_CACHE)
     local.mkdir(parents=True, exist_ok=True)
-    count = 0
-    if source.is_dir():
-        shutil.copytree(source, local, dirs_exist_ok=True)
-        count = sum(1 for p in local.rglob("*") if p.is_file())
-    print(f"warm cache: {count} files copied from the Volume", flush=True)
+    tar_path = Path(CACHE_TAR)
+    if not tar_path.exists():
+        print("warm cache: Volume has no tarball yet (cold start)", flush=True)
+        return
+    started = time.time()
+    try:
+        with tarfile.open(tar_path, "r:gz") as tar:
+            tar.extractall(local, filter="data")
+        print(
+            f"warm cache: {tar_path.stat().st_size / 1e6:.0f} MB tarball extracted in "
+            f"{time.time() - started:.1f} s",
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001 - a cache problem must never block a run
+        print(f"warm cache: extraction failed ({exc}); building cold", flush=True)
 
 
 def _warm_cache_commit() -> None:
-    """Merge new cache files back into the Volume (content-addressed files, last writer wins)."""
-    source, local = Path(CACHE_ROOT) / "inductor", Path(LOCAL_CACHE)
-    added = 0
+    """Pack the local cache into one tarball and replace the Volume's copy (last writer wins)."""
+    started = time.time()
+    tmp = "/root/inductor-cache.tar.gz"
     try:
-        for path in local.rglob("*"):
-            if not path.is_file():
-                continue
-            target = source / path.relative_to(local)
-            if not target.exists():
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(path, target)
-                added += 1
+        with tarfile.open(tmp, "w:gz", compresslevel=1) as tar:
+            tar.add(LOCAL_CACHE, arcname=".")
+        size = os.path.getsize(tmp)
+        if size > CACHE_TAR_MAX_BYTES:
+            print(
+                f"warm cache: {size / 1e6:.0f} MB tarball over the cap; not committed", flush=True
+            )
+            return
+        Path(CACHE_TAR).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(tmp, CACHE_TAR)
         cache.commit()
-        print(f"warm cache: {added} new files committed to the Volume", flush=True)
+        print(
+            f"warm cache: {size / 1e6:.0f} MB tarball committed in {time.time() - started:.1f} s",
+            flush=True,
+        )
     except Exception as exc:  # noqa: BLE001 - a cache problem must never lose results
         print(f"warm cache: commit failed ({exc}); results are unaffected", flush=True)
 
