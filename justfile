@@ -31,6 +31,11 @@ run n="1" *args:
 diag n="1" *args:
     shift; uv run python -m benchmark.run --submission {{team}} --n {{n}} --no-accuracy-target "$@"
 
+# Like run, but on a Modal A100-80GB from your laptop: just modal 3 --params '{"epochs": 10}'
+[positional-arguments]
+modal n="1" *args:
+    shift; TEAM={{team}} uv run --project .. modal run ../scripts/modal_speedrun.py --n {{n}} "$@"
+
 # Show the most recent run summary
 last:
     cat "$(ls -d results/{{team}}/*/ | tail -1)summary.json"
