@@ -19,6 +19,16 @@ Working folders: `scripts/` for experiments, `notebooks/` for exploration, `data
 
 We are competing in the [CIFAR-100 speedrun](https://github.com/AIDDA-Institute/CIFAR-100-speedrun): reach 75% mean test accuracy in the lowest preparation + training time on an A100. The organizer repo lives in `cifar100-speedrun/` as a git subtree; read its `README.md` and `RULES.md`. Our recipe is `cifar100-speedrun/submissions/futurebiohackers/submission.py`.
 
+Our recipe adapts [airbench](https://github.com/KellerJordan/cifar10-airbench) to CIFAR-100. Over 40 trials on a Modal A100-SXM4-80GB it averaged **75.29%** accuracy in **8.11 s** of prepare + train time. The organizer baseline is 75.36% in 59.30 s. The architecture, hyperparameters and results table are in `cifar100-speedrun/submissions/futurebiohackers/README.md`. The defaults in `submission.py` are the recipe we plan to submit. To experiment, override them with `--params`.
+
+| Config | Accuracy | Time |
+|---|---:|---:|
+| Submitted defaults: 8.5 epochs, widths 128/384/576 | 75.48% | 8.11 s |
+| `{"epochs": 9}` | 75.61% | 8.58 s |
+| `{"epochs": 8, "widths": [128, 384, 768]}` | 75.62% | 8.40 s |
+
+The table rows are 8 trials each, all run on the same GPU. Use the `{"epochs": 9}` setting if we need more accuracy margin.
+
 Commands run through [just](https://just.systems) (`uv tool install rust-just`) from the repo root. On the GPU machine:
 
 ```sh
@@ -39,12 +49,15 @@ No GPU machine needed: `just modal` runs the same harness on a [Modal](https://m
 ```sh
 just modal                                  # one trial
 just modal 3 --params '{"epochs": 10}'      # same flags as just run
+just modal 40                               # full official-style run with the 75% target
 just last                                   # results are copied back locally
 ```
 
+Modal needs a payment method on the workspace before it will start any GPU function, even when credits cover the cost. Modal's `A100-80GB` is the SXM part (400 W), but official judging uses the A100 80GB PCIe (300 W), so official times will probably be slower than our Modal times. Set `MODAL_GPU` to pick another GPU type. An empty `MODAL_GPU` runs on CPU only.
+
 CIFAR-100 is cached in the `cifar100-data` volume. Every run is also kept in the `cifar100-results` volume, so after a dropped connection you can fetch results with `uv run modal volume get --force cifar100-results futurebiohackers/ cifar100-speedrun/results/`. Script: `scripts/modal_speedrun.py`.
 
-To submit, fork the upstream repo and open a PR that adds only `submissions/futurebiohackers/`.
+We have not submitted yet. To submit, fork the upstream repo and open a PR that adds only `submissions/futurebiohackers/`.
 
 ## Science skills
 
