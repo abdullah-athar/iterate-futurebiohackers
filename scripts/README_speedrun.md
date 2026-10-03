@@ -68,7 +68,7 @@ also work from WSL.
   gets SIGINT and keeps its finished trials) and runs that no longer fit are skipped, so the
   payload always comes back. Before launching, every job's GPU time is estimated from its
   specs and jobs above `MODAL_JOB_LIMIT_MIN` (20) are refused unless `--allow-big` is given.
-- GPU guard (default: require an A100-SXM4-80GB, any power limit): Modal's `A100-80GB` pool
+- GPU guard (default: require an A100-SXM4-80GB at 400 W): Modal's `A100-80GB` pool
   mixes SXM4 cards at 400 W and 500 W with PCIe cards (300 W), and the 500 W cards are about
   7% faster. The container checks nvidia-smi before build; on the wrong card it returns at
   once (about 0.3 GPU-min) and the launcher retries, up to `MODAL_GPU_ATTEMPTS` calls
@@ -78,9 +78,11 @@ also work from WSL.
   gets the card fails. `--require-power 400` pins the power limit (references, finalists).
   Timing comparisons are only valid within one container (same card, same power limit).
 - Compile caches: `::main` builds cold (an empty `TORCHINDUCTOR_CACHE_DIR` per run, like the
-  judges' container; builds over 300 s are flagged). `::screen` (and `--warm`) copies the
-  persistent cache Volume `cifar100-inductor-cache` into the container, enables the inductor
-  FX graph cache, and merges new files back at the end, so only new graphs pay a compile.
+  judges' container; builds over 300 s are flagged). `::screen` (and `--warm`) extracts the
+  persistent cache from the Volume `cifar100-inductor-cache` (ONE tarball, `inductor.tar.gz`:
+  a per-file layout with tens of thousands of Triton files stalled containers for 25 min),
+  enables the inductor FX graph cache, and writes the tarball back at the end (last writer
+  wins), so only new graphs pay a compile: 133 s cold, 16-18 s warm, 40-120 s for new graphs.
 - Non-finite losses: with `count_nonfinite` the recipe prints `NONFINITE_LOSSES n` at the end
   of every trial; the launcher sums them per run (`nonfinite` column; any value above 0
   disqualifies a variant). `::screen` and `::ab` turn it on by default.
