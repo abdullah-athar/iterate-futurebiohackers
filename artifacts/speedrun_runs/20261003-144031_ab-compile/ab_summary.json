@@ -1,0 +1,98 @@
+{
+  "tag": "ab-compile",
+  "environment": {
+    "task_id": "ta-01M40ZMP3SGZ9SPRJG0YMVT7ZR",
+    "hostname": "modal",
+    "region": "us-west",
+    "cloud": "CLOUD_PROVIDER_AZURE",
+    "gpu_name": "NVIDIA A100 80GB PCIe",
+    "gpu_memory": "81920 MiB",
+    "gpu_power_limit": "300.00 W",
+    "driver": "580.95.05",
+    "mig": "Disabled",
+    "versions": "python 3.12.10 torch 2.4.0+cu124 torchvision 0.19.0+cu124 cuda_runtime 12.4 cudnn 90100 cuda_available True\ncuda_devices ['NVIDIA A100 80GB PCIe']",
+    "cpu_count": 20,
+    "cpu_affinity": 20
+  },
+  "pcie_attempts": [
+    "NVIDIA A100-SXM4-80GB [task ta-01M40ZKEABYKKX8VDZVWYN1JER]",
+    "NVIDIA A100 80GB PCIe [task ta-01M40ZMP3SGZ9SPRJG0YMVT7ZR]"
+  ],
+  "container_seconds": 281.1,
+  "rows": [
+    {
+      "label": "control",
+      "params": "{}",
+      "config": "futurebiohackers",
+      "returncode": 0,
+      "folder": "artifacts/speedrun_runs/20261003-144031_ab-compile/00_control",
+      "gpu": "NVIDIA A100 80GB PCIe",
+      "power_limit": "300.00 W",
+      "container_wall": 129.3,
+      "deadline_hit": false,
+      "complete": true,
+      "qualified": true,
+      "run_error": null,
+      "n": 2,
+      "trials_ok": 2,
+      "mean_acc": 0.75815,
+      "acc_std": 0.0016263455967290372,
+      "mean_time": 56.114058313,
+      "time_std": 0.3124562751742547,
+      "mean_eval": 0.19984499600000305,
+      "build_time": 4.115204961,
+      "mean_prepare": 0.0957977614999983,
+      "mean_train": 56.018260551500006,
+      "accs": [
+        0.757,
+        0.7593
+      ],
+      "times": [
+        55.893118361999996,
+        56.334998264000006
+      ],
+      "evals": [
+        0.22943744800001298,
+        0.17025254399999312
+      ],
+      "verdict": "QUALIFIED (>= 75%)"
+    },
+    {
+      "label": "compile-default",
+      "params": "{\"use_compile\": true}",
+      "config": "futurebiohackers {\"use_compile\": true}",
+      "returncode": 0,
+      "folder": "artifacts/speedrun_runs/20261003-144031_ab-compile/01_compile-default",
+      "gpu": "NVIDIA A100 80GB PCIe",
+      "power_limit": "300.00 W",
+      "container_wall": 141.8,
+      "deadline_hit": false,
+      "complete": true,
+      "qualified": true,
+      "run_error": null,
+      "n": 2,
+      "trials_ok": 2,
+      "mean_acc": 0.7592,
+      "acc_std": 0.00042426406871188177,
+      "mean_time": 41.783384217999995,
+      "time_std": 0.0010802866275995279,
+      "mean_eval": 0.1925357694999832,
+      "build_time": 44.97128484800001,
+      "mean_prepare": 0.082479578499985,
+      "mean_train": 41.70090463950001,
+      "accs": [
+        0.7595,
+        0.7589
+      ],
+      "times": [
+        41.784148095999996,
+        41.782620339999994
+      ],
+      "evals": [
+        0.2083258299999784,
+        0.17674570899998798
+      ],
+      "verdict": "QUALIFIED (>= 75%)"
+    }
+  ]
+}

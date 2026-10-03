@@ -5,3 +5,4 @@
 {"time": "2026-10-03T14:31:34", "label": "ab-noise (pcie-guard attempt 1)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 4.9, "gpu_minutes": 0.33, "note": "aborted before build"}
 {"time": "2026-10-03T14:34:12", "label": "ab-noise", "gpu": "NVIDIA A100 80GB PCIe", "container_seconds": 151.5, "gpu_minutes": 2.77, "note": ""}
 {"time": "2026-10-03T14:35:15", "label": "ab-compile (pcie-guard attempt 1)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 5.8, "gpu_minutes": 0.35, "note": "aborted before build"}
+{"time": "2026-10-03T14:40:31", "label": "ab-compile", "gpu": "NVIDIA A100 80GB PCIe", "container_seconds": 281.1, "gpu_minutes": 4.94, "note": ""}
