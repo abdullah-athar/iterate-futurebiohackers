@@ -83,6 +83,8 @@ Time limit: {turn_s} s of wall clock; you are stopped at the deadline. Have a co
 4. Self-test with `./try` (validate split on remote CPUs, ~15 s) or `./try candidate.py screen`.
    It prints per-instance score vs baseline/best_known, cpu_ms and errors. Fix crashes and overruns.
 5. Stop when candidate.py and hypothesis.txt are final. Only candidate.py is submitted.
+   Never revert candidate.py to the parent: if your self-test shows no gain, leave your attempted
+   change in place. The harness then records the hypothesis as falsified, so other agents don't repeat it.
 """
 
 PROMPT = "Read AGENT.md and STATUS.md in the current directory and follow them. Work only in this directory."
