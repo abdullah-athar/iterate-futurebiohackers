@@ -4,16 +4,17 @@ Claim a workstream by replacing `Unclaimed` with your name. Update the status an
 
 | Workstream | First deliverable | Owner | Status / branch or PR |
 | --- | --- | --- | --- |
-| Benchmark and baseline | Choose the problem, data split, metric direction, compute budget, and a reproducible baseline command. | Unclaimed | To do |
-| Evaluation | Define candidate inputs and score outputs; report failures, elapsed time, and reproducibility metadata. | Unclaimed | To do |
+| Benchmark and baseline | Choose the problem, data split, metric direction, compute budget, and a reproducible baseline command. | Team | Done: `median_string` benchmark with Set Median baseline |
+| Evaluation | Define candidate inputs and score outputs; report failures, elapsed time, and reproducibility metadata. | Team | Done: `median_string.Evaluator` with small/medium/hard tiers and JSON reports |
 | Search loop | Propose candidates, evaluate under the agreed budget, and retain the best valid result. | Unclaimed | To do |
 | Experiment analysis | Compare against the baseline and summarize improvements, failure cases, and limitations. | Unclaimed | To do |
 | Demo and submission | Prepare the live demo, short description, credits, and presentation. | Unclaimed | To do |
 
 ## Decisions to agree first
 
-- [ ] Select the team's official track and benchmark.
-- [ ] Specify the objective, success threshold, and evaluation budget.
-- [ ] Agree on the candidate interface and result format.
+- [x] Select the team's official track and benchmark: Track 1 (Autoresearch) on Median String (Steiner String) problem.
+- [x] Specify the objective, success threshold, and evaluation budget: Minimize total Steiner distance vs. Set Median baseline.
+- [x] Agree on the candidate interface and result format: `BaseSolver.solve(instance)` returning candidate string, evaluated by `median_string.Evaluator`.
+
 - [ ] Decide how to separate search-time feedback from final evaluation.
 - [ ] Choose the compute provider and assign someone to save all work locally before temporary access expires.
