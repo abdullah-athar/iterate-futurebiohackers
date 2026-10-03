@@ -1,0 +1,70 @@
+{
+  "round": "r6",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "diag-recompile",
+      "control": false,
+      "n": 3,
+      "variants": [
+        {"label": "defaults-torchlogs", "params": {}, "env": {"TORCH_LOGS": "recompiles"}, "hypothesis": "priority 1: do the 24->32 resolution switch or the first trials trigger recompiles / cuDNN autotune in train? (TORCH_LOGS=recompiles)"}
+      ]
+    },
+    {
+      "name": "k2",
+      "control_index": 1,
+      "variants": [
+        {"label": "e8.25", "params": {"epochs": 8.25}, "hypothesis": "k on the promoted recipe: 0.5 epoch less"},
+        {"label": "e9.25", "params": {"epochs": 9.25}, "hypothesis": "k on the promoted recipe: 0.5 epoch more"},
+        {"label": "switch0.35", "params": {"resolution_switch": 0.35}, "hypothesis": "24 px for 35% of the steps instead of 25%: more saving, accuracy cost to trade"}
+      ]
+    },
+    {
+      "name": "arch-a",
+      "control_index": 1,
+      "variants": [
+        {"label": "w64-256-768", "params": {"widths": [64, 256, 768]}, "hypothesis": "priority 5: group 1 at 64 channels (largest maps); on the old net 64 cost 0.9 pp, but the stack may absorb part"},
+        {"label": "w80-256-768", "params": {"widths": [80, 256, 768]}, "hypothesis": "group 1 at 80 channels"},
+        {"label": "d2-3-3", "params": {"depths": [2, 3, 3]}, "hypothesis": "depth 2 in group 1 (drop its residual pair)"}
+      ]
+    },
+    {
+      "name": "arch-b",
+      "control_index": 1,
+      "variants": [
+        {"label": "d3-2-3", "params": {"depths": [3, 2, 3]}, "hypothesis": "depth 2 in group 2 (on the old net: -0.87 s for -0.11 pp)"},
+        {"label": "w96-256-640", "params": {"widths": [96, 256, 640]}, "hypothesis": "group 3 at 640 channels"},
+        {"label": "w96-256-896", "params": {"widths": [96, 256, 896]}, "hypothesis": "group 3 at 896 channels: accuracy to trade for epochs"}
+      ]
+    },
+    {
+      "name": "batch",
+      "control_index": 1,
+      "variants": [
+        {"label": "bs1536", "params": {"batch_size": 1536}, "hypothesis": "priority 4: fewer steps, better GEMM tiling; sum loss keeps the airbench lr/wd scaling (NaN watch)"},
+        {"label": "bs2048", "params": {"batch_size": 2048}, "hypothesis": "batch 2048 (NaN watch)"},
+        {"label": "bs1536-e9.25", "params": {"batch_size": 1536, "epochs": 9.25}, "hypothesis": "batch 1536 with the time saving spent on 0.5 epoch"}
+      ]
+    },
+    {
+      "name": "select",
+      "control_index": 1,
+      "variants": [
+        {"label": "hard0.75-offline", "params": {"hard_fraction": 0.75}, "hypothesis": "priority 3: PR #5's proxy hard-example selection (offline prepass, keep the hardest 75% of each batch) on top of our stack"},
+        {"label": "hard0.75-online", "params": {"hard_fraction": 0.75, "proxy_mode": "online"}, "hypothesis": "same selection scored online by the proxy every batch"},
+        {"label": "hard0.5-offline", "params": {"hard_fraction": 0.5}, "hypothesis": "keep the hardest half of each batch"}
+      ]
+    },
+    {
+      "name": "fine-sys",
+      "control_index": 1,
+      "variants": [
+        {"label": "scale1.5", "params": {"scaling_factor": 0.16666666666666666}, "hypothesis": "priority 6: logit scale 1.5/9 (1.25/9 gave +0.24 pp over 1/9)"},
+        {"label": "jitter0.45", "params": {"jitter": 0.45}, "hypothesis": "stronger photometric jitter"},
+        {"label": "crop-triton", "params": {"crop_mode": "triton"}, "hypothesis": "PR #5's Triton crop/flip kernel instead of the 25-mask crop (speed only)"}
+      ]
+    }
+  ]
+}

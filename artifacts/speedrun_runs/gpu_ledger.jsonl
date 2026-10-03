@@ -93,3 +93,4 @@
 {"time": "2026-10-03T18:37:41", "label": "final-S7-res24q-e8.75-500W (gpu-guard miss 9)", "gpu": "NVIDIA A100 80GB PCIe", "power": "300.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: GPU 'NVIDIA A100 80GB PCIe' is not 'NVIDIA A100-SXM4-80GB'"}
 {"time": "2026-10-03T18:37:45", "label": "final-S7-res24q-e8.75-500W (gpu-guard miss 10)", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: power limit 400.00 W is not 500 W"}
 {"time": "2026-10-03T18:37:49", "label": "final-S7-res24q-e8.75-500W (gpu-guard miss 11)", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 0.1, "gpu_minutes": 0.25, "note": "aborted before build: power limit 400.00 W is not 500 W"}
+{"time": "2026-10-03T19:01:25", "label": "final2-defaults-400W", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 439.4, "gpu_minutes": 7.57, "note": ""}
