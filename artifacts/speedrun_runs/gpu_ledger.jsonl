@@ -9,3 +9,12 @@
 {"time": "2026-10-03T14:48:24", "label": "ab-maxautotune", "gpu": "NVIDIA A100 80GB PCIe", "container_seconds": 359.5, "gpu_minutes": 6.24, "note": ""}
 {"time": "2026-10-03T14:56:23", "label": "ab-epochs-a", "gpu": "NVIDIA A100 80GB PCIe", "container_seconds": 402.3, "gpu_minutes": 6.96, "note": ""}
 {"time": "2026-10-03T15:04:33", "label": "ab-bs1024", "gpu": "NVIDIA A100 80GB PCIe", "container_seconds": 413.8, "gpu_minutes": 7.15, "note": ""}
+{"time": "2026-10-03T15:06:01", "label": "ab-tweaks-a (pcie-guard attempt 1)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 5.6, "gpu_minutes": 0.34, "note": "aborted before build"}
+{"time": "2026-10-03T15:06:11", "label": "ab-tweaks-a (pcie-guard attempt 2)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 5.1, "gpu_minutes": 0.34, "note": "aborted before build"}
+{"time": "2026-10-03T15:06:22", "label": "ab-tweaks-a (pcie-guard attempt 3)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 4.8, "gpu_minutes": 0.33, "note": "aborted before build"}
+{"time": "2026-10-03T15:06:31", "label": "ab-tweaks-a (pcie-guard attempt 4)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 4.9, "gpu_minutes": 0.33, "note": "aborted before build"}
+{"time": "2026-10-03T15:06:41", "label": "ab-tweaks-a (pcie-guard attempt 5)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 4.5, "gpu_minutes": 0.33, "note": "aborted before build"}
+{"time": "2026-10-03T15:06:53", "label": "ab-tweaks-a (pcie-guard attempt 6)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 4.5, "gpu_minutes": 0.33, "note": "aborted before build"}
+{"time": "2026-10-03T15:08:52", "label": "ab-tweaks-a (pcie-guard attempt 7)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 4.7, "gpu_minutes": 0.33, "note": "aborted before build"}
+{"time": "2026-10-03T15:09:01", "label": "ab-tweaks-a (pcie-guard attempt 8)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 4.7, "gpu_minutes": 0.33, "note": "aborted before build"}
+{"time": "2026-10-03T15:13:38", "label": "pre-budget validation runs (env_check 19 s, template-n1 26 s, baseline-n2 147 s, 3 containers)", "gpu": "NVIDIA A100 80GB PCIe / SXM4", "container_seconds": 192.0, "gpu_minutes": 3.95, "note": "counted conservatively toward the 90-min budget"}
