@@ -1,0 +1,6 @@
+[project]
+name = "iterate-futurebiohackers"
+version = "0.1.0"
+description = "Project for the Iterate AI x Science Hackathon, London, 3–4 October 2026."
+requires-python = ">=3.11"
+dependencies = []
