@@ -1,14 +1,25 @@
 {
-  "k": 1.0,
+  "k": 0.7,
   "unit": "accuracy percentage points per second of prepare+train",
-  "source": "r3/calib2 on Abdullah's 96/256/768 network, SXM 400 W, n=8 paired, control 8.5 epochs (74.98 pct / 6.00 s): e8.0 -0.35 pp / -0.31 s, e9.0 +0.36 pp / +0.35 s, e9.5 +0.27 pp / +0.68 s. Local slope 8.0->9.0 = 1.08 pp/s; least squares over all three = 0.61; k rounded to 1.0. Old network (r1 rows) used 0.445.",
-  "previous": {
-    "k": 0.445,
-    "network": "128/384/576",
-    "rounds": [
-      "calib",
-      "r1"
-    ]
-  },
-  "time": "2026-10-03T17:58:00"
+  "source": "r6/k2 on the promoted recipe (8.75 ep, 24 px first quarter, stack), SXM 400 W, n=8 paired, control 75.37 pct / 5.67 s: e8.25 -0.23 pp / -0.37 s, e9.25 +0.17 pp / +0.24 s; least squares 0.65 pp/s, rounded to 0.7. Earlier bases: 128/384/576 (rounds calib, r1) 0.445; 96/256/768 at 8.5 ep (rounds r3, r4, r5) 1.0.",
+  "previous": [
+    {
+      "k": 0.445,
+      "network": "128/384/576",
+      "rounds": [
+        "calib",
+        "r1"
+      ]
+    },
+    {
+      "k": 1.0,
+      "network": "96/256/768 at 8.5 epochs",
+      "rounds": [
+        "r3",
+        "r4",
+        "r5"
+      ]
+    }
+  ],
+  "time": "2026-10-03T19:30:00"
 }

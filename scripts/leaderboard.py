@@ -812,8 +812,9 @@ def main(argv: list[str] | None = None) -> int:
     now = datetime.now().astimezone()
     k, k_data = load_k(args.k_file)
     previous = k_data.get("previous") if isinstance(k_data, dict) else None
-    if isinstance(previous, dict) and num(previous.get("k")):
-        ROUND_K.update({str(r): float(previous["k"]) for r in previous.get("rounds", [])})
+    for block in previous if isinstance(previous, list) else [previous]:
+        if isinstance(block, dict) and num(block.get("k")):
+            ROUND_K.update({str(r): float(block["k"]) for r in block.get("rounds", [])})
     rows = read_jsonl(args.registry, "registry")
     ledger = read_jsonl(args.ledger, "ledger")
     entries = [build_entry(r, k) for r in rows]
