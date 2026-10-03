@@ -36,7 +36,9 @@ NVIDIA A100-SXM4-80GB cards (judging hardware), one run per power limit:
 | --- | ---: | ---: | ---: | ---: |
 | A100-SXM4-80GB, 400 W | 75.34% | 0.28 pp | 5.76 s | 0.17 s |
 
-The cold `build` took 187 s. No trial had a non-finite loss.
+The cold `build` took 187 s. No trial had a non-finite loss. Modal handed out no 500 W
+card in 11 attempts on 3 October evening; on this network the 500 W cards had run about 7%
+faster than the 400 W ones.
 
 **Changes from the previous recipe** (96/256/768 at 9.5 epochs: 75.25% in 6.86 s): 8.75
 epochs with the first quarter at 24x24, lr 10.8, label smoothing 0.25, BatchNorm bias lr 32x,
