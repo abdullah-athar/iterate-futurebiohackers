@@ -1,0 +1,17 @@
+{
+  "round": "r14",
+  "n": 8,
+  "seed": 0,
+  "control": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "compile_loss": true, "fused_sgd": true, "epochs": 9.5},
+  "jobs": [
+    {
+      "name": "stem-c",
+      "control_index": 1,
+      "variants": [
+        {"label": "S3-poolfirst-g1", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "compile_loss": true, "fused_sgd": true, "epochs": 9.5, "pool_first": [true, false, false]}, "hypothesis": "stem C: whitening -> maxpool 2x2 -> group 1's first conv at 15x15 instead of 31x31 (the 24->C1 conv and its backward run on a quarter of the positions)"},
+        {"label": "S3-poolfirst-g1-e10.0", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "compile_loss": true, "fused_sgd": true, "epochs": 10.0, "pool_first": [true, false, false]}, "hypothesis": "stem C with half an epoch bought back"},
+        {"label": "S3-poolfirst-g1g2", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "compile_loss": true, "fused_sgd": true, "epochs": 9.5, "pool_first": [true, true, false]}, "hypothesis": "pool before conv1 in groups 1 and 2"}
+      ]
+    }
+  ]
+}
