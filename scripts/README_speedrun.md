@@ -37,12 +37,12 @@ The team env works natively on Windows. The speedrun env does not: torch 2.4.0's
 wheel fails at import (`fbgemm.dll` needs `libomp140.x86_64.dll`, which only ships with
 Visual Studio). Use WSL (Ubuntu), which resolves the same lockfile to the Linux CUDA 12.4
 wheels the judges use. Keep the venv on the Linux filesystem so it stays fast, is not
-synced by OneDrive, and cannot collide with a Windows `.venv` in the same folder:
+synced by cloud-sync tools, and cannot collide with a Windows `.venv` in the same folder:
 
 ```sh
 wsl -d Ubuntu-24.04
 curl -LsSf https://astral.sh/uv/install.sh | sh                 # once, inside WSL
-cd /mnt/c/<path-to>/iterate-futurebiohackers
+cd /mnt/c/dev/iterate-futurebiohackers
 scripts/wsl_speedrun.sh python -m benchmark.run --submission futurebiohackers --device cpu --synthetic --n 2
 ```
 
