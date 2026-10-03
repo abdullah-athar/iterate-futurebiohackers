@@ -1,11 +1,11 @@
-"""Throwaway reset check for submissions/futurebiohackers. Not part of the submission.
+"""Reset check for submissions/futurebiohackers (airbench-style recipe). Not part of the submission.
 
-Builds once, then runs prepare + train for two different seeds on the SAME state object
-and checks that prepare really starts from scratch (weights, BatchNorm statistics,
-gradients, optimizer state), that a reused state behaves exactly like a fresh build,
-and that repeating a seed reproduces a trial bit for bit on CPU.
+Builds once, then runs prepare + train for two different seeds on the SAME state object and
+checks that prepare really starts from scratch (every parameter, BatchNorm statistics,
+optimizer state, lookahead EMA buffers), that a reused state behaves exactly like a fresh
+build, and that repeating a seed reproduces a trial bit for bit on CPU.
 
-Run from the speedrun env with cwd cifar100-speedrun (synthetic images, CPU, ~1 min):
+Run from the speedrun env with cwd cifar100-speedrun (synthetic images, CPU, about a minute):
     uv run python ../scripts/check_reset.py                     # Linux/macOS
     scripts/wsl_speedrun.sh python ../scripts/check_reset.py    # Windows, via WSL
 """
@@ -21,16 +21,19 @@ from benchmark.api import BuildContext
 from benchmark.data import synthetic_split
 from benchmark.worker import load_submission, seed_everything
 
-# Speed only. The recipe's own defaults (40 epochs, width 64) are not touched.
-PARAMS = {"epochs": 2, "width": 16}
-RESET_BUFFERS = ("mean", "std")  # recomputed from the data each trial, so identical across trials
+# Speed only (narrow network, two epochs, eager). The recipe's own defaults are not touched.
+# The synthetic split has 64 images: batch 8 gives 16 steps, so the lookahead EMA (every 5
+# steps) really updates and the final EMA copy does not just restore the initial weights.
+PARAMS = {"widths": [32, 64, 64], "epochs": 2.0, "batch_size": 8, "compile": ""}
 
 results: list[tuple[str, bool]] = []
 
 
-def check(name: str, ok: bool) -> None:
+def check(name: str, ok: bool, detail: list[str] | None = None) -> None:
     results.append((name, ok))
     print(f"{'PASS' if ok else 'FAIL'}  {name}", flush=True)
+    if not ok and detail:
+        print(f"      offending: {detail}", flush=True)
 
 
 def snapshot(model: torch.nn.Module) -> dict[str, torch.Tensor]:
@@ -41,18 +44,23 @@ def differing(a: dict, b: dict) -> list[str]:
     return [k for k in a if not torch.equal(a[k], b[k])]
 
 
-def learnable(model: torch.nn.Module) -> list[str]:
-    return [name for name, _ in model.named_parameters()]
+def trainable(model: torch.nn.Module) -> list[str]:
+    return [name for name, p in model.named_parameters() if p.requires_grad]
 
 
-def randomly_initialised(model: torch.nn.Module) -> list[str]:
-    """Conv/Linear weights: seed-dependent init. BatchNorm affine params start at 1/0 always."""
-    return [
-        f"{prefix}.{name}" if prefix else name
-        for prefix, module in model.named_modules()
-        if isinstance(module, torch.nn.Conv2d | torch.nn.Linear)
-        for name, _ in module.named_parameters(recurse=False)
-    ]
+def random_init(model: torch.nn.Module) -> list[str]:
+    """Weights with a seed-dependent init: Linear layers and convs with more output than input
+    channels. The recipe's Conv sets the first `in` output filters to a dirac (identity)
+    kernel, so a square conv is fully deterministic; BatchNorm biases start at zero."""
+    names = []
+    for prefix, module in model.named_modules():
+        linear = isinstance(module, torch.nn.Linear)
+        tall_conv = isinstance(module, torch.nn.Conv2d) and (
+            module.out_channels > module.in_channels
+        )
+        if (linear or tall_conv) and module.weight.requires_grad:
+            names.append(f"{prefix}.weight" if prefix else "weight")
+    return names
 
 
 def batchnorm_is_fresh(model: torch.nn.Module) -> bool:
@@ -62,7 +70,6 @@ def batchnorm_is_fresh(model: torch.nn.Module) -> bool:
                 torch.equal(module.running_mean, torch.zeros_like(module.running_mean))
                 and torch.equal(module.running_var, torch.ones_like(module.running_var))
                 and int(module.num_batches_tracked) == 0
-                and torch.equal(module.weight, torch.ones_like(module.weight))
                 and torch.equal(module.bias, torch.zeros_like(module.bias))
             ):
                 return False
@@ -78,89 +85,78 @@ def main() -> int:
     context = BuildContext(torch.device("cpu"), PARAMS)
 
     state = module.build(context)
-    after_build = snapshot(state.model)
-    params = learnable(state.model)
-    check(
-        "build ran a synthetic warmup (optimizer state is non-empty)",
-        len(state.optimizer.state) > 0,
-    )
-    check(
-        "build left BatchNorm statistics changed by the warmup", not batchnorm_is_fresh(state.model)
-    )
+    net = state.net
 
     # Trial 1: seed 42 -------------------------------------------------------------
     seed_everything(42)
     module.prepare(state, data, 42)
-    after_prepare_1 = snapshot(state.model)
-    changed = differing(after_build, after_prepare_1)
-    check(
-        "prepare #1 re-initialised every learnable parameter touched by the warmup",
-        all(p in changed for p in params),
-    )
-    check(
-        "prepare #1 reset BatchNorm (running stats, counters, affine params)",
-        batchnorm_is_fresh(state.model),
-    )
-    check("prepare #1 created an optimizer with EMPTY state", len(state.optimizer.state) == 0)
-    check("prepare #1 cleared gradients", all(p.grad is None for p in state.model.parameters()))
-    optimizer_1 = state.optimizer
     model = module.train(state)
-    check("train returned the eager nn.Module held in state", model is state.model)
+    check("train returned an nn.Module", isinstance(model, torch.nn.Module))
     after_train_1 = snapshot(model)
-    check(
-        "train #1 changed every learnable parameter",
-        all(p in differing(after_prepare_1, after_train_1) for p in params),
-    )
     check(
         "train #1 populated the optimizer state (momentum buffers)", len(state.optimizer.state) > 0
     )
+    optimizer_1 = state.optimizer
 
     # Trial 2: seed 43, same state object --------------------------------------------
     seed_everything(43)
     module.prepare(state, data, 43)
-    after_prepare_2 = snapshot(state.model)
+    after_prepare_2 = snapshot(model)
+    params = trainable(model)
+    changed = differing(after_train_1, after_prepare_2)
     check(
-        "prepare #2: every learnable parameter differs from the weights after train #1",
-        all(p in differing(after_train_1, after_prepare_2) for p in params),
+        "prepare #2: every trainable parameter differs from the weights after train #1",
+        all(p in changed for p in params),
+        [p for p in params if p not in changed],
+    )
+    check("prepare #2 reset BatchNorm (running stats, counters, biases)", batchnorm_is_fresh(model))
+    check(
+        "prepare #2 built a NEW optimizer with EMPTY state",
+        state.optimizer is not optimizer_1 and len(state.optimizer.state) == 0,
+    )
+    # Gradients are not reset in prepare, and need not be: _fit zeroes them before every
+    # backward, and the "reused state == fresh build" check below proves they cannot leak.
+    check(
+        "prepare #2: lookahead EMA buffers equal the fresh parameters (no carry-over)",
+        all(torch.equal(e, p) for e, p in zip(state.ema, state.float_state, strict=True)),
     )
     check(
-        "prepare #2: every Conv/Linear weight differs from prepare #1 (different seed)",
-        all(p in differing(after_prepare_1, after_prepare_2) for p in randomly_initialised(model)),
+        "prepare #2: whitening bias is zero again",
+        torch.equal(net.whiten.bias, torch.zeros_like(net.whiten.bias)),
     )
-    check(
-        "prepare #2: normalization buffers equal prepare #1 (same data, recomputed)",
-        all(
-            f"{b}" in after_prepare_1 and torch.equal(after_prepare_1[b], after_prepare_2[b])
-            for b in RESET_BUFFERS
-        ),
-    )
-    check("prepare #2 built a NEW optimizer object", state.optimizer is not optimizer_1)
-    check("prepare #2 optimizer state is EMPTY", len(state.optimizer.state) == 0)
-    check("prepare #2 reset BatchNorm", batchnorm_is_fresh(state.model))
-    check("prepare #2 cleared gradients", all(p.grad is None for p in state.model.parameters()))
     after_train_2 = snapshot(module.train(state))
 
     # History independence: a brand-new build with the same seed must match the reused state.
     fresh = module.build(context)
     seed_everything(43)
     module.prepare(fresh, data, 43)
-    check(
-        "prepare on the reused state == prepare on a fresh build (seed 43)",
-        not differing(snapshot(fresh.model), after_prepare_2),
-    )
+    fresh_model = module.train(fresh)
     check(
         "full trial on the reused state == full trial on a fresh build (seed 43)",
-        not differing(snapshot(module.train(fresh)), after_train_2),
+        not differing(snapshot(fresh_model), after_train_2),
     )
 
-    # Determinism: repeating seed 42 on the twice-used state reproduces trial 1 exactly.
+    # Different seeds give different inits; repeating a seed reproduces a trial exactly.
     seed_everything(42)
     module.prepare(state, data, 42)
+    after_prepare_1b = snapshot(model)
+    seed_dependent = random_init(model)
+    seed_changed = differing(after_prepare_1b, after_prepare_2)
+    check(
+        "different seeds give different inits for every seed-dependent Conv/Linear weight",
+        bool(seed_dependent) and all(w in seed_changed for w in seed_dependent),
+        [w for w in seed_dependent if w not in seed_changed],
+    )
     check(
         "repeating seed 42 reproduces trial #1 bit for bit (CPU)",
         not differing(snapshot(module.train(state)), after_train_1),
     )
 
+    # Whitening statistics come from the training data passed to prepare, nothing else.
+    check(
+        "whitening weights are recomputed from the data in prepare (same data -> identical)",
+        torch.equal(after_prepare_2["net.whiten.weight"], after_prepare_1b["net.whiten.weight"]),
+    )
     check(
         "training tensors were not modified",
         torch.equal(data.images, original_images) and torch.equal(data.labels, original_labels),

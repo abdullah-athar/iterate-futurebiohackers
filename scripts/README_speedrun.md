@@ -21,9 +21,8 @@ uv sync --locked                                          # team env (Python 3.1
 uv run modal setup                                        # once, opens a browser; writes ~/.modal.toml
 (cd cifar100-speedrun && uv sync --frozen)                # speedrun env (Python 3.12.10 + torch 2.4.0)
 (cd cifar100-speedrun && uv run python -m benchmark.run --submission futurebiohackers --device cpu --synthetic --n 2)
-uv run modal run scripts/modal_speedrun.py::env_check     # A100 + versions, no training
-uv run modal run scripts/modal_speedrun.py::download_data # once per Modal workspace: CIFAR-100 -> Volume cifar100-data
-uv run modal run scripts/modal_speedrun.py::main --tag first --n 1 --no-accuracy-target
+uv run modal run scripts/modal_speedrun.py::env_check     # GPU name/power + placement, no training
+uv run modal run scripts/modal_speedrun.py::main --tag first --n 1 --no-accuracy-target  # downloads CIFAR-100 into the Volume on first use
 ```
 
 The CPU smoke test must end with `"complete": true` and `"qualified": null`
@@ -55,49 +54,42 @@ also work from WSL.
 
 | Command | What it does |
 | --- | --- |
-| `::env_check` | nvidia-smi (name, memory, power limit, MIG), torch/torchvision/CUDA versions, CPUs |
-| `::download_data` | fills the `cifar100-data` Volume (mounted at `/data`) |
-| `::smoke` | CPU + synthetic smoke test inside the Modal image, no GPU |
-| `::main --tag T --n N [--submission futurebiohackers or --submission-path P] [--params JSON] [--no-accuracy-target] [--seed S] [--build-timeout S] [--torch-logs recompiles]` | one `benchmark.run`; results in `artifacts/speedrun_runs/<ts>_<T>/` |
-| `::ab --tag T --n N --variants '[{...}, {...}]' [--control-params JSON] [--labels a,b] [--submission-paths '["..."]']` | control + variants **sequentially in one container on one card**, each its own `benchmark.run` (fresh build, nothing shared); comparison table + `ab_summary.{md,json}` in `<ts>_<T>/NN_<label>/`. Variants are parameter deltas merged over the control. The default way to compare speed. |
-| `::fetch --run-id ID` | copy `results/futurebiohackers/ID/` out of the `cifar100-results` Volume (no GPU), e.g. after a Modal timeout |
-| `::sweep --tag T --n N --params-list '[{...}, {...}]'` | one A100 container per params entry, in parallel, no PCIe guard; gated behind `SPEEDRUN_ALLOW_SWEEP=1` |
+| `::env_check` | nvidia-smi (name, memory, power limit, MIG) and the container's task id, region and cloud; no training |
+| `::main [--tag T] [--no-require-pcie] [--no-pcie-fallback] <harness flags>` | one `benchmark.run` with the harness flags passed straight through (`--n N`, `--params JSON`, `--no-accuracy-target`, `--seed S`, `--build-timeout S`, `--submission-path P`, ...; default `--n 1`). `just modal [n] [flags]` calls this. Results in `artifacts/speedrun_runs/<ts>_<T>/` and `cifar100-speedrun/results/` (for `just last`). |
+| `::ab --tag T --n N --variants '[{...}, {...}]' [--labels a,b] [--control-params JSON] [--seed S] [--profile]` | control + variants **sequentially in one container on one card**, each its own `benchmark.run` (fresh build, cold compile cache, nothing shared); table with mean acc, std, mean prepare+train, build time, GPU and the **paired** per-seed Δacc ± SE and Δtime vs the control, saved as `ab_summary.{md,json}` in `<ts>_<T>/NN_<label>/`. Variants are parameter deltas merged over the control. The default way to compare recipes. |
+| `::profile [--params JSON] [--epochs E]` | runs `scripts/profile_recipe.py` on the real data: prepare breakdown, per-step forward/backward/optimizer time, per-group compute split, top kernels |
 
-- GPU is pinned to `A100-80GB` (plain `A100` can be a 40GB card), 4 CPUs. Every GPU function
-  has a hard Modal timeout of 15 min (`SPEEDRUN_TIMEOUT_MIN`), so a hung run cannot burn more.
-  The launcher estimates the container time from the specs and refuses launches that cannot
-  fit; inside the container each variant has a deadline (the harness gets SIGINT and keeps
-  its finished trials) and variants that no longer fit are skipped, so the payload always
-  comes back. `--build-timeout` defaults to 300 s (the 5-minute rule for compile builds).
-- PCIe guard (`--require-pcie`, default on for `main` and `ab`): Modal's `A100-80GB` pool mixes
-  the judges' PCIe card (300 W) with SXM4 cards (500 W). The container checks nvidia-smi
-  before build; on a non-PCIe card it returns at once (about 0.35 GPU-min) and the launcher
-  retries, up to `SPEEDRUN_PCIE_ATTEMPTS` calls in total (default 8), logging every attempt
-  with the GPU name, Modal task id, region and cloud. GPU functions are single-use containers,
-  so a retry is never served by the container that just failed. `SPEEDRUN_REGION` /
-  `SPEEDRUN_CLOUD` (aws, gcp, oci) pin the placement once a PCIe region is known;
-  `SPEEDRUN_SCHEDULE_WAIT_S` bounds the wait for a pinned pool. `--no-require-pcie` disables
-  the guard (fine for relative A/B comparisons: control and variants share one card).
-- Each `benchmark.run` in an A/B gets its own empty `TORCHINDUCTOR_CACHE_DIR`, so compiled
-  variants report cold build times like the judges' container.
+- CIFAR-100 is downloaded into the `cifar100-data` Volume on first use; `TEAM` picks the
+  submission folder and `MODAL_GPU` the GPU type (default `A100-80GB`; plain `A100` can be a
+  40GB card). 4 CPUs per container, like the judges.
+- Every GPU function has a hard Modal timeout of `MODAL_TIMEOUT_MIN` minutes (default 20),
+  so a hung run cannot burn more. Inside the container each run has a deadline (the harness
+  gets SIGINT and keeps its finished trials) and runs that no longer fit are skipped, so the
+  payload always comes back.
+- PCIe guard (default on): Modal's `A100-80GB` pool mixes the judges' PCIe card (300 W) with
+  SXM4 cards (400-500 W). The container checks nvidia-smi before build; on a non-PCIe card it
+  returns at once (about 0.3 GPU-min) and the launcher retries, up to `MODAL_PCIE_ATTEMPTS`
+  calls (default 4), logging every attempt with the GPU name, Modal task id, region and cloud.
+  GPU functions are single-use containers, so a retry is never served by the container that
+  just failed. After the last attempt the run continues on whatever card it gets and every
+  result row and LOG.md row carries the GPU name (`--no-pcie-fallback` aborts instead;
+  `--no-require-pcie` skips the guard). PCIe cards have so far come from Azure us-west.
+- Each `benchmark.run` gets its own empty `TORCHINDUCTOR_CACHE_DIR`, so compiled variants
+  report cold build times like the judges' container; builds over 300 s are flagged.
 - GPU budget: `artifacts/speedrun_runs/gpu_ledger.jsonl` records every container attempt (wall
   time + 15 s start allowance, failed and timed-out calls included) and the launcher prints
-  `GPU used: X/90 min` before and after every call. `SPEEDRUN_GPU_BUDGET_MIN` (90) is a hard
-  stop; `SPEEDRUN_GPU_STOP_MIN` (60) is a checkpoint that needs `SPEEDRUN_GPU_CONTINUE=1`.
-- The image is built once (uv 0.10.8 + `uv sync --frozen` on the organizer lock); the
-  speedrun code is mounted at start, so recipe edits never rebuild it.
+  `GPU used: X/120 min` before and after every call. `MODAL_GPU_BUDGET_MIN` (120) is a hard
+  stop; `MODAL_GPU_CHECKPOINTS` (60,100) are report lines that need `MODAL_GPU_CONTINUE=1`.
+- The image is `debian_slim` + `uv_sync` on the organizer lock, built once; the speedrun code
+  is mounted at start, so recipe edits never rebuild it.
 - Exit code 1 from `benchmark.run` means below target or incomplete, not a crash: read
   `summary.json` (`complete`, `qualified`, `run_error`) and `error.txt`.
 - The launcher prints a warning if the GPU is not `NVIDIA A100 80GB PCIe`; an SXM card
   (power limit about 400 W instead of 300 W) makes timings slightly optimistic compared
   with the judges' machine.
-- `SPEEDRUN_IMAGE=dockerfile` switches to `modal.Image.from_dockerfile` on the organizer
-  Dockerfile (experimental; may be rejected by Modal's builder, and bakes the code in).
-- First image build measured on 3 October 2026: about 3 min wall (CUDA base 81 s, apt 21 s,
-  torch sync 55 s); later runs reuse the cached image and reach the function in a few seconds.
 - Modal refuses `A100-80GB` functions until the workspace has a payment method on file
   ("Please add a payment method to use A100-80GB GPU functions"). Because `modal run`
-  validates every function of the app, this also blocks `::download_data` and `::smoke`.
+  validates every function of the app, this blocks every entrypoint.
   Check `uv run modal profile list` points at the workspace holding the hackathon credits
   (`uv run modal token new` to add another workspace, `uv run modal profile activate NAME`),
   and its Billing page at modal.com/settings.

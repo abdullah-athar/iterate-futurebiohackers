@@ -34,7 +34,7 @@ diag n="1" *args:
 # Like run, but on a Modal A100-80GB from your laptop: just modal 3 --params '{"epochs": 10}'
 [positional-arguments]
 modal n="1" *args:
-    shift; TEAM={{team}} uv run --project .. modal run ../scripts/modal_speedrun.py --n {{n}} "$@"
+    shift; TEAM={{team}} PYTHONUTF8=1 uv run --project .. modal run ../scripts/modal_speedrun.py::main --n {{n}} "$@"
 
 # Show the most recent run summary
 last:

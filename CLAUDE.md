@@ -21,13 +21,27 @@ AGENTS.md
 - Local CPU smoke test (no GPU, no data; expect `"complete": true`, `"qualified": null`):
   `cd cifar100-speedrun && uv run python -m benchmark.run --submission futurebiohackers --device cpu --synthetic --n 2`
   (Windows: `scripts/wsl_speedrun.sh python -m benchmark.run --submission futurebiohackers --device cpu --synthetic --n 2`).
-- Modal, from the repo root in the team env (`uv run modal setup` once):
-  `uv run modal run scripts/modal_speedrun.py::env_check`,
-  `::download_data` (once), `::smoke`,
-  `::main --tag T --n N [--submission-path P] [--params '{"k": v}'] [--no-accuracy-target]`,
-  `::sweep --tag T --n N --params-list '[{...}, {...}]'`.
-- Results: `artifacts/speedrun_runs/<timestamp>_<tag>/` (summary.json, trials.jsonl,
-  config.json, modal_run.json; `source/` is gitignored). Add a row to
+- Modal, from the repo root in the team env (`uv run modal setup` once). The launcher
+  `scripts/modal_speedrun.py` has several entrypoints, so `modal run` needs `::name`;
+  `just modal [n] [harness flags]` already calls `::main` (that `::main` is the only change
+  teammates see). Harness flags pass straight through; `TEAM` and `MODAL_GPU` env vars and
+  the CIFAR-100 auto-download work as before:
+  `just modal 3 --params '{"epochs": 10}'` or
+  `uv run modal run scripts/modal_speedrun.py::main --n 3 --params '{"epochs": 10}'`;
+  `::ab --n 8 --variants '[{...}, {...}]' --labels a,b [--control-params '{...}'] [--profile]`
+  runs control + variants sequentially in one container and prints paired Δacc ± SE / Δtime;
+  `::profile` shows where the time goes. Launcher flags: `--tag T`, `--no-require-pcie`,
+  `--no-pcie-fallback`. Env: `MODAL_TIMEOUT_MIN` (default 20, hard cap per container),
+  `MODAL_PCIE_ATTEMPTS` (default 4), `MODAL_GPU_BUDGET_MIN` (default 120, hard stop),
+  `MODAL_GPU_CHECKPOINTS` (60,100: report, then `MODAL_GPU_CONTINUE=1` to go on).
+  Windows: set `PYTHONUTF8=1` for every Modal command (`just modal` does).
+- The PCIe guard is on by default: Modal's `A100-80GB` pool mixes the judges' PCIe card with
+  SXM4 parts; non-PCIe containers abort before build and are retried, then the run falls
+  back to SXM with the GPU name on every result row. `GPU used: X/120 min` is printed after
+  every call from `artifacts/speedrun_runs/gpu_ledger.jsonl`.
+- Results: `cifar100-speedrun/results/<team>/<run_id>/` (for `just last`, gitignored) and
+  `artifacts/speedrun_runs/<timestamp>_<tag>/` (summary.json, trials.jsonl, config.json,
+  modal_run.json, `ab_summary.md`; `source/` is gitignored). Add a row to
   `artifacts/speedrun_runs/LOG.md` for every GPU run (the launcher prints the row).
 
 ## Non-negotiable rules (see cifar100-speedrun/RULES.md)
