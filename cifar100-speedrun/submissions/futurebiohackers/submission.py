@@ -44,7 +44,7 @@ DEFAULTS = {
     # fraction of steps, then 32. Overrides train_resolution/resolution_switch.
     "resolution_schedule": [],
     "crop_mode": "indexed",  # one gather per epoch; "masked" is airbench's 25 masked copies
-    "fused_sgd": False,
+    "fused_sgd": True,  # one fused CUDA kernel for the SGD step
     "compile_loss": False,
     "hard_fraction": 1.0,  # <1 enables a freshly trained small proxy
     "proxy_widths": [32, 64, 128],

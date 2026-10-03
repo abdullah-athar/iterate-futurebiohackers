@@ -11,6 +11,7 @@ timer.
 
 Implementation details that change the time but not the model:
 
+- The SGD step is one fused CUDA kernel (`fused_sgd`).
 - BatchNorm runs in fp16 like the rest of the network (`bn_dtype: "half"`).
 - The forward pass and loss compile as one graph (`compile_step`), with static
   shapes so no recompilation happens inside a trial.
@@ -25,14 +26,18 @@ Implementation details that change the time but not the model:
 40 random seeds (drawn like the organizer seed file), both recipes back to back
 in one Modal A100-SXM4-80GB container, 75% target enforced:
 
-| Recipe | Mean accuracy | Mean preparation + training | Qualified |
-| --- | ---: | ---: | --- |
-| This recipe | 75.094% (sd 0.25) | 5.627 s (sd 0.015) | yes |
-| PR #9 defaults | 75.169% (sd 0.24) | 5.816 s (sd 0.016) | yes |
+| Seed set | Recipe | Mean accuracy | Mean preparation + training | Qualified |
+| --- | --- | ---: | ---: | --- |
+| A | This recipe without fused SGD | 75.094% (sd 0.25) | 5.627 s (sd 0.015) | yes |
+| A | PR #9 defaults | 75.169% (sd 0.24) | 5.816 s (sd 0.016) | yes |
+| B | **This recipe (defaults, fused SGD)** | **75.130% (sd 0.29)** | **6.048 s** (sd 0.055) | yes |
+| B | PR #9 defaults | 75.268% (sd 0.28) | 6.319 s (sd 0.042) | yes |
 
-This recipe is 3.2% faster than PR #9 on the same GPU and seeds. Its accuracy
-margin is thin: across all 65 trials run so far it averages about 75.12%, so a
-different 40-seed draw falls below 75% with an estimated 2-3% probability.
+Seed sets A and B are independent random draws; each row pair ran in one
+container. Set B landed on a slower card, so compare within a pair: the recipe is
+3.2% faster than PR #9 without fused SGD and 4.3% faster with it. Its accuracy
+margin is thin: across 105 trials it averages about 75.11%, so a different
+40-seed draw falls below 75% with an estimated 2-3% probability.
 Official judging uses an A100 80GB PCIe (300 W), which will be slower than these
 SXM (400 W) timings.
 
@@ -45,7 +50,6 @@ by default:
 
 | Option | Result |
 | --- | --- |
-| `fused_sgd: true` | 1.6% faster at equal accuracy (5 trials); 40-seed check pending |
 | `resolution_schedule: [[28, 0.5]]` | 28 px for the first half: about 3% better than cutting epochs |
 | `widths: [64, 256, 768]`, depths 3, 9 epochs | 8.4% faster than PR #9 at -0.06 pt (5 trials) |
 | `inductor_tuning` | coordinate-descent tuning: 0.5% faster, within noise |
