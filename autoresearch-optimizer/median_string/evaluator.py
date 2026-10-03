@@ -286,7 +286,7 @@ def main() -> None:
         "--tier",
         type=str,
         default="small",
-        choices=["small", "medium", "hard"],
+        choices=["small", "medium", "hard", "confirm", "holdout"],
         help="Difficulty tier for the benchmark suite (default: small).",
     )
     parser.add_argument(
