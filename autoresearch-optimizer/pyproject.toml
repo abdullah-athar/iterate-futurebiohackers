@@ -4,4 +4,7 @@ version = "0.1.0"
 description = "Team workspace for the Iterate AI x Science autoresearch optimizer."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
-dependencies = []
+dependencies = [
+    "anthropic>=1.11.0",
+    "pyabpoa>=1.5.7.1",
+]

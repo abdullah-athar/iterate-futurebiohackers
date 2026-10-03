@@ -1,6 +1,7 @@
 # Team workspace commands. Run `just` to list them.
 # Override the team folder with TEAM=name just run.
 
+set dotenv-load
 set working-directory := "cifar100-speedrun"
 
 team := env("TEAM", "futurebiohackers")
@@ -65,3 +66,15 @@ autoresearch-smoke:
 autoresearch-eval *args:
     uv run python scripts/evaluate_median_string.py "$@"
 
+
+# Run the autoresearch loop: just autoresearch-run --proposer claude --iterations 10
+[working-directory: justfile_directory() / "autoresearch-optimizer"]
+[positional-arguments]
+autoresearch-run *args:
+    uv run python -m autoresearch "$@"
+
+# Run the median string and autoresearch tests
+[working-directory: justfile_directory() / "autoresearch-optimizer"]
+autoresearch-test:
+    uv run python scripts/test_median_string.py
+    uv run python scripts/test_autoresearch.py

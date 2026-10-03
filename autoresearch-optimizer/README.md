@@ -2,7 +2,7 @@
 
 Shared workspace for building an autoresearch optimizer: propose algorithm changes, evaluate them against a reproducible baseline, and keep improvements with an experiment record.
 
-This idea fits **Track 1: AI Automated Discovery of Algorithms — Build Your Own Autoresearch Framework**. The benchmark, objective, and search strategy are team decisions; claim a workstream in [TASKS.md](TASKS.md). This folder is an initial scaffold; the optimizer and benchmark are still to be implemented. The team must choose one official track for its submission.
+This idea fits **Track 1: AI Automated Discovery of Algorithms — Build Your Own Autoresearch Framework**. The benchmark, objective, and search strategy are team decisions; claim a workstream in [TASKS.md](TASKS.md). The team must choose one official track for its submission.
 
 ## Get started
 
@@ -37,6 +37,30 @@ autoresearch-optimizer/
   data/             # local inputs, ignored by Git
   artifacts/        # local results, ignored by Git
 ```
+
+## Autoresearch loop
+
+`autoresearch/` runs a simple hill-climbing loop. Each iteration, Claude rewrites the current champion solver. The new solver is scored in a subprocess with a timeout, and it is kept only if it lowers the total distance on the search suite. At the end, the champion is scored on a held-out suite: the same tier regenerated with seeds offset by 10,000, which the loop never sees.
+
+```sh
+just autoresearch-run --proposer mock --iterations 3 --search-tier small     # offline dry run
+just autoresearch-run --proposer claude --iterations 10 --search-tier medium # needs ANTHROPIC_API_KEY
+just autoresearch-test
+```
+
+Each run writes `ledger.jsonl`, `champion.py`, `summary.json`, and every candidate file to `artifacts/autoresearch/<run>/`.
+
+Every component sits behind a small interface in `autoresearch/core.py` and is chosen by name in `autoresearch/config.py`:
+
+| Component | Interface | Implementations |
+| --- | --- | --- |
+| Proposer | `propose(ctx) -> Candidate` | `claude`, `mock` |
+| Evaluator | `evaluate(candidate, suite) -> Result` | `subprocess` |
+| Selector | `accept(memory, result)`, `parents(memory)` | `greedy` |
+| Memory | `record`, `champion`, `summary` | `jsonl` |
+| Budget | `exhausted(memory)` | `iterations` |
+
+To add a variant, such as a population selector or a reflective memory, write a class with the same methods, register it in `REGISTRY`, and select it with `--selector <name>`. Only `autoresearch/loop.py` knows how the components fit together.
 
 ## Work together
 
