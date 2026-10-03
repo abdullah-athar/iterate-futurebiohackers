@@ -13,6 +13,7 @@ them, and initializes the patch-whitening layer from training images.
 """
 
 import math
+import sys
 from types import SimpleNamespace
 
 import torch
@@ -79,6 +80,9 @@ DEFAULTS = {
     "muon_wd": 1.04e-6,  # per example
     "bias_lr": 0.0573,
     "head_lr": 0.5415,
+    # Diagnostic (off by default): count training steps whose loss was not finite on the
+    # device and print "NONFINITE_LOSSES n" to stderr after train. One sync per trial.
+    "count_nonfinite": False,
 }
 
 
@@ -411,6 +415,8 @@ def build(context: BuildContext):
         raise ValueError("global_pool must be adaptive, amax, or max")
     if hyp["optimizer"] not in ("sgd", "muon") or len(hyp["color_jitter"]) != 2:
         raise ValueError("optimizer must be sgd or muon; color_jitter needs two ranges")
+    if type(hyp["count_nonfinite"]) is not bool:
+        raise ValueError("count_nonfinite must be a boolean")
     device = context.device
     cuda = device.type == "cuda"
     dtype = torch.float16 if cuda else torch.float32
@@ -478,6 +484,7 @@ def build(context: BuildContext):
         ema=[t.clone() for t in float_state],
         proxy=None,
         crop_kernel=crop_kernel,
+        nonfinite=None,
     )
     if hyp["hard_fraction"] < 1:
         proxy_hyp = {**hyp, "widths": hyp["proxy_widths"], "depths": [2, 2, 2]}
@@ -542,6 +549,8 @@ def prepare(state, data: TrainingData, seed: int) -> None:
         state.proxy.train()
         state.proxy.whiten.weight.data.copy_(net.whiten.weight)
     torch._foreach_copy_(state.ema, state.float_state)
+    if hyp["count_nonfinite"]:
+        state.nonfinite = torch.zeros((), dtype=torch.int64, device=device)
 
     # Alternating flip: flip a random half once, then mirror everything on odd epochs.
     images = batch_flip_lr(images)
@@ -628,6 +637,8 @@ def train(state) -> nn.Module:
         if cuda_rng is not None:
             torch.cuda.set_rng_state(cuda_rng, state.device)
     _fit(state, state.total_steps)
+    if state.nonfinite is not None:
+        print(f"NONFINITE_LOSSES {int(state.nonfinite)}", file=sys.stderr, flush=True)
     return state.classifier
 
 
@@ -723,6 +734,8 @@ def _fit(state, total_steps, proxy_only=False):
                     seen += batch_size
                     continue
             loss = state.forward_loss(inputs, targets, progress < whiten_frac)
+            if state.nonfinite is not None:
+                state.nonfinite += (~torch.isfinite(loss.detach())).to(torch.int64)
             for optimizer in optimizers:
                 optimizer.zero_grad(set_to_none=True)
             loss.backward()
