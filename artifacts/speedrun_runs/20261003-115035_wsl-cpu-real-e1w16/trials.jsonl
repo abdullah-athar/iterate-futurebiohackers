@@ -1,0 +1,2 @@
+{"trial": 0, "seed": 0, "status": "ok", "prepare_time": 0.5522994320000123, "train_time": 58.41160538, "total_timed_time": 58.96390481200001, "evaluation_time": 4.669305866000002, "telemetry": [], "accuracy": 0.1506}
+{"trial": 1, "seed": 1, "status": "ok", "prepare_time": 0.6350658750000093, "train_time": 54.386185805000025, "total_timed_time": 55.021251680000034, "evaluation_time": 4.236439298999983, "telemetry": [], "accuracy": 0.1571}
