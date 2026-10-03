@@ -1,0 +1,38 @@
+{
+  "returncode": 1,
+  "wall_seconds": 190.3,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T183213Z-36efce44",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"compile_loss\": true, \"count_nonfinite\": true, \"fused_sgd\": true, \"widths\": [64, 256, 768]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "compile-loss-fused",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"compile_loss\": true, \"count_nonfinite\": true, \"fused_sgd\": true, \"widths\": [64, 256, 768]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"compile_loss\": true, \"count_nonfinite\": true, \"fused_sgd\": true, \"widths\": [64, 256, 768]}",
+    "delta": {
+      "widths": [
+        64,
+        256,
+        768
+      ],
+      "compile_loss": true,
+      "fused_sgd": true
+    },
+    "hypothesis": "PR #5's speed switches together: compiled loss and fused SGD (speed only)",
+    "env": {},
+    "config": "futurebiohackers {\"compile_loss\": true, \"fused_sgd\": true, \"widths\": [64, 256, 768]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

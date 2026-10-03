@@ -1,0 +1,37 @@
+{
+  "returncode": 1,
+  "wall_seconds": 106.9,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T183852Z-97cb750d",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"crop_mode\": \"triton\", \"widths\": [64, 256, 768]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "triton-crop",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"crop_mode\": \"triton\", \"widths\": [64, 256, 768]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"crop_mode\": \"triton\", \"widths\": [64, 256, 768]}",
+    "delta": {
+      "widths": [
+        64,
+        256,
+        768
+      ],
+      "crop_mode": "triton"
+    },
+    "hypothesis": "Triton crop on the 64-channel base (-0.04 s, +0.07 pp on the promoted base)",
+    "env": {},
+    "config": "futurebiohackers {\"crop_mode\": \"triton\", \"widths\": [64, 256, 768]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
