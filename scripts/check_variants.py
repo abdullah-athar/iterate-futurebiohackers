@@ -114,21 +114,43 @@ def main() -> int:
     torch.set_num_threads(4)
     reference = load_submission(reference_dir())
     new = load_submission(TEAM_DIR)
-    a = trial(reference, BASE)
-    b = trial(new, BASE)
+    # Our DEFAULTS may differ from the reference's (promoted values) and add switches the
+    # reference does not know (jitter, low_res_compile, count_nonfinite). The faithfulness
+    # test: our file, with every shared parameter set to OUR default and our own switches
+    # turned off, must match the reference file given the same shared parameters.
+    shared = {
+        k: v
+        for k, v in new.DEFAULTS.items()
+        if k in reference.DEFAULTS and reference.DEFAULTS[k] != v and k not in BASE
+    }
+    ours_only = {k: v for k, v in new.DEFAULTS.items() if k not in reference.DEFAULTS}
+    off = {"jitter": 0.0, "count_nonfinite": False}
+    if shared:
+        print(f"promoted defaults vs {REFERENCE_REF}: {shared}", flush=True)
+    if ours_only:
+        print(f"switches only in our file: {ours_only}", flush=True)
+    a = trial(reference, {**BASE, **shared})
+    b = trial(new, {**BASE, **shared, **off})
     same = (
         set(a.weights) == set(b.weights)
         and all(torch.equal(a.weights[k], b.weights[k]) for k in a.weights)
         and torch.equal(a.out, b.out)
     )
-    check(f"control path bit-identical to the reference recipe ({REFERENCE_REF})", same)
+    check(f"shared-parameter path bit-identical to the reference recipe ({REFERENCE_REF})", same)
     count = len(synthetic_split(train=True).labels)
     control_steps = math.ceil(BASE["epochs"] * (count // BASE["batch_size"]))
     check(
-        f"control path: total_steps unchanged ({control_steps})",
+        f"shared-parameter path: total_steps unchanged ({control_steps})",
         a.state.total_steps == control_steps == b.state.total_steps,
     )
-    check("control path prints nothing on stderr", b.stderr.strip() == "")
+    check("shared-parameter path prints nothing on stderr", b.stderr.strip() == "")
+    d = trial(new, BASE)  # our real defaults (plus the small BASE overrides)
+    check("our defaults run with finite predictions and nothing on stderr", d.stderr.strip() == "")
+    if new.DEFAULTS.get("jitter"):
+        check(
+            "our defaults differ from the shared path only through jitter (own generator)",
+            d.state.aug_generator is not None and not torch.equal(d.out, b.out),
+        )
 
     runs = {}
     for name, delta in VARIANTS.items():
