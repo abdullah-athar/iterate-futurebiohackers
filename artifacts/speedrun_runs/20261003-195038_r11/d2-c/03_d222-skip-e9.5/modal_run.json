@@ -1,0 +1,38 @@
+{
+  "returncode": 1,
+  "wall_seconds": 77.6,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T185951Z-d2caea35",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"depth2_residual\": true, \"depths\": [2, 2, 2], \"epochs\": 9.5}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "d222-skip-e9.5",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"depth2_residual\": true, \"depths\": [2, 2, 2], \"epochs\": 9.5}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"depth2_residual\": true, \"depths\": [2, 2, 2], \"epochs\": 9.5}",
+    "delta": {
+      "depths": [
+        2,
+        2,
+        2
+      ],
+      "depth2_residual": true,
+      "epochs": 9.5
+    },
+    "hypothesis": "depth 2 + skip with 0.75 epoch bought back",
+    "env": {},
+    "config": "futurebiohackers {\"depth2_residual\": true, \"depths\": [2, 2, 2], \"epochs\": 9.5}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

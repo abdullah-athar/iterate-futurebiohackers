@@ -1,0 +1,37 @@
+{
+  "returncode": 1,
+  "wall_seconds": 145.3,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T185210Z-f7499f0d",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"depth2_residual\": true, \"depths\": [2, 2, 2]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "d222-skip",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"depth2_residual\": true, \"depths\": [2, 2, 2]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"depth2_residual\": true, \"depths\": [2, 2, 2]}",
+    "delta": {
+      "depths": [
+        2,
+        2,
+        2
+      ],
+      "depth2_residual": true
+    },
+    "hypothesis": "depth 2 everywhere with a skip connection over the second conv (keeps a residual path)",
+    "env": {},
+    "config": "futurebiohackers {\"depth2_residual\": true, \"depths\": [2, 2, 2]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
