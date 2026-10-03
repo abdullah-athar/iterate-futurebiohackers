@@ -1,0 +1,43 @@
+{
+  "returncode": 0,
+  "wall_seconds": 84.4,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T214933Z-39d1aa13",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"aug_off_last\": 0.5, \"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "B-augoff0.5",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"aug_off_last\": 0.5, \"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"aug_off_last\": 0.5, \"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.25
+        ],
+        [
+          28,
+          0.5
+        ]
+      ],
+      "epochs": 9.5,
+      "aug_off_last": 0.5
+    },
+    "hypothesis": "candidate B + no-augmentation finish (last 0.5 ep): stack read at n=8",
+    "env": {},
+    "config": "futurebiohackers {\"aug_off_last\": 0.5, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

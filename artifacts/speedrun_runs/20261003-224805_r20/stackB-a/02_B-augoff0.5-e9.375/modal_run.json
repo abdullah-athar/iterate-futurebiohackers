@@ -1,0 +1,43 @@
+{
+  "returncode": 0,
+  "wall_seconds": 83.3,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T215219Z-742a7f2c",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"aug_off_last\": 0.5, \"count_nonfinite\": true, \"epochs\": 9.375, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "B-augoff0.5-e9.375",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"aug_off_last\": 0.5, \"count_nonfinite\": true, \"epochs\": 9.375, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"aug_off_last\": 0.5, \"count_nonfinite\": true, \"epochs\": 9.375, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.25
+        ],
+        [
+          28,
+          0.5
+        ]
+      ],
+      "epochs": 9.375,
+      "aug_off_last": 0.5
+    },
+    "hypothesis": "the stack with an eighth of an epoch trimmed (re-trim with k)",
+    "env": {},
+    "config": "futurebiohackers {\"aug_off_last\": 0.5, \"epochs\": 9.375, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

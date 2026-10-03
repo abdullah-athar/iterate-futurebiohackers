@@ -1,0 +1,42 @@
+{
+  "returncode": 1,
+  "wall_seconds": 83.1,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T215219Z-bfc9a409",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.25], [28, 0.75]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "B-24q-28q75",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.25], [28, 0.75]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.25], [28, 0.75]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.25
+        ],
+        [
+          28,
+          0.75
+        ]
+      ],
+      "epochs": 9.5
+    },
+    "hypothesis": "28 px phase extended to 75%: fewer 32 px steps",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 9.5, \"resolution_schedule\": [[24, 0.25], [28, 0.75]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
