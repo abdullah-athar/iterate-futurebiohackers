@@ -110,8 +110,8 @@ DEADLINE_MARGIN_S = 60.0  # the container stops starting work this long before R
 MIN_RUN_S = 90.0  # do not start a run with less container time left than this
 SCHEDULE_WAIT_S = 1800.0  # extra wait for Modal to find a container (parallel jobs may queue)
 CONTAINER_START_S = 15.0  # billed start-up allowance per container, not measurable inside it
-# Hard cap: 1200 GPU-min counted from the 63.0 min on the ledger when the cap was set.
-GPU_BUDGET_MIN = float(os.environ.get("MODAL_GPU_BUDGET_MIN", "1263"))
+# Hard cap on the ledger total (raised to 2000 GPU-min on 3 Oct 2026, evening).
+GPU_BUDGET_MIN = float(os.environ.get("MODAL_GPU_BUDGET_MIN", "2000"))
 GPU_CHECKPOINTS = [
     float(x) for x in os.environ.get("MODAL_GPU_CHECKPOINTS", "").split(",") if x.strip()
 ]
@@ -348,6 +348,7 @@ def _run(spec: dict, deadline: float | None, warm: bool) -> dict:
         *spec["args"],
     ]
     env = dict(os.environ)
+    env.update(spec.get("env") or {})  # e.g. {"TORCH_LOGS": "recompiles"} for a diagnostic run
     if warm:
         env["TORCHINDUCTOR_CACHE_DIR"] = LOCAL_CACHE
         env["TRITON_CACHE_DIR"] = f"{LOCAL_CACHE}/triton"
@@ -922,6 +923,7 @@ def _make_spec(
     count_nonfinite: bool,
     hypothesis: str = "",
     delta: dict | None = None,
+    env: dict | None = None,
 ) -> dict:
     full = {**params, "count_nonfinite": True} if count_nonfinite else dict(params)
     encoded = json.dumps(full, sort_keys=True)
@@ -936,6 +938,7 @@ def _make_spec(
         "params": encoded,
         "delta": delta if delta is not None else params,
         "hypothesis": hypothesis,
+        "env": env or {},
         "config": f"{TEAM} {json.dumps(delta if delta is not None else params, sort_keys=True)}",
     }
 
@@ -973,6 +976,7 @@ def _job_specs(job: dict, cfg: dict) -> list[dict]:
                 cfg["count_nonfinite"],
                 hypothesis=variant.get("hypothesis", ""),
                 delta=variant["params"],
+                env=variant.get("env"),
             )
         )
     if job.get("profile"):
