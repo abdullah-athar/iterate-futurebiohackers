@@ -1,0 +1,93 @@
+{
+  "round": "r6",
+  "job": "diag-recompile",
+  "environment": {
+    "task_id": "ta-01M41EYPVAJNAQFVRAKQSS4FYR",
+    "hostname": "modal",
+    "region": "ap-southeast",
+    "cloud": "CLOUD_PROVIDER_GCP",
+    "cpu_count": 20,
+    "gpu_name": "NVIDIA A100-SXM4-80GB",
+    "gpu_memory": "81920 MiB",
+    "gpu_power_limit": "400.00 W",
+    "driver": "580.95.05",
+    "mig": "Disabled"
+  },
+  "gpu_attempts": [
+    "NVIDIA A100 80GB PCIe @ 300.00 W [task ta-01M41EX13PSK1QSQWGY3EJP6MR CLOUD_PROVIDER_UNSPECIFIED/us-east]",
+    "NVIDIA A100-SXM4-80GB @ 500.00 W [task ta-01M41EXBYVR04FD4B64BJB116R CLOUD_PROVIDER_UNSPECIFIED/eu]",
+    "NVIDIA A100-SXM4-80GB @ 500.00 W [task ta-01M41EY94M3EAHEPGM6FPR46RR CLOUD_PROVIDER_UNSPECIFIED/eu]",
+    "NVIDIA A100 80GB PCIe @ 300.00 W [task ta-01M41EYDSH99JM9AF5KK9C0ZKR CLOUD_PROVIDER_UNSPECIFIED/us-east]",
+    "NVIDIA A100-SXM4-80GB @ 400.00 W [task ta-01M41EYPVAJNAQFVRAKQSS4FYR CLOUD_PROVIDER_GCP/ap-southeast]"
+  ],
+  "container_seconds": 94.6,
+  "rows": [
+    {
+      "label": "defaults-torchlogs",
+      "params": "{\"count_nonfinite\": true}",
+      "delta": {},
+      "hypothesis": "priority 1: do the 24->32 resolution switch or the first trials trigger recompiles / cuDNN autotune in train? (TORCH_LOGS=recompiles)",
+      "config": "futurebiohackers {}",
+      "returncode": 0,
+      "folder": "artifacts/speedrun_runs/20261003-190226_r6/diag-recompile/00_defaults-torchlogs",
+      "gpu": "NVIDIA A100-SXM4-80GB",
+      "power_limit": "400.00 W",
+      "task_id": "ta-01M41EYPVAJNAQFVRAKQSS4FYR",
+      "region": "ap-southeast",
+      "cloud": "CLOUD_PROVIDER_GCP",
+      "container_wall": 79.8,
+      "deadline_hit": false,
+      "nonfinite": 0,
+      "build_mode": "warm",
+      "complete": true,
+      "qualified": true,
+      "run_error": null,
+      "n": 3,
+      "trials_ok": 3,
+      "mean_acc": 0.7550666666666667,
+      "acc_std": 0.002074447717666872,
+      "mean_time": 5.993467851333331,
+      "time_std": 0.07391425780037834,
+      "mean_eval": 0.12819170499999663,
+      "build_time": 44.194825279,
+      "mean_prepare": 0.19353133633333167,
+      "mean_train": 5.799936514999999,
+      "by_trial": {
+        "0": [
+          0.7532,
+          5.908723861999988
+        ],
+        "1": [
+          0.7547,
+          6.027055786000005
+        ],
+        "2": [
+          0.7573,
+          6.044623905999998
+        ]
+      },
+      "seeds": [
+        0,
+        1,
+        2
+      ],
+      "accs": [
+        0.7532,
+        0.7547,
+        0.7573
+      ],
+      "times": [
+        5.908723861999988,
+        6.027055786000005,
+        6.044623905999998
+      ],
+      "evals": [
+        0.1273901919999929,
+        0.11588927199998977,
+        0.14129565100000718
+      ],
+      "verdict": "QUALIFIED (>= 75%)"
+    }
+  ],
+  "profile": null
+}

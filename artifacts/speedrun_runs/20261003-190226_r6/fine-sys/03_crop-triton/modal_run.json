@@ -1,0 +1,32 @@
+{
+  "returncode": 0,
+  "wall_seconds": 138.3,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T180949Z-8623cd0f",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"crop_mode\": \"triton\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "crop-triton",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"crop_mode\": \"triton\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"crop_mode\": \"triton\"}",
+    "delta": {
+      "crop_mode": "triton"
+    },
+    "hypothesis": "PR #5's Triton crop/flip kernel instead of the 25-mask crop (speed only)",
+    "env": {},
+    "config": "futurebiohackers {\"crop_mode\": \"triton\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

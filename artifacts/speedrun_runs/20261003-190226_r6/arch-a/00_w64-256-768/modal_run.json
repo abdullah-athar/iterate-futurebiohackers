@@ -1,0 +1,36 @@
+{
+  "returncode": 1,
+  "wall_seconds": 145.0,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T180246Z-79b391d8",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"widths\": [64, 256, 768]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "w64-256-768",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"widths\": [64, 256, 768]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"widths\": [64, 256, 768]}",
+    "delta": {
+      "widths": [
+        64,
+        256,
+        768
+      ]
+    },
+    "hypothesis": "priority 5: group 1 at 64 channels (largest maps); on the old net 64 cost 0.9 pp, but the stack may absorb part",
+    "env": {},
+    "config": "futurebiohackers {\"widths\": [64, 256, 768]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

@@ -1,0 +1,33 @@
+{
+  "returncode": 0,
+  "wall_seconds": 80.8,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T181104Z-bca51fd6",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"batch_size\": 1536, \"count_nonfinite\": true, \"epochs\": 9.25}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "bs1536-e9.25",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"batch_size\": 1536, \"count_nonfinite\": true, \"epochs\": 9.25}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"batch_size\": 1536, \"count_nonfinite\": true, \"epochs\": 9.25}",
+    "delta": {
+      "batch_size": 1536,
+      "epochs": 9.25
+    },
+    "hypothesis": "batch 1536 with the time saving spent on 0.5 epoch",
+    "env": {},
+    "config": "futurebiohackers {\"batch_size\": 1536, \"epochs\": 9.25}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

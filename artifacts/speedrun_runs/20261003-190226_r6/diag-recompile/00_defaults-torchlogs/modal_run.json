@@ -1,0 +1,32 @@
+{
+  "returncode": 0,
+  "wall_seconds": 79.8,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T180341Z-416311bf",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 3 --params '{\"count_nonfinite\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "defaults-torchlogs",
+    "n": 3,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "3",
+      "--params",
+      "{\"count_nonfinite\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true}",
+    "delta": {},
+    "hypothesis": "priority 1: do the 24->32 resolution switch or the first trials trigger recompiles / cuDNN autotune in train? (TORCH_LOGS=recompiles)",
+    "env": {
+      "TORCH_LOGS": "recompiles"
+    },
+    "config": "futurebiohackers {}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

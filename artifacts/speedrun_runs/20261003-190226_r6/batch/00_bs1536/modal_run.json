@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 212.6,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T180248Z-50c70185",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"batch_size\": 1536, \"count_nonfinite\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "bs1536",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"batch_size\": 1536, \"count_nonfinite\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"batch_size\": 1536, \"count_nonfinite\": true}",
+    "delta": {
+      "batch_size": 1536
+    },
+    "hypothesis": "priority 4: fewer steps, better GEMM tiling; sum loss keeps the airbench lr/wd scaling (NaN watch)",
+    "env": {},
+    "config": "futurebiohackers {\"batch_size\": 1536}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

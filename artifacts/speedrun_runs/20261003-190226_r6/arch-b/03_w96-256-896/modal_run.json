@@ -1,0 +1,36 @@
+{
+  "returncode": 0,
+  "wall_seconds": 170.8,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T180904Z-77277454",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"widths\": [96, 256, 896]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "w96-256-896",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"widths\": [96, 256, 896]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"widths\": [96, 256, 896]}",
+    "delta": {
+      "widths": [
+        96,
+        256,
+        896
+      ]
+    },
+    "hypothesis": "group 3 at 896 channels: accuracy to trade for epochs",
+    "env": {},
+    "config": "futurebiohackers {\"widths\": [96, 256, 896]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
