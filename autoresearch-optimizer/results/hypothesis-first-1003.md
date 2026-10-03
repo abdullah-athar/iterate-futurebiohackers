@@ -25,3 +25,29 @@ rewording of a ledger idea (multi-start from top-4 set medians) and a second Mye
 kernel, and kept the 2 distinct ideas.
 
 Reproduce: `uv run python -m autoresearch --run artifacts/runs/<name> swarm --agents 2 --turn-s 120 --generations 1 --eval local --max-budget-usd 1 --hypothesis-first`
+
+## 12 agents × 2 generations, without and with the gate
+
+Same settings for both runs (`--agents 12 --turn-s 120 --generations 2 --eval local --max-budget-usd 1 --seed 0`),
+run one after the other: `cmp12-nogate-1003-2019` and `cmp12-gate-1003-2019`. One run each.
+
+| | Without gate | With gate |
+|---|---|---|
+| Ideas stopped before code | — | 3 of 24 (12.5%) |
+| Duplicates caught by the code novelty gate | 1 | 0 |
+| Hypothesis calls | — | $0.90 ($0.028 per agent in gen 1, $0.047 in gen 2) |
+| Gate calls (Haiku) | — | $0.11 ($0.05–0.06 per generation) |
+| Coding sessions | $2.63 (24 × $0.110) | $2.53 (21 sessions) |
+| **Total cost** | **$2.63** | **$3.55 (+35%)** |
+| Wall clock | 3 min 0 s | 7 min 36 s |
+| Best (validate) | 511 | 511 |
+| Holdout best (seed 1024, baseline 1147) | 927 | 921 |
+
+The gate stopped 3 ideas, below the ~18% break-even, so it cost more than it saved. Two things
+made it more expensive than in the smoke runs: the hypothesis call grows with the ledger in
+STATUS.md ($0.015 with an empty ledger, $0.047 after one generation of 12), and the gate waits for
+the slowest hypothesis and then for the judge before any coding starts.
+
+In the no-gate run, 12 of the 23 evaluated solvers reached exactly 511 with different code: the
+redundancy that wastes sessions here is agents converging on the same result, which neither gate
+detects.
