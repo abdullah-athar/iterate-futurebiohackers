@@ -65,3 +65,8 @@ autoresearch-smoke:
 autoresearch-eval *args:
     uv run python scripts/evaluate_median_string.py "$@"
 
+# Render the autoresearch dashboard: just autoresearch-viz render artifacts/runs -o artifacts/viz/dashboard.html
+[working-directory: justfile_directory() / "autoresearch-optimizer"]
+[positional-arguments]
+autoresearch-viz *args:
+    uv run python -m autoresearch_viz "$@"
