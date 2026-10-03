@@ -1,0 +1,142 @@
+{
+  "round": "r1",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "aug-jitter",
+      "variants": [
+        {"label": "jitter0.1", "params": {"jitter": 0.1}, "hypothesis": "mild per-image brightness/contrast jitter regularises; accuracy gain buys epochs"},
+        {"label": "jitter0.2", "params": {"jitter": 0.2}, "hypothesis": "moderate photometric jitter; same mechanism, stronger"},
+        {"label": "jitter0.3", "params": {"jitter": 0.3}, "hypothesis": "strong photometric jitter; may hurt at 8.5 epochs (under-training)"}
+      ]
+    },
+    {
+      "name": "aug-translate",
+      "variants": [
+        {"label": "translate1", "params": {"translate": 1}, "hypothesis": "less translation = less regularisation, closer fit in few epochs; also 9 instead of 25 crop masks"},
+        {"label": "translate3", "params": {"translate": 3}, "hypothesis": "more translation = more regularisation; accuracy gain buys epochs"}
+      ]
+    },
+    {
+      "name": "aug-cutout",
+      "variants": [
+        {"label": "cutout4", "params": {"cutout": 4}, "hypothesis": "small cutout as extra regularisation (airbench96 uses cutout at long schedules)"},
+        {"label": "cutout8", "params": {"cutout": 8}, "hypothesis": "larger cutout; likely too strong for 8.5 epochs"}
+      ]
+    },
+    {
+      "name": "arch-widths-a",
+      "variants": [
+        {"label": "w96-384-576", "params": {"widths": [96, 384, 576]}, "hypothesis": "group 1 is 36% of forward time at 31x31; narrowing it saves the most time per channel"},
+        {"label": "w64-384-576", "params": {"widths": [64, 384, 576]}, "hypothesis": "halve group 1; big time saving, accuracy risk"}
+      ]
+    },
+    {
+      "name": "arch-widths-b",
+      "variants": [
+        {"label": "w128-320-768", "params": {"widths": [128, 320, 768]}, "hypothesis": "move capacity from group 2 (40% of time) to the cheap 3x3 group 3"},
+        {"label": "w96-320-640", "params": {"widths": [96, 320, 640]}, "hypothesis": "narrow groups 1 and 2, widen group 3: time saving with partial capacity compensation"}
+      ]
+    },
+    {
+      "name": "arch-widths-c",
+      "variants": [
+        {"label": "w128-256-768", "params": {"widths": [128, 256, 768]}, "hypothesis": "aggressive group 2 cut compensated by group 3"},
+        {"label": "w128-384-512", "params": {"widths": [128, 384, 512]}, "hypothesis": "narrower head group: small time saving, tests whether group 3 capacity matters"}
+      ]
+    },
+    {
+      "name": "arch-depths-a",
+      "variants": [
+        {"label": "d2-3-3", "params": {"depths": [2, 3, 3]}, "hypothesis": "drop the residual pair in group 1 (largest spatial map): saves ~1/3 of group 1 time"},
+        {"label": "d3-2-3", "params": {"depths": [3, 2, 3]}, "hypothesis": "drop the residual pair in group 2 (40% of time)"}
+      ]
+    },
+    {
+      "name": "arch-depths-b",
+      "variants": [
+        {"label": "d3-3-2", "params": {"depths": [3, 3, 2]}, "hypothesis": "drop the residual pair in group 3 (cheapest group): small saving, tests depth sensitivity"},
+        {"label": "silu", "params": {"activation": "silu"}, "hypothesis": "SiLU is cheaper than erf-GELU and often equal in accuracy at short schedules"}
+      ]
+    },
+    {
+      "name": "opt-lr-mom",
+      "variants": [
+        {"label": "lr7.2", "params": {"lr": 7.2}, "hypothesis": "lr x0.8: the 8.5-epoch schedule may be over-aggressive"},
+        {"label": "lr10.8", "params": {"lr": 10.8}, "hypothesis": "lr x1.2: faster progress per step in a short schedule"},
+        {"label": "mom0.8", "params": {"momentum": 0.8}, "hypothesis": "lower momentum (lr is decoupled, so this changes the effective step too)"}
+      ]
+    },
+    {
+      "name": "opt-mom-wd",
+      "variants": [
+        {"label": "mom0.9", "params": {"momentum": 0.9}, "hypothesis": "higher momentum smooths the noisy few-epoch trajectory"},
+        {"label": "wd0.0084", "params": {"weight_decay": 0.0084}, "hypothesis": "wd x0.7: less regularisation for a short schedule"},
+        {"label": "wd0.0168", "params": {"weight_decay": 0.0168}, "hypothesis": "wd x1.4: stronger regularisation; with lookahead EMA may improve generalisation"}
+      ]
+    },
+    {
+      "name": "opt-ls-warmup",
+      "variants": [
+        {"label": "ls0.25", "params": {"label_smoothing": 0.25}, "hypothesis": "slightly less label smoothing"},
+        {"label": "ls0.35", "params": {"label_smoothing": 0.35}, "hypothesis": "slightly more label smoothing (100 classes tolerate strong smoothing)"},
+        {"label": "warmup0.15", "params": {"warmup": 0.15}, "hypothesis": "shorter warmup leaves more steps at high lr"}
+      ]
+    },
+    {
+      "name": "opt-warmup-final",
+      "variants": [
+        {"label": "warmup0.3", "params": {"warmup": 0.3}, "hypothesis": "longer warmup stabilises the fp16 early phase"},
+        {"label": "final0.03", "params": {"final_lr": 0.03}, "hypothesis": "decay further at the end for a sharper final convergence"},
+        {"label": "final0.15", "params": {"final_lr": 0.15}, "hypothesis": "decay less: the lookahead EMA already averages the noise"}
+      ]
+    },
+    {
+      "name": "opt-bias-ema",
+      "variants": [
+        {"label": "bias32", "params": {"bias_scaler": 32.0}, "hypothesis": "BN biases learn too fast at 64x"},
+        {"label": "bias128", "params": {"bias_scaler": 128.0}, "hypothesis": "BN biases can learn faster still (airbench uses 64x on CIFAR-10)"},
+        {"label": "ema-off", "params": {"ema_every": 0}, "hypothesis": "no lookahead EMA: saves the EMA kernels (0.33 ms x 82) at some accuracy cost"}
+      ]
+    },
+    {
+      "name": "opt-ema-whiten",
+      "variants": [
+        {"label": "ema3", "params": {"ema_every": 3}, "hypothesis": "more frequent lookahead averaging"},
+        {"label": "ema10", "params": {"ema_every": 10}, "hypothesis": "less frequent lookahead averaging: fewer EMA kernels, maybe equal accuracy"},
+        {"label": "whiten2", "params": {"whiten_bias_epochs": 2}, "hypothesis": "freeze the whitening bias earlier: the bias-grad graph runs fewer steps"}
+      ]
+    },
+    {
+      "name": "opt-whiten-bn",
+      "variants": [
+        {"label": "whiten4", "params": {"whiten_bias_epochs": 4}, "hypothesis": "train the whitening bias longer"},
+        {"label": "bn0.5", "params": {"bn_momentum": 0.5}, "hypothesis": "slower BN statistics (momentum 0.6 is already very fast)"},
+        {"label": "bn0.7", "params": {"bn_momentum": 0.7}, "hypothesis": "even faster BN statistics for a short schedule"}
+      ]
+    },
+    {
+      "name": "opt-scale",
+      "variants": [
+        {"label": "scale0.0889", "params": {"scaling_factor": 0.08888888888888889}, "hypothesis": "logit scale x0.8: softer logits with label smoothing 0.3"},
+        {"label": "scale0.1389", "params": {"scaling_factor": 0.1388888888888889}, "hypothesis": "logit scale x1.25: sharper logits"}
+      ]
+    },
+    {
+      "name": "opt-batch",
+      "variants": [
+        {"label": "bs768", "params": {"batch_size": 768}, "hypothesis": "smaller batch = more steps per epoch; the sum loss keeps the airbench lr/wd scaling; maybe better accuracy per epoch"},
+        {"label": "bs1536", "params": {"batch_size": 1536}, "hypothesis": "larger batch = fewer steps and less Python overhead per epoch; fp16 sum loss grows (NaN risk)"}
+      ]
+    },
+    {
+      "name": "sys-compile",
+      "variants": [
+        {"label": "no-cudagraphs", "params": {"compile": "max-autotune-no-cudagraphs"}, "hypothesis": "cheaper build; measures what CUDA graphs are worth per step"},
+        {"label": "silu-gather", "params": {"activation": "silu", "crop_gather": true}, "hypothesis": "cheap-swaps bundle: SiLU plus the sync-free vectorised crop"}
+      ]
+    }
+  ]
+}

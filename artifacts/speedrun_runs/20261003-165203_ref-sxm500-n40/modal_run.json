@@ -1,0 +1,17 @@
+{
+  "returncode": 0,
+  "wall_seconds": 387.2,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T154538Z-6c55400f",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 40",
+  "spec": {
+    "label": "ref-sxm500-n40",
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "40"
+    ],
+    "config": "futurebiohackers --n 40"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "round": "calib",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "epochs",
+      "variants": [
+        {
+          "label": "e8.0",
+          "params": {"epochs": 8.0},
+          "hypothesis": "exchange-rate calibration: 0.5 fewer epochs; k = dacc/dtime"
+        },
+        {
+          "label": "e7.5",
+          "params": {"epochs": 7.5},
+          "hypothesis": "exchange-rate calibration: 1.0 fewer epochs; k = dacc/dtime"
+        }
+      ]
+    }
+  ]
+}
