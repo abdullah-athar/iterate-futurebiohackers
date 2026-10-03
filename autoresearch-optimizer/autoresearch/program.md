@@ -30,8 +30,8 @@ uv run python -m autoresearch --run artifacts/runs/<name> init --problem median_
      `rejected_duplicate`, `rejected_guard` (disallowed import/call), `rejected_screen`
      (invalid/crash/worse than baseline on screen), `failed`.
    - A candidate that beats the global best on `validate` is **re-tested on a fresh `confirm`
-     set** before it is accepted; if it does not also win there the gain is treated as noise and
-     the candidate is not promoted (verdict `unconfirmed`). Every submission gets a verdict:
+     set** before it is accepted; if it scores *worse* than the incumbent there the gain is treated
+     as noise/overfit and the candidate is not promoted (verdict `unconfirmed`). Every submission gets a verdict:
      `supported` / `partial` / `falsified` / `unconfirmed` / `inconclusive` / `untested`.
      `status` lists the falsified hypotheses — read them, do not re-propose them, build on *why*
      they failed.

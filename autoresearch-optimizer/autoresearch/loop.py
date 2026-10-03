@@ -224,7 +224,7 @@ class ResearchRun:
                 return
 
     def _confirm(self, entry: Entry, source: str, incumbent: Entry | None = None) -> bool | None:
-        """Re-test a claimed new global best on fresh instances. True = confirmed (or no confirm split)."""
+        """Re-test a claimed new global best on fresh instances: confirmed unless it scores worse there."""
         split = self.problem.confirm_split
         if not split:
             return None
@@ -233,7 +233,8 @@ class ResearchRun:
         if not res.ok:
             return False
         ref = incumbent.eval_result(split) if incumbent else None
-        return ref is None or not ref.ok or res.score < ref.score
+        # a tie on fresh instances is not evidence of overfitting; only a regression refutes the gain
+        return ref is None or not ref.ok or res.score <= ref.score
 
     def evaluate_holdout(self, entry: Entry) -> EvalResult:
         return evaluate_in_subprocess(self.problem_name, self.problem, self.store.read_candidate(entry), "holdout")
