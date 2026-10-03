@@ -1,67 +1,32 @@
-# futurebiohackers: ResNet9-style CIFAR-100 baseline
+# futurebiohackers: airbench-style CIFAR-100 recipe
 
-Plain PyTorch 2.4 recipe modelled on the organizers' verified reference (repository
-README: ResNet9-style, 40 epochs, width 64, 75.36% mean accuracy, 59.30 s prepare + train
-on an A100 80GB PCIe). No pretrained weights, no external data, nothing learned survives
-between trials. Only `torch` and `benchmark.api` are imported.
+An adaptation of Keller Jordan's [airbench](https://github.com/KellerJordan/cifar10-airbench)
+(MIT, Copyright (c) 2024 Keller Jordan) to CIFAR-100, trained from scratch with no test-time
+augmentation.
 
 ## Recipe
 
-| Part | Choice |
-| --- | --- |
-| Network | ResNet9 (DAWNBench design, `model.py`): conv(3→64) → conv(64→128) + maxpool → residual(128) → conv(128→256) + maxpool → conv(256→512) + maxpool → residual(512) → global maxpool → linear(512→100) × 0.125. 3×3 convolutions without bias, BatchNorm, ReLU. 6.6 M parameters at width 64. |
-| Input | The evaluator convention, float32 in [0, 1]. Per-channel mean/std normalization is inside `forward()`, from statistics computed on the training split in `prepare` (never hard-coded). |
-| Augmentation | Random 32×32 crop from the 4-pixel zero-padded image + random horizontal flip, on the device, one gather per batch, driven by a per-trial generator seeded with the trial seed. |
-| Optimizer | SGD, Nesterov momentum 0.9, weight decay 5e-4 on every parameter, batch 512, last partial batch dropped (97 steps per epoch). |
-| Schedule | Per step: linear warmup to lr 0.4 over the first 15% of steps, then linear decay to 0. 40 epochs = 3,880 steps. |
-| Loss | Cross-entropy with label smoothing 0.1. |
-| Precision | `auto`: bf16 autocast + channels_last on Ampere or newer CUDA GPUs (the A100); fp16 autocast + GradScaler on older CUDA GPUs (free Colab/Kaggle T4 or P100 accuracy checks); fp32 on CPU. Evaluation runs the eager fp32 model (TF32 enabled). |
-| Compile | `use_compile` exists but is off: untested without a GPU. |
+- **Network**: frozen 2x2 patch-whitening conv (initialized from 5,000 training images in
+  `prepare`), then three conv groups of widths 128/384/576. Each group has three 3x3 convs
+  with max-pooling and a residual over the last two. BatchNorm has frozen weights and
+  momentum 0.6, activations are GELU, the head is linear, and the model runs in fp16 and
+  channels-last.
+- **Training**: 8.5 epochs, batch 1024, Nesterov SGD (lr 9.0, wd 0.012 per 1024 examples,
+  momentum 0.85, 64x lr on BatchNorm biases). Label smoothing 0.3. 23% warmup, then linear
+  decay to 0.07x. Lookahead EMA every 5 steps.
+- **Augmentation**: alternating flip and 2-pixel reflect-padded translation.
+- **Untimed `build`**: `torch.compile(mode="max-autotune")` plus a warmup of the training and
+  evaluation kernels on random synthetic images. `prepare` resets every parameter, BatchNorm
+  statistic, optimizer and EMA buffer before each trial.
 
-## Parameters
+Every setting can be overridden for experiments with `--params`; the defaults are the
+submitted recipe.
 
-Pass with `--params '{"epochs": 10}'`. The defaults are the baseline; the official run needs no `--params`.
+## Development results
 
-| Key | Default | Meaning |
-| --- | --- | --- |
-| `epochs` | 40 | passes over the 50,000 training images |
-| `width` | 64 | base channel count (layers use 1×, 2×, 4×, 8×) |
-| `batch_size` | 512 | training batch (capped at the dataset size for the synthetic fixtures) |
-| `lr` | 0.4 | peak learning rate |
-| `momentum` | 0.9 | SGD momentum (Nesterov when > 0) |
-| `weight_decay` | 5e-4 | L2 weight decay on all parameters |
-| `label_smoothing` | 0.1 | cross-entropy label smoothing |
-| `warmup_fraction` | 0.15 | fraction of steps spent warming up to `lr` |
-| `precision` | `auto` | `auto`, `bf16`, `fp16` or `fp32` |
-| `bn_weight_decay` | true | `false` removes weight decay from the BatchNorm scale/shift parameters |
-| `use_compile` | false | wrap the training model in `torch.compile` (compiled during the synthetic warmup in `build`; evaluation uses the eager module) |
-| `compile_mode` | `default` | `torch.compile` mode: `default`, `reduce-overhead`, `max-autotune`, `max-autotune-no-cudagraphs` |
+40 trials on a Modal NVIDIA A100-SXM4-80GB (400 W), so timings will differ on the official
+A100 80GB PCIe:
 
-Unknown keys are rejected so typos cannot silently fall back to the defaults.
-
-## What runs where
-
-- **`build` (untimed, once):** merge parameters, build the model on the device, enable cuDNN
-  autotuning, then 3 synthetic forward/backward/optimizer steps on random uint8 images plus
-  two synthetic eval forwards (batch 1024 and the 784-image final batch). No real data, no
-  trial seed; the synthetic generator uses the constant 0.
-- **`prepare` (timed, every trial):** `reset_parameters()` on every module (weights, BatchNorm
-  running statistics and counters) using the torch RNG the harness just seeded with the trial
-  seed, drop gradients, new optimizer (empty momentum buffers), new GradScaler if fp16, new
-  `torch.Generator(seed)` for shuffling and augmentation, copy images and labels to the
-  device, compute the normalization statistics from the training split.
-- **`train` (timed):** the loop above. Returns `state.model`, the eager module.
-- **Evaluation:** one forward per batch in `eval()` mode, no augmentation, no state change.
-
-## Local checks
-
-```bash
-uv run python -m benchmark.run --submission futurebiohackers --device cpu --synthetic --n 2
-uv run python -m benchmark.data --root data
-uv run python -m benchmark.run --submission futurebiohackers --device cpu --n 2 \
-    --no-accuracy-target --eval-timeout 120 --params '{"epochs": 1, "width": 16}'
-uv run python -m benchmark.run --submission futurebiohackers --n 1          # GPU, real recipe
-```
-
-On CPU the 10,000-image test pass exceeds the 5 s evaluation limit even at width 16, so
-development runs on CPU pass `--eval-timeout`. The GPU run uses the official limits.
+| Mean accuracy | Accuracy std | Mean prepare + train | Time std |
+| ---: | ---: | ---: | ---: |
+| 75.29% | 0.25 pp | 8.11 s | 0.02 s |
