@@ -56,6 +56,7 @@ DEFAULTS = {
     "activation": "gelu",  # or "silu"
     "bn_dtype": "float",  # or "half"
     "color_jitter": [0.0, 0.0],  # per-image brightness and contrast ranges
+    "global_pool": "adaptive",  # "adaptive", "amax", or "max" over the final feature map
     # "muon" follows hiverge/cifar10-speedrun: Muon on conv filters, SGD on biases and head.
     "optimizer": "sgd",
     "muon_lr": 0.205,
@@ -140,6 +141,7 @@ class Net(nn.Module):
         self.head = nn.Linear(w3, num_classes, bias=False)
         self.scaling_factor = hyp["scaling_factor"]
         self.muon_head = hyp["optimizer"] == "muon"
+        self.global_pool = hyp["global_pool"]
 
     def reset(self):
         for m in self.modules():
@@ -164,8 +166,13 @@ class Net(nn.Module):
     def forward(self, x, whiten_bias_grad: bool = True):
         b = self.whiten.bias
         x = self.act(F.conv2d(x, self.whiten.weight, b if whiten_bias_grad else b.detach()))
-        # Global max over the final map; AdaptiveMaxPool2d's backward uses slow atomics.
-        x = self.layers(x).flatten(2).amax(2)
+        x = self.layers(x)
+        if self.global_pool == "adaptive":
+            x = F.adaptive_max_pool2d(x, 1).flatten(1)
+        elif self.global_pool == "amax":
+            x = x.flatten(2).amax(2)
+        else:
+            x = x.flatten(2).max(2).values
         if self.muon_head:
             return self.head(x) / x.size(-1)
         return self.head(x) * self.scaling_factor
@@ -348,6 +355,8 @@ def build(context: BuildContext):
         raise ValueError("pool_first must contain three booleans")
     if hyp["activation"] not in ("gelu", "silu") or hyp["bn_dtype"] not in ("float", "half"):
         raise ValueError("activation must be gelu or silu; bn_dtype must be float or half")
+    if hyp["global_pool"] not in ("adaptive", "amax", "max"):
+        raise ValueError("global_pool must be adaptive, amax, or max")
     if hyp["optimizer"] not in ("sgd", "muon") or len(hyp["color_jitter"]) != 2:
         raise ValueError("optimizer must be sgd or muon; color_jitter needs two ranges")
     device = context.device
