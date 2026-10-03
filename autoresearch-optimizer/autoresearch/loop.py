@@ -45,6 +45,7 @@ class LoopConfig:
     exploit: float = 0.7
     patience: int = 4          # proposals without global improvement before 'plateau'
     ucb_c: float = 0.8
+    time_budget_ms: int = 1000  # CPU budget per instance for one solve() call
 
     def to_dict(self) -> dict:
         return self.__dict__.copy()
@@ -200,7 +201,7 @@ class ResearchRun:
         for split in self.problem.splits:
             if split == "holdout" or split == self.problem.confirm_split:
                 continue
-            res = evaluate_in_subprocess(self.problem_name, self.problem, source, split)
+            res = evaluate_in_subprocess(self.problem_name, self.problem, source, split, self.config.time_budget_ms)
             entry.evals[split] = res.to_dict()
             if not res.ok:
                 entry.status = STATUS_FAILED if split == self.problem.objective_split else STATUS_REJECTED_SCREEN
@@ -221,7 +222,7 @@ class ResearchRun:
         split = self.problem.confirm_split
         if not split:
             return None
-        res = evaluate_in_subprocess(self.problem_name, self.problem, source, split)
+        res = evaluate_in_subprocess(self.problem_name, self.problem, source, split, self.config.time_budget_ms)
         entry.evals[split] = res.to_dict()
         if not res.ok:
             return False
@@ -230,7 +231,8 @@ class ResearchRun:
         return ref is None or not ref.ok or res.score <= ref.score
 
     def evaluate_holdout(self, entry: Entry) -> EvalResult:
-        return evaluate_in_subprocess(self.problem_name, self.problem, self.store.read_candidate(entry), "holdout")
+        return evaluate_in_subprocess(self.problem_name, self.problem, self.store.read_candidate(entry), "holdout",
+                                      self.config.time_budget_ms)
 
     @staticmethod
     def describe_entry(e: Entry) -> str:

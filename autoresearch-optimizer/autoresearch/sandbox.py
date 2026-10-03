@@ -25,13 +25,16 @@ def load_solve_function(source: str):
     return solve
 
 
-def evaluate_in_subprocess(problem_name: str, problem: Problem, source: str, split: str) -> EvalResult:
-    """Run `problem.evaluate(source, split)` in a fresh interpreter; kill it on timeout."""
+def evaluate_in_subprocess(problem_name: str, problem: Problem, source: str, split: str,
+                           budget_ms: int | None = None) -> EvalResult:
+    """Run `problem.evaluate(source, split, budget_ms)` in a fresh interpreter; kill it on timeout."""
     timeout = problem.timeouts.get(split, 120.0)
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, dir=tempfile.gettempdir()) as f:
         f.write(source)
         src_path = f.name
     cmd = [sys.executable, "-m", "autoresearch.worker", problem_name, split, src_path]
+    if budget_ms is not None:
+        cmd.append(str(budget_ms))
     t0 = time.perf_counter()
     try:
         proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=timeout, check=False)

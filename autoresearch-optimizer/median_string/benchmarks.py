@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import random
 from typing import Literal
 from .instance import ProblemInstance
@@ -232,9 +233,14 @@ def get_hard_suite() -> list[ProblemInstance]:
     ]
 
 
-def get_confirm_suite(seed_offset: int = 5000) -> list[ProblemInstance]:
+def get_confirm_suite(seed_offset: int | None = None) -> list[ProblemInstance]:
     """Fresh medium-difficulty instances used by the autoresearch loop to re-test a claimed
-    new best before accepting it (guards against selecting on evaluation noise/overfitting)."""
+    new best before accepting it (guards against selecting on evaluation noise/overfitting).
+
+    The seed comes from AUTORESEARCH_CONFIRM_SEED when set, so remote evaluators can use seeds
+    the proposing agents never see."""
+    if seed_offset is None:
+        seed_offset = int(os.environ.get("AUTORESEARCH_CONFIRM_SEED", 5000))
     specs = [
         ("confirm_dna_25bp_k12", "ACGT", 25, 12, 0.20, 0.04, "levenshtein"),
         ("confirm_dna_40bp_k15", "ACGT", 40, 15, 0.25, 0.05, "levenshtein"),
@@ -245,12 +251,15 @@ def get_confirm_suite(seed_offset: int = 5000) -> list[ProblemInstance]:
     return _fresh_suite(specs, seed_offset, "Confirmation instance")
 
 
-def get_holdout_suite(seed_offset: int = 9000) -> list[ProblemInstance]:
+def get_holdout_suite(seed_offset: int | None = None) -> list[ProblemInstance]:
     """Fresh instances with the medium/hard generator settings but unseen seeds.
 
     Used by the autoresearch loop for final reporting so that search-time feedback
-    (small/medium tiers) is separated from the final evaluation.
+    (small/medium tiers) is separated from the final evaluation. The seed comes from
+    AUTORESEARCH_HOLDOUT_SEED when set.
     """
+    if seed_offset is None:
+        seed_offset = int(os.environ.get("AUTORESEARCH_HOLDOUT_SEED", 9000))
     specs = [
         ("holdout_dna_25bp_k12", "ACGT", 25, 12, 0.20, 0.04, "levenshtein"),
         ("holdout_dna_40bp_k15", "ACGT", 40, 15, 0.25, 0.05, "levenshtein"),

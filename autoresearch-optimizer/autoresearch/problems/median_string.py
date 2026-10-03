@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import signal
 import time
 from pathlib import Path
 
@@ -28,10 +29,54 @@ SOLVER CONTRACT: a single Python file defining `def solve(instance) -> str`.
 Allowed imports: Python stdlib and `from median_string.metrics import sum_distance,
 levenshtein_distance, hamming_distance, calculate_distance, compute_set_median`.
 No other third-party packages. Must be deterministic (seed any RNG).
-TIME BUDGET: whole 'screen' split < 20 s, whole 'validate' split (5 instances, 10-15 strings
-of 20-50 chars) < 90 s. Levenshtein in pure Python is slow: a 40x40 DP is ~1 ms; budget
-the number of objective evaluations accordingly (roughly <= 20k per instance).
+TIME BUDGET: each solve() call gets instance.time_budget_ms of CPU time (default 1000 ms).
+Going over by more than 25% makes that instance invalid (score = baseline + 1000), so check
+time.process_time() against the budget and return your best string so far. Levenshtein in
+pure Python is slow: a 40x40 DP is ~1 ms, so a full sum_distance on 15 strings is ~15 ms.
+Incremental scoring and early stopping matter as much as the search strategy.
 """
+
+BUDGET_GRACE = 1.25  # an instance is invalid once solve() uses more than budget * grace of CPU
+
+
+class _OverBudget(BaseException):
+    """Raised by the CPU timer inside a candidate; a BaseException so `except Exception` can't swallow it."""
+
+
+def _on_timer(signum, frame):
+    raise _OverBudget
+
+
+def _budgeted(solve, budget_ms: int, cpu_ms: dict[str, float]):
+    """Wrap `solve` with a per-call CPU limit (SIGPROF) and a wall-clock backstop (SIGALRM)."""
+    limit = budget_ms * BUDGET_GRACE / 1000
+
+    def wrapped(instance):
+        instance.time_budget_ms = budget_ms
+        handlers = signal.signal(signal.SIGPROF, _on_timer), signal.signal(signal.SIGALRM, _on_timer)
+        over = False
+        t0 = time.process_time()
+        try:
+            try:
+                signal.setitimer(signal.ITIMER_PROF, limit)
+                signal.setitimer(signal.ITIMER_REAL, 3 * limit + 1)  # sleeping/blocked solvers
+                out = solve(instance)
+            finally:
+                signal.setitimer(signal.ITIMER_PROF, 0)
+                signal.setitimer(signal.ITIMER_REAL, 0)
+        except _OverBudget:
+            over = True
+        finally:
+            signal.signal(signal.SIGPROF, handlers[0])
+            signal.signal(signal.SIGALRM, handlers[1])
+        used = time.process_time() - t0
+        cpu_ms[instance.name] = round(1000 * used, 1)
+        if over or used > limit:
+            raise TimeoutError(f"over budget: {1000 * used:.0f} ms CPU > {budget_ms} ms x {BUDGET_GRACE}")
+        return out
+
+    return wrapped
+
 
 
 class MedianStringProblem:
@@ -49,7 +94,7 @@ class MedianStringProblem:
     def seed_source(self) -> str:
         return SEED_PATH.read_text()
 
-    def evaluate(self, source: str, split: str) -> EvalResult:
+    def evaluate(self, source: str, split: str, budget_ms: int | None = None) -> EvalResult:
         tier = self._tiers[split]
         t0 = time.perf_counter()
         try:
@@ -60,6 +105,9 @@ class MedianStringProblem:
             return EvalResult(split, baseline + 1000 * len(instances), baseline,
                               elapsed=time.perf_counter() - t0,
                               error=f"Failed to load solver: {type(e).__name__}: {e}")
+        cpu_ms: dict[str, float] = {}
+        if budget_ms:
+            solve = _budgeted(solve, budget_ms, cpu_ms)
         summary = Evaluator().evaluate_solver(
             FunctionalSolver(solve, name="candidate"), benchmark=tier, verbose=False
         )
@@ -76,6 +124,7 @@ class MedianStringProblem:
                 valid=r.is_valid,
                 error=r.error_message,
                 elapsed=round(r.elapsed_seconds, 3),
+                cpu_ms=cpu_ms.get(r.instance_name, 0.0),
                 info=(f"k={inst.num_strings} len={lens[0]}-{lens[-1]} |alphabet|={len(inst.alphabet)} "
                       f"metric={inst.metric} mut={inst.metadata.get('mutation_rate')} "
                       f"indel={inst.metadata.get('indel_rate')}"),

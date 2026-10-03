@@ -24,6 +24,7 @@ class InstanceDiag:
     error: str = ""
     elapsed: float = 0.0
     info: str = ""
+    cpu_ms: float = 0.0
 
     @property
     def vs_baseline(self) -> float:
@@ -88,7 +89,7 @@ class Problem(Protocol):
     objective_split: str              # split whose score is the search objective
     confirm_split: str | None  # fresh instances used only to confirm a claimed new global best
     allowed_imports: tuple[str, ...]
-    timeouts: dict[str, float]        # wall-clock limit (s) per split for one evaluation
+    timeouts: dict[str, float]        # wall-clock limit (s) per split for one evaluation (outer backstop)
 
     def describe(self) -> str:        # problem statement + solver contract for the proposer
         ...
@@ -96,7 +97,8 @@ class Problem(Protocol):
     def seed_source(self) -> str:     # starting solver source code
         ...
 
-    def evaluate(self, source: str, split: str) -> EvalResult:  # runs in the worker process
+    def evaluate(self, source: str, split: str, budget_ms: int | None = None) -> EvalResult:
+        """Runs in the worker process. `budget_ms` is the CPU budget per instance (None = unlimited)."""
         ...
 
 
