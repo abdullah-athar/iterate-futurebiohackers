@@ -23,11 +23,11 @@ from benchmark.api import BuildContext, TrainingData
 
 # Override any value with --params, e.g. '{"epochs": 9, "widths": [128, 384, 768]}'.
 DEFAULTS = {
-    "epochs": 8.75,
+    "epochs": 8.25,
     "batch_size": 1024,
-    "lr": 10.8,  # per 1024 examples, decoupled from momentum (airbench convention)
+    "lr": 11.5,  # per 1024 examples, decoupled from momentum (airbench convention)
     "momentum": 0.85,
-    "weight_decay": 0.012,  # per 1024 examples, decoupled from the learning rate
+    "weight_decay": 0.017,  # per 1024 examples, decoupled from the learning rate
     "bias_scaler": 32.0,  # learning-rate multiplier for BatchNorm biases
     "label_smoothing": 0.25,
     "warmup": 0.23,  # fraction of steps spent ramping the learning rate up
@@ -35,23 +35,24 @@ DEFAULTS = {
     "whiten_bias_epochs": 3,
     "translate": 2,
     "cutout": 0,
-    "widths": [96, 256, 768],
+    "widths": [128, 256, 768],
     "depth": 3,  # convs per group; the third adds a residual connection
-    "depths": None,  # optional per-group depths, e.g. [2, 3, 3]
+    "depths": [2, 3, 3],  # per-group convs; None uses depth for every group
     "train_resolution": 24,  # reduced resolution for the first training stage
     "resolution_switch": 0.25,  # fraction of steps before returning to 32 pixels
     "crop_mode": "masked",  # "indexed" preserves channels-last with one gather
     "fused_sgd": False,
-    "compile_loss": False,
+    "compile_loss": True,
     "hard_fraction": 1.0,  # <1 enables a freshly trained small proxy
     "proxy_widths": [32, 64, 128],
     "proxy_every": 4,  # proxy backward/update period; scores every batch
     "proxy_mode": "offline",  # airbench-style prepass, or online selection
-    "gelu_approximate": "none",  # "tanh" uses a cheaper approximation
+    "gelu_approximate": "none",  # "tanh" uses a cheaper approximation; "silu" swaps in SiLU
+    "global_pool": "max",  # "max": plain full-map max pool, avoids adaptive atomics
     "autotune_backends": "ATEN,TRITON",  # ATen/cuDNN and Inductor Triton candidates
     "pool_first": [False, False, False],  # move selected group pools before conv1
     "scaling_factor": 1.25 / 9,  # logit scale (airbench uses 1/9)
-    "bn_momentum": 0.7,
+    "bn_momentum": 0.5,
     "ema_every": 5,  # lookahead EMA period in steps; 0 disables it
     "compile": "max-autotune",  # torch.compile mode; "" runs eagerly
     # Accuracy-recovery and resizing switches.
@@ -75,7 +76,7 @@ class BatchNorm(nn.BatchNorm2d):
         x = self(x)
         if residual is not None:
             x = x + residual
-        return F.gelu(x, approximate=approximate)
+        return _activate(x, approximate)
 
 
 class Conv(nn.Conv2d):
@@ -111,6 +112,30 @@ class ConvGroup(nn.Module):
         return self.norm3.activate(self.conv3(x), self.approximate, x0)
 
 
+def _activate(x, approximate):
+    return F.silu(x) if approximate == "silu" else F.gelu(x, approximate=approximate)
+
+
+class Activation(nn.Module):
+    def __init__(self, approximate):
+        super().__init__()
+        self.approximate = approximate
+
+    def forward(self, x):
+        return _activate(x, self.approximate)
+
+
+class GlobalMaxPool(nn.Module):
+    def __init__(self, implementation):
+        super().__init__()
+        self.implementation = implementation
+
+    def forward(self, x):
+        if self.implementation == "max":
+            return F.max_pool2d(x, x.shape[-2:])
+        return F.adaptive_max_pool2d(x, 1)
+
+
 class Net(nn.Module):
     def __init__(self, hyp, num_classes):
         super().__init__()
@@ -120,7 +145,7 @@ class Net(nn.Module):
         self.whiten = nn.Conv2d(3, 24, kernel_size=2, padding=0, bias=True)
         self.whiten.weight.requires_grad = False
         self.layers = nn.Sequential(
-            nn.GELU(approximate=hyp["gelu_approximate"]),
+            Activation(hyp["gelu_approximate"]),
             ConvGroup(
                 24, w1, depths[0], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][0]
             ),
@@ -130,7 +155,7 @@ class Net(nn.Module):
             ConvGroup(
                 w2, w3, depths[2], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][2]
             ),
-            nn.AdaptiveMaxPool2d(1),
+            GlobalMaxPool(hyp["global_pool"]),
         )
         self.head = nn.Linear(w3, num_classes, bias=False)
         self.scaling_factor = hyp["scaling_factor"]
@@ -268,8 +293,8 @@ def build(context: BuildContext):
         raise ValueError("hard_fraction must be in (0, 1]; proxy_every must be positive")
     if hyp["proxy_mode"] not in ("online", "offline"):
         raise ValueError("proxy_mode must be online or offline")
-    if hyp["gelu_approximate"] not in ("none", "tanh"):
-        raise ValueError("gelu_approximate must be none or tanh")
+    if hyp["gelu_approximate"] not in ("none", "tanh", "silu"):
+        raise ValueError("gelu_approximate must be none, tanh or silu")
     if hyp["autotune_backends"] not in ("ATEN", "TRITON", "ATEN,TRITON"):
         raise ValueError("autotune_backends must be ATEN, TRITON, or ATEN,TRITON")
     if len(hyp["pool_first"]) != 3 or any(type(v) is not bool for v in hyp["pool_first"]):
