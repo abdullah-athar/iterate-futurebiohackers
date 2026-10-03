@@ -1,0 +1,133 @@
+{
+  "round": "r20",
+  "n": 8,
+  "seed": 0,
+  "control": {
+    "resolution_schedule": [
+      [
+        24,
+        0.25
+      ],
+      [
+        28,
+        0.5
+      ]
+    ],
+    "epochs": 9.5
+  },
+  "jobs": [
+    {
+      "name": "stackB-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "B-augoff0.5",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.25
+              ],
+              [
+                28,
+                0.5
+              ]
+            ],
+            "epochs": 9.5,
+            "aug_off_last": 0.5
+          },
+          "hypothesis": "candidate B + no-augmentation finish (last 0.5 ep): stack read at n=8"
+        },
+        {
+          "label": "B-augoff0.5-e9.375",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.25
+              ],
+              [
+                28,
+                0.5
+              ]
+            ],
+            "epochs": 9.375,
+            "aug_off_last": 0.5
+          },
+          "hypothesis": "the stack with an eighth of an epoch trimmed (re-trim with k)"
+        },
+        {
+          "label": "B-augoff0.5-e9.25",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.25
+              ],
+              [
+                28,
+                0.5
+              ]
+            ],
+            "epochs": 9.25,
+            "aug_off_last": 0.5
+          },
+          "hypothesis": "the stack with a quarter epoch trimmed"
+        }
+      ]
+    },
+    {
+      "name": "schedB-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "B-24q30-28h",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.3
+              ],
+              [
+                28,
+                0.5
+              ]
+            ],
+            "epochs": 9.5
+          },
+          "hypothesis": "24 px to 30% of the examples then 28 px to 50%: slightly longer cheap phase"
+        },
+        {
+          "label": "B-24q-28q75",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.25
+              ],
+              [
+                28,
+                0.75
+              ]
+            ],
+            "epochs": 9.5
+          },
+          "hypothesis": "28 px phase extended to 75%: fewer 32 px steps"
+        },
+        {
+          "label": "B-28to80",
+          "params": {
+            "resolution_schedule": [
+              [
+                28,
+                0.8
+              ]
+            ],
+            "epochs": 9.5
+          },
+          "hypothesis": "28 px for 80% then 32 px (two resolutions, four graphs)"
+        }
+      ]
+    }
+  ]
+}
