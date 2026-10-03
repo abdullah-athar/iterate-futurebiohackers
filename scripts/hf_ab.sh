@@ -14,7 +14,7 @@ tar --exclude=__pycache__ -cf - pyproject.toml uv.lock .python-version LICENSE R
 cp "$ROOT/scripts/hf_ab_driver.py" "$STAGE/"
 cd "$STAGE"
 hf jobs run --flavor "${FLAVOR:-a100-large}" --timeout "${TIMEOUT:-2h}" \
-  -v .:/src -e OMP_NUM_THREADS=4 -e UV_PROJECT_ENVIRONMENT=/opt/venv -e UV_LINK_MODE=copy \
+  -v .:/src -e OMP_NUM_THREADS=4 -e SEED="${SEED:-0}" -e UV_PROJECT_ENVIRONMENT=/opt/venv -e UV_LINK_MODE=copy \
   ghcr.io/astral-sh/uv:python3.12-bookworm \
   bash -c "set -e; cp -r /src /app && cd /app && uv sync --frozen --no-dev -q \
 && nvidia-smi --query-gpu=name,power.limit --format=csv \

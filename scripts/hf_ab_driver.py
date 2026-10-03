@@ -1,6 +1,7 @@
 """Run inside an HF Job: one benchmark.run per variant, same seeds, same card."""
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -11,7 +12,7 @@ for i, params in enumerate([{}] + variants):
     root = Path(f"/app/ab/{i:02d}")
     cmd = [
         "/opt/venv/bin/python", "-m", "benchmark.run", "--submission", team, "--n", n,
-        "--seed", "0", "--no-accuracy-target", "--results-root", str(root),
+        "--seed", os.environ.get("SEED", "0"), "--no-accuracy-target", "--results-root", str(root),
         "--params", json.dumps(params),
     ]
     print(f"\n### variant {i}: {json.dumps(params)}", flush=True)
