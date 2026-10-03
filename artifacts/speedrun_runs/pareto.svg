@@ -2,7 +2,7 @@
 <title>CIFAR-100 speedrun: accuracy vs prepare+train time</title>
 <rect width="800" height="500" fill="#fcfcfb"/>
 <text x="62" y="24" font-size="14" font-weight="600" fill="#0b0b0b">CIFAR-100 speedrun: mean accuracy vs mean prepare+train time</text>
-<text x="776" y="24" text-anchor="end" font-size="10" fill="#898781">2026-10-03 18:17; k = 1 pp/s</text>
+<text x="776" y="24" text-anchor="end" font-size="10" fill="#898781">2026-10-03 18:26; k = 1 pp/s</text>
 <circle cx="68" cy="44" r="5" fill="#2a78d6"/>
 <text x="78" y="48" fill="#52514e">round calib</text>
 <circle cx="168.0" cy="44" r="5" fill="#eb6834"/>
@@ -12,13 +12,15 @@
 <circle cx="332.0" cy="44" r="5" fill="#eda100"/>
 <text x="342.0" y="48" fill="#52514e">round r4</text>
 <circle cx="414.0" cy="44" r="5" fill="#e87ba4"/>
-<text x="424.0" y="48" fill="#52514e">round reference</text>
-<rect x="533.0" y="39" width="10" height="10" fill="#52514e"/>
-<text x="548.0" y="48" fill="#52514e">control</text>
-<line x1="608.0" y1="44" x2="620.0" y2="44" stroke="#52514e" stroke-width="2"/>
-<text x="624.0" y="48" fill="#52514e">Pareto frontier</text>
-<line x1="62" y1="60" x2="74" y2="60" stroke="#898781" stroke-width="1.5" stroke-dasharray="4 3"/>
-<text x="78" y="64" fill="#52514e">75 % target</text>
+<text x="424.0" y="48" fill="#52514e">round r5</text>
+<circle cx="496.0" cy="44" r="5" fill="#008300"/>
+<text x="506.0" y="48" fill="#52514e">round reference</text>
+<rect x="615.0" y="39" width="10" height="10" fill="#52514e"/>
+<text x="630.0" y="48" fill="#52514e">control</text>
+<line x1="62" y1="60" x2="74" y2="60" stroke="#52514e" stroke-width="2"/>
+<text x="78" y="64" fill="#52514e">Pareto frontier</text>
+<line x1="186.0" y1="60" x2="198.0" y2="60" stroke="#898781" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text x="202.0" y="64" fill="#52514e">75 % target</text>
 <line x1="62.0" y1="82" x2="62.0" y2="448" stroke="#e1e0d9"/>
 <text x="62.0" y="464" text-anchor="middle" fill="#898781">4</text>
 <line x1="204.8" y1="82" x2="204.8" y2="448" stroke="#e1e0d9"/>
@@ -166,6 +168,10 @@
 <circle cx="341.6" cy="206.4" r="12" fill="#000" fill-opacity="0"/>
 <rect x="336.6" y="201.4" width="10" height="10" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>control (control, round r5): 74.91 % acc, 6.01 s; BELOW 75%</title>
+<circle cx="349.4" cy="215.2" r="12" fill="#000" fill-opacity="0"/>
+<rect x="344.4" y="210.2" width="10" height="10" fill="#e87ba4" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>w128-256-768 (variant, round r1): 75.23 % acc, 6.18 s; dacc +0.03 +- 0.15 pp; dtime -1.16 s; dtime_adj -1.24 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="373.2" cy="175.5" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="373.2" cy="175.5" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
@@ -198,6 +204,10 @@
 <circle cx="339.3" cy="183.6" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="339.3" cy="183.6" r="5" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>S7-res28-e9.0 (variant, round r5): 75.34 % acc, 5.92 s; dacc +0.43 +- 0.08 pp; dtime -0.09 s; dtime_adj -0.52 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="336.2" cy="163.1" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="336.2" cy="163.1" r="5" fill="#e87ba4" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>S7-res28-e9.0 (variant, round r4): 75.33 % acc, 6.12 s; dacc +0.33 +- 0.11 pp; dtime -0.18 s; dtime_adj -0.51 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="364.2" cy="164.2" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="364.2" cy="164.2" r="5" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
@@ -205,6 +215,10 @@
 <g><title>S7-res28-e8.5 (variant, round r4): 74.95 % acc, 5.77 s; dacc -0.04 +- 0.16 pp; dtime -0.53 s; dtime_adj -0.48 s; BELOW 75%</title>
 <circle cx="315.0" cy="209.8" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="315.0" cy="209.8" r="5" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>S7-res28-e8.75 (variant, round r5): 75.17 % acc, 5.80 s; dacc +0.26 +- 0.08 pp; dtime -0.22 s; dtime_adj -0.48 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="318.6" cy="183.4" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="318.6" cy="183.4" r="5" fill="#e87ba4" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>ls0.25 (variant, round r1): 75.33 % acc, 7.44 s; dacc +0.21 +- 0.09 pp; dtime +0.00 s; dtime_adj -0.47 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="553.6" cy="163.1" r="12" fill="#000" fill-opacity="0"/>
@@ -217,6 +231,10 @@
 <g><title>res24-s0.5-stack4 (variant, round r3): 74.34 % acc, 4.98 s; dacc -0.64 +- 0.14 pp; dtime -1.09 s; dtime_adj -0.44 s; BELOW 75%; on the Pareto frontier</title>
 <circle cx="201.5" cy="285.0" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="201.5" cy="285.0" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>S6-res28-e9.0 (variant, round r5): 75.21 % acc, 5.92 s; dacc +0.30 +- 0.11 pp; dtime -0.09 s; dtime_adj -0.40 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="335.9" cy="178.2" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="335.9" cy="178.2" r="5" fill="#e87ba4" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>bn0.7 (variant, round r1): 75.29 % acc, 7.24 s; dacc +0.16 +- 0.10 pp; dtime -0.03 s; dtime_adj -0.40 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="525.2" cy="168.5" r="12" fill="#000" fill-opacity="0"/>
@@ -484,11 +502,11 @@
 </g>
 <g><title>ref-sxm500-n40 (variant, round reference): 75.19 % acc, 6.94 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="482.3" cy="180.6" r="12" fill="#000" fill-opacity="0"/>
-<circle cx="482.3" cy="180.6" r="5" fill="#e87ba4" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="482.3" cy="180.6" r="5" fill="#008300" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>ref-sxm400-n40 (variant, round reference): 75.20 % acc, 7.41 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="548.4" cy="179.3" r="12" fill="#000" fill-opacity="0"/>
-<circle cx="548.4" cy="179.3" r="5" fill="#e87ba4" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="548.4" cy="179.3" r="5" fill="#008300" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <text x="139.9" y="420.7" text-anchor="start" font-size="10" fill="#52514e">res24-s0.75</text>
 <text x="198.0" y="333.8" text-anchor="start" font-size="10" fill="#52514e">res24-s0.5</text>
@@ -506,13 +524,17 @@
 <text x="306.1" y="150.7" text-anchor="end" font-size="10" fill="#52514e">S7-res24s0.25-e9.0</text>
 <text x="322.2" y="199.9" text-anchor="start" font-size="10" fill="#52514e">S8-res28-e8.75</text>
 <text x="323.0" y="222.8" text-anchor="start" font-size="10" fill="#52514e">S7-res28-e8.5</text>
+<text x="310.6" y="178.4" text-anchor="end" font-size="10" fill="#52514e">S7-res28-e8.75</text>
 <text x="330.1" y="293.7" text-anchor="start" font-size="10" fill="#52514e">w64-384-576</text>
-<text x="341.6" y="190.6" text-anchor="start" font-size="10" fill="#52514e">S6-res28-e9.0</text>
-<text x="347.3" y="178.6" text-anchor="start" font-size="10" fill="#52514e">S7-res28-e8.75</text>
-<text x="349.6" y="219.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="355.0" y="201.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="355.9" y="219.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="357.4" y="165.9" text-anchor="start" font-size="10" fill="#52514e">S7-e8.5</text>
+<text x="341.6" y="172.6" text-anchor="start" font-size="10" fill="#52514e">S6-res28-e9.0</text>
+<text x="343.9" y="191.2" text-anchor="start" font-size="10" fill="#52514e">S6-res28-e9.0</text>
+<text x="344.2" y="158.1" text-anchor="start" font-size="10" fill="#52514e">S7-res28-e9.0</text>
+<text x="347.3" y="196.6" text-anchor="start" font-size="10" fill="#52514e">S7-res28-e8.75</text>
+<text x="349.6" y="201.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="355.0" y="219.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="355.9" y="201.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="357.4" y="183.9" text-anchor="start" font-size="10" fill="#52514e">S7-e8.5</text>
+<text x="357.4" y="210.2" text-anchor="start" font-size="10" fill="#52514e">control</text>
 <text x="357.6" y="217.0" text-anchor="start" font-size="10" fill="#52514e">ls0.25</text>
 <text x="357.9" y="172.0" text-anchor="start" font-size="10" fill="#52514e">stack4</text>
 <text x="357.9" y="218.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
