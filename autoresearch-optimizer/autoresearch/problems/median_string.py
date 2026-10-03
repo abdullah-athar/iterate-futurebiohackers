@@ -27,14 +27,21 @@ SOLVER CONTRACT: a single Python file defining `def solve(instance) -> str`.
   instance.strings: list[str]      instance.alphabet: str
   instance.metric: "levenshtein" | "hamming"   instance.target_length: None (any length ok)
 Allowed imports: Python stdlib and `from median_string.metrics import sum_distance,
-levenshtein_distance, hamming_distance, calculate_distance, compute_set_median`.
+levenshtein_distance, levenshtein_editops, hamming_distance, calculate_distance, compute_set_median`.
 No other third-party packages. Must be deterministic (seed any RNG).
 TIME BUDGET: each solve() call gets instance.time_budget_ms of CPU time (default 1000 ms).
 Going over by more than 25% makes that instance invalid (score = baseline + 1000), so check
-time.process_time() against the budget and return your best string so far. Levenshtein in
-pure Python is slow: a 40x40 DP is ~1 ms, so a full sum_distance on 15 strings is ~15 ms.
-Incremental scoring and early stopping matter as much as the search strategy.
+time.process_time() against the budget and return your best string so far.
+median_string.metrics.levenshtein_distance is a fast C++ implementation (~2 us at 40x40,
+~0.1 ms at 1500x1500); levenshtein_editops(a, b) returns an optimal edit script
+[(op, i, j), ...] for alignment-based methods. A DP written in pure Python is ~3000x slower.
 """
+
+LONG_DESCRIPTION = DESCRIPTION.replace(
+    "Instances are planted motifs with\nsubstitution noise 15-38% and indel noise 0-10%",
+    "Instances are MSA-scale: four 1500 bp DNA\ninstances (k=10-20 strings, substitution noise 10-30%, indel noise 2-8%) and one\n"
+    "500 aa protein instance (k=12). All use Levenshtein distance. A full single-edit neighbourhood of\n"
+    "a 1500-char center has ~13k moves (~6 s to score naively), so the budget forces targeted search")
 
 BUDGET_GRACE = 1.25  # an instance is invalid once solve() uses more than budget * grace of CPU
 
@@ -149,3 +156,14 @@ class MedianStringProblem:
 def _baseline_total(instances) -> int:
     from median_string.metrics import compute_set_median
     return sum(compute_set_median(i.strings, metric=i.metric)[1] for i in instances)
+
+
+class MedianStringLongProblem(MedianStringProblem):
+    """Same contract with MSA-scale objective instances (1500 bp DNA, 500 aa protein)."""
+
+    name = "median_string_long"
+    timeouts = {"screen": 30.0, "validate": 120.0, "confirm": 120.0, "holdout": 120.0}  # noqa: RUF012
+    _tiers = {"screen": "small", "validate": "long", "confirm": "long_confirm", "holdout": "long_holdout"}  # noqa: RUF012
+
+    def describe(self) -> str:
+        return LONG_DESCRIPTION

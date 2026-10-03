@@ -63,14 +63,14 @@ def test_agent_run():
         assert seed_entry.confirmed is True and "confirm" in seed_entry.evals
         proposals = [
             (mp.SEED_DUPLICATE, "cosmetic rewrite of the seed", "tune"),
-            (mp.CONSENSUS_LOCAL_SEARCH, "consensus start + full re-scoring local search", "tune"),
+            (mp.SLOW_ON_VALIDATE, "set median, but slow on the objective split", "tune"),
             (mp.FAST_DESCENT, "steepest descent with incremental DP over sub/ins/del", "tune"),
             (mp.BROKEN, "syntax error", "fix_losers"),
         ]
         entries = [run.submit(src, hyp, mode, [run.archive().global_best.id], proposer="test")
                    for src, hyp, mode in proposals]
         statuses = [e.status for e in entries]
-        # duplicate caught; slow solver over the 1000 ms budget; fast solver kept; syntax error caught
+        # duplicate caught; solver over the 1000 ms budget on validate fails; fast solver kept; syntax error caught
         assert statuses == [STATUS_REJECTED_DUPLICATE, "failed", STATUS_KEPT, STATUS_REJECTED_SCREEN], statuses
         assert "over budget" in entries[1].note, entries[1].note
         assert all(e.verdict for e in entries), [e.verdict for e in entries]

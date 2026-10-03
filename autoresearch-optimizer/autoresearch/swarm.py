@@ -38,21 +38,23 @@ class Assignment:
 
 
 def allocate(run: ResearchRun, n: int, rng: random.Random) -> list[Assignment]:
-    """Spread n agents over the eligible modes: one each first, the rest in proportion to UCB score."""
+    """Spread n agents over the eligible modes: one each first, the rest in proportion to UCB score.
+
+    An untried mode is weighted like the best tried one and capped at an even share, so a mode with
+    no evidence yet cannot take most of a generation."""
     entries = run.entries()
     archive = run.archive(entries)
     scores = run.mode_scores(entries, archive)
     finite = [v for v in scores.values() if v != float("inf")]
-    weights = {m: (max(finite, default=1.0) + 1.0 if v == float("inf") else v) for m, v in scores.items()}
+    weights = {m: (max(finite, default=1.0) if v == float("inf") else v) for m, v in scores.items()}
+    cap = {m: -(-n // len(scores)) if v == float("inf") and finite else n for m, v in scores.items()}
     counts = Counter({m: 1 for m in list(scores)[:n]})
-    rest = n - sum(counts.values())
-    if rest > 0:
-        total = sum(weights.values())
-        shares = {m: rest * w / total for m, w in weights.items()}
-        for m in shares:
-            counts[m] += int(shares[m])
-        for m in sorted(shares, key=lambda m: shares[m] - int(shares[m]), reverse=True)[: n - sum(counts.values())]:
-            counts[m] += 1
+    while sum(counts.values()) < n:
+        open_modes = [m for m in scores if counts[m] < cap[m]] or list(scores)
+        # largest remaining deficit against the proportional target gets the next agent
+        total = sum(weights[m] for m in open_modes)
+        m = max(open_modes, key=lambda m: n * weights[m] / total - counts[m])
+        counts[m] += 1
     modes = [m for m in MODES if m in counts for _ in range(counts[m])]
     directions = list(getattr(run.problem, "directions", ()) or [""])
     rng.shuffle(directions)
