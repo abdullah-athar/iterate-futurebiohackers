@@ -566,6 +566,15 @@ def _estimate_run_seconds(spec: dict, warm: bool, control_params: dict | None = 
         build = EST_BUILD_WARM_S
     if params.get("low_res") and params.get("low_res_epochs"):
         build += EST_BUILD_LOW_RES_S
+    schedule = params.get("res_schedule")
+    if schedule:  # one default-mode graph per low resolution
+        build += EST_BUILD_LOW_RES_S * len(schedule)
+    elif "train_resolution" in params and params["train_resolution"] != base.get(
+        "train_resolution"
+    ):
+        build += EST_BUILD_LOW_RES_S
+    if params.get("hard_fraction", 1.0) < 1.0:
+        build += 300.0  # PR #5's offline proxy prepass compiles and trains a second network
     return EST_RUN_OVERHEAD_S + build + int(spec.get("n", 1)) * trial
 
 

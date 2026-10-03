@@ -56,8 +56,16 @@ DEFAULTS = {
     "compile": "max-autotune",  # torch.compile mode; "" runs eagerly
     # Accuracy-recovery and resizing switches.
     "jitter": 0.3,  # per-image brightness/contrast jitter strength (own RNG, seeded per trial)
-    "low_res_compile": "default",  # torch.compile mode of the separate static low-res graph
+    "low_res_compile": "default",  # torch.compile mode of the static low-res graphs; "" = eager
     "count_nonfinite": False,  # count non-finite step losses on the GPU; train() prints the total
+    # Staged resizing: [[resolution, until_fraction], ...] with increasing fractions, e.g.
+    # [[20, 0.2], [24, 0.4], [28, 0.6]]; steps past the last stage run at 32. When set, it
+    # replaces the train_resolution/resolution_switch pair above.
+    "res_schedule": None,
+    # Hard-example filtering: from epoch filter_start on, every epoch trains only on the
+    # filter_keep fraction of the training set with the highest last training loss.
+    "filter_start": 0,  # 0 disables filtering
+    "filter_keep": 0.75,
 }
 
 
@@ -242,6 +250,70 @@ def indexed_crop(images, crop_size):
 
 
 #############################################
+#                 Schedules                 #
+#############################################
+
+
+def _resolutions(hyp):
+    """Sorted training resolutions, 32 included: the res_schedule stages, or the
+    train_resolution/resolution_switch pair when res_schedule is null."""
+    if hyp["res_schedule"] is None:
+        return sorted({hyp["train_resolution"], 32})
+    return sorted({resolution for resolution, _ in hyp["res_schedule"]} | {32})
+
+
+def _validate_schedule(schedule):
+    if schedule is None:
+        return
+    pairs = [stage for stage in schedule if isinstance(stage, list | tuple) and len(stage) == 2]
+    fractions = [fraction for _, fraction in pairs]
+    if (
+        not pairs
+        or len(pairs) != len(schedule)
+        or any(resolution not in (16, 20, 24, 28) for resolution, _ in pairs)
+        or any(not 0 < fraction < 1 for fraction in fractions)
+        or fractions != sorted(set(fractions))
+    ):
+        raise ValueError(
+            "res_schedule must list [resolution, until_fraction] pairs with resolutions in"
+            " {16, 20, 24, 28} and strictly increasing fractions in (0, 1)"
+        )
+
+
+def _stages(hyp, total_steps):
+    """(resolution, first step of the next stage) pairs; steps past the last pair run at 32."""
+    if hyp["res_schedule"] is None:
+        return [(hyp["train_resolution"], int(total_steps * hyp["resolution_switch"]))]
+    return [
+        (resolution, int(total_steps * fraction)) for resolution, fraction in hyp["res_schedule"]
+    ]
+
+
+def _step_resolution(stages, step):
+    for resolution, until in stages:
+        if step < until:
+            return resolution
+    return 32
+
+
+def _epoch_steps(hyp, epoch, count, batch_size):
+    """Optimizer steps in one epoch; filtered epochs see round(filter_keep * count) examples."""
+    if hyp["filter_start"] and epoch >= hyp["filter_start"]:
+        count = round(hyp["filter_keep"] * count)
+    return count // batch_size
+
+
+def _steps_until(hyp, epochs, count, batch_size):
+    """Steps in the first `epochs` epochs, a fractional last epoch rounded up. Without
+    filtering this is the base recipe's math.ceil(epochs * steps_per_epoch)."""
+    if not hyp["filter_start"]:
+        return math.ceil(epochs * (count // batch_size))
+    full = math.floor(epochs)
+    steps = sum(_epoch_steps(hyp, epoch, count, batch_size) for epoch in range(full))
+    return steps + math.ceil((epochs - full) * _epoch_steps(hyp, full, count, batch_size))
+
+
+#############################################
 #                 Interface                 #
 #############################################
 
@@ -276,6 +348,13 @@ def build(context: BuildContext):
         raise ValueError("pool_first must contain three booleans")
     if hyp["jitter"] < 0:
         raise ValueError("jitter must be non-negative")
+    _validate_schedule(hyp["res_schedule"])
+    if type(hyp["filter_start"]) is not int or hyp["filter_start"] < 0:
+        raise ValueError("filter_start must be a non-negative epoch index")
+    if not 0 < hyp["filter_keep"] <= 1:
+        raise ValueError("filter_keep must be in (0, 1]")
+    if hyp["filter_start"] and (hyp["hard_fraction"] < 1 or hyp["compile_loss"]):
+        raise ValueError("filter_start cannot be combined with hard_fraction < 1 or compile_loss")
     device = context.device
     cuda = device.type == "cuda"
     dtype = torch.float16 if cuda else torch.float32
@@ -293,21 +372,37 @@ def build(context: BuildContext):
     for m in net.modules():
         if isinstance(m, nn.BatchNorm2d):
             m.float()
-    if cuda and hyp["compile"] and hyp["train_resolution"] < 32:
+    resolutions = _resolutions(hyp)
+    if cuda and hyp["compile"] and resolutions[0] < 32:
         # Progressive resizing: one static graph per resolution over the same eager net.
         # dynamic=False keeps dynamo from switching to dynamic shapes on the second size, and
-        # the low-res graph compiles in the cheaper low_res_compile mode (a second
-        # max-autotune graph added about 230 s to the cold build).
-        train_net = torch.compile(net, mode=hyp["compile"], dynamic=False)
-        low_net = torch.compile(net, mode=hyp["low_res_compile"], dynamic=False)
+        # the low-res graphs compile in the cheaper low_res_compile mode (a second
+        # max-autotune graph added about 230 s to the cold build); "" runs them eagerly.
+        # Every resolution adds two entries (whitening bias trained / frozen) to the dynamo
+        # cache of Net.forward, whose default limit of 8 holds at most four resolutions.
+        import torch._dynamo.config as dynamo_config
+
+        dynamo_config.cache_size_limit = max(dynamo_config.cache_size_limit, 2 * len(resolutions))
+        nets = {32: torch.compile(net, mode=hyp["compile"], dynamic=False)}
+        for resolution in resolutions[:-1]:
+            nets[resolution] = (
+                torch.compile(net, mode=hyp["low_res_compile"], dynamic=False)
+                if hyp["low_res_compile"]
+                else net
+            )
     elif cuda and hyp["compile"]:
-        train_net = low_net = torch.compile(net, mode=hyp["compile"])
+        nets = {32: torch.compile(net, mode=hyp["compile"])}
     else:
-        train_net = low_net = net
+        nets = dict.fromkeys(resolutions, net)
 
     def loss_fn(outputs, labels):
         return F.cross_entropy(
             outputs.float(), labels, label_smoothing=hyp["label_smoothing"], reduction="sum"
+        )
+
+    def example_loss_fn(outputs, labels):
+        return F.cross_entropy(
+            outputs.float(), labels, label_smoothing=hyp["label_smoothing"], reduction="none"
         )
 
     loss_fn = torch.compile(loss_fn) if cuda and hyp["compile_loss"] else loss_fn
@@ -317,9 +412,11 @@ def build(context: BuildContext):
         device=device,
         dtype=dtype,
         net=net,
-        train_net=train_net,
-        low_net=low_net,
+        train_net=nets[32],
+        low_net=nets[resolutions[0]],
+        nets=nets,
         loss_fn=loss_fn,
+        example_loss_fn=example_loss_fn,
         classifier=Classifier(net, dtype).to(device),
         float_state=float_state,
         ema=[t.clone() for t in float_state],
@@ -327,6 +424,7 @@ def build(context: BuildContext):
         crop_kernel=crop_kernel,
         aug_generator=None,
         nonfinite=None,
+        scores=None,
     )
     if hyp["hard_fraction"] < 1:
         proxy_hyp = {**hyp, "widths": hyp["proxy_widths"], "depths": [2, 2, 2]}
@@ -351,7 +449,7 @@ def build(context: BuildContext):
             torch.randint(0, 256, (count, 3, 32, 32), dtype=torch.uint8),
             torch.randint(0, context.num_classes, (count,)),
         )
-        for resolution in sorted({hyp["train_resolution"], 32}):
+        for resolution in resolutions:
             state.warmup_resolution = resolution
             for _ in range(2):
                 prepare(state, synthetic, seed=0)
@@ -396,22 +494,24 @@ def prepare(state, data: TrainingData, seed: int) -> None:
 
     # Alternating flip: flip a random half once, then mirror everything on odd epochs.
     images = batch_flip_lr(images)
-    if hyp["train_resolution"] < 32:
-        small = F.interpolate(
-            images,
-            size=(hyp["train_resolution"],) * 2,
-            mode="bilinear",
-            align_corners=False,
-        )
-        if hyp["translate"]:
-            small = F.pad(small, (hyp["translate"],) * 4, "reflect")
-        state.small_images = small.to(memory_format=torch.channels_last)
-    else:
-        state.small_images = None
+    # One downscaled, reflect-padded copy of the flipped set per reduced training resolution.
+    state.small_images = {}
+    for resolution in _resolutions(hyp):
+        if resolution < 32:
+            small = F.interpolate(
+                images, size=(resolution,) * 2, mode="bilinear", align_corners=False
+            )
+            if hyp["translate"]:
+                small = F.pad(small, (hyp["translate"],) * 4, "reflect")
+            state.small_images[resolution] = small.to(memory_format=torch.channels_last)
     if hyp["translate"]:
         images = F.pad(images, (hyp["translate"],) * 4, "reflect")
     state.images = images
     state.labels = data.labels.to(device, non_blocking=True)
+    # Last training loss of every example (+inf until seen): the hard-example filter's key.
+    state.scores = (
+        torch.full((len(data.labels),), math.inf, device=device) if hyp["filter_start"] else None
+    )
 
     batch_size = min(hyp["batch_size"], len(data.labels))
     momentum = hyp["momentum"]
@@ -426,8 +526,10 @@ def prepare(state, data: TrainingData, seed: int) -> None:
     state.batch_size = batch_size
     state.masks = []
     state.steps_per_epoch = len(data.labels) // batch_size
-    state.total_steps = math.ceil(hyp["epochs"] * state.steps_per_epoch)
-    state.whiten_bias_steps = math.ceil(hyp["whiten_bias_epochs"] * state.steps_per_epoch)
+    state.total_steps = _steps_until(hyp, hyp["epochs"], len(data.labels), batch_size)
+    state.whiten_bias_steps = _steps_until(
+        hyp, hyp["whiten_bias_epochs"], len(data.labels), batch_size
+    )
 
 
 def _make_optimizer(net, lr, lr_biases, wd, hyp, device):
@@ -472,7 +574,7 @@ def hyp_count_nonfinite(state) -> bool:
 
 def _fit(state, total_steps, proxy_only=False):
     hyp, net, optimizer = state.hyp, state.net, state.optimizer
-    labels, batch_size, steps_per_epoch = state.labels, state.batch_size, state.steps_per_epoch
+    labels, batch_size = state.labels, state.batch_size
     warmup_steps = int(total_steps * hyp["warmup"])
     ema_decay = (0.95**5 * (torch.arange(total_steps + 1) / total_steps) ** 3).tolist()
     nonfinite = (
@@ -480,24 +582,30 @@ def _fit(state, total_steps, proxy_only=False):
         if hyp["count_nonfinite"] and not proxy_only
         else None
     )
+    stages = _stages(hyp, total_steps)
+    filtering = bool(hyp["filter_start"])
     step = 0
+    epoch = 0
     net.train()
-    for epoch in range(math.ceil(total_steps / steps_per_epoch)):
+    while step < total_steps:
         images = None
         current_resolution = None
         order = torch.randperm(len(labels), device=labels.device)
-        for i in range(steps_per_epoch):
+        if filtering and epoch >= hyp["filter_start"]:
+            # Keep the examples with the highest last training loss. The permutation is drawn
+            # exactly as in the unfiltered recipe, so the global RNG stream stays paired with it.
+            hardest = state.scores.topk(round(hyp["filter_keep"] * len(labels)), sorted=False)
+            keep = torch.zeros_like(order, dtype=torch.bool)
+            keep[hardest.indices] = True
+            order = order[keep[order]]
+        for i in range(len(order) // batch_size):
             if step >= total_steps:
                 break
             resolution = getattr(state, "warmup_resolution", None)
             if resolution is None:
-                resolution = (
-                    hyp["train_resolution"]
-                    if step < int(total_steps * hyp["resolution_switch"])
-                    else 32
-                )
+                resolution = _step_resolution(stages, step)
             if resolution != current_resolution:
-                source = state.small_images if resolution < 32 else state.images
+                source = state.small_images[resolution] if resolution < 32 else state.images
                 if state.crop_kernel is not None:
                     images = state.crop_kernel(source, resolution, flip=epoch % 2 == 1)
                 else:
@@ -510,7 +618,7 @@ def _fit(state, total_steps, proxy_only=False):
                 if hyp["jitter"]:
                     images = batch_jitter(images, hyp["jitter"], state.aug_generator)
                 current_resolution = resolution
-                train_net = state.train_net if resolution == 32 else state.low_net
+                train_net = state.nets[resolution]
             idx = order[i * batch_size : (i + 1) * batch_size]
             inputs, targets = images[idx], labels[idx]
             offline_main = (
@@ -548,7 +656,12 @@ def _fit(state, total_steps, proxy_only=False):
                     step += 1
                     continue
             outputs = train_net(inputs, step < state.whiten_bias_steps)
-            loss = state.loss_fn(outputs, targets)
+            if filtering:
+                losses = state.example_loss_fn(outputs, targets)
+                state.scores[idx] = losses.detach()
+                loss = losses.sum()
+            else:
+                loss = state.loss_fn(outputs, targets)
             if nonfinite is not None:
                 nonfinite += (~torch.isfinite(loss.detach())).to(nonfinite.dtype)
             optimizer.zero_grad(set_to_none=True)
@@ -565,10 +678,12 @@ def _fit(state, total_steps, proxy_only=False):
             step += 1
             if hyp["ema_every"] and step % hyp["ema_every"] == 0:
                 _lookahead(state, ema_decay[step])
+        epoch += 1
     if hyp["ema_every"] and not proxy_only:
         _lookahead(state, 1.0)
     if not proxy_only:
         state.nonfinite = nonfinite
+        state.steps_taken = step
 
 
 @torch.no_grad()

@@ -1,16 +1,19 @@
 """Variant-switch check for submissions/futurebiohackers. Not part of the submission.
 
 1. With default parameters the recipe must give a trial that is bit-identical (weights and
-   predictions) to the reference recipe: Abdullah's PR #5 file (origin/runtime-optimization),
+   predictions) to the reference recipe (default: the promoted file on origin/speedrun-accuracy-stack;
    the base our switches are ported onto. So experimental switches never change the control,
-   its step count, or its silence on stderr.
+   its step count, or its silence on stderr. Switches the reference file does not know are
+   turned off for that comparison; with the promoted file as reference (CHECK_VARIANTS_REF=
+   origin/speedrun-accuracy-stack) it compares our defaults with the promoted defaults.
 2. Every experimental switch (ours and his) must run end to end on CPU with finite predictions;
-   the non-finite counter must report 0.
+   the non-finite counter must report 0, filtered schedules take exactly total_steps steps
+   with finite scores, and staged resizing keeps one downscaled copy per low resolution.
 
 CPU, synthetic images, about 20 s. Run from the speedrun env with cwd cifar100-speedrun:
     uv run python ../scripts/check_variants.py [reference_submission_dir]
     scripts/wsl_speedrun.sh python ../scripts/check_variants.py          # Windows, via WSL
-The reference defaults to `git show origin/runtime-optimization:...submission.py`; set
+The reference defaults to `git show origin/speedrun-accuracy-stack:...submission.py`; set
 CHECK_VARIANTS_REF=<git ref> to compare against another commit.
 """
 
@@ -36,9 +39,11 @@ from benchmark.worker import load_submission, seed_everything
 TEAM_DIR = (
     Path(__file__).resolve().parents[1] / "cifar100-speedrun" / "submissions" / "futurebiohackers"
 )
-REFERENCE_REF = os.environ.get("CHECK_VARIANTS_REF", "origin/runtime-optimization")
+REFERENCE_REF = os.environ.get("CHECK_VARIANTS_REF", "origin/speedrun-accuracy-stack")
 # The synthetic split has 64 images: batch 8 gives 8 steps per epoch, 16 in two epochs.
 BASE = {"widths": [32, 64, 64], "epochs": 2.0, "batch_size": 8, "compile": ""}
+# Our switches with their "off" values; the control turns off those the reference file lacks.
+OFF = {"jitter": 0.0, "count_nonfinite": False, "res_schedule": None, "filter_start": 0}
 VARIANTS = {
     # ours: accuracy recovery and progressive resizing
     "jitter": {"jitter": 0.2},
@@ -56,6 +61,18 @@ VARIANTS = {
         "train_resolution": 24,
         "resolution_switch": 0.5,
         "count_nonfinite": True,
+    },
+    # ours: staged resizing (replaces the train_resolution pair) and hard-example filtering
+    "res_schedule_20_24": {"res_schedule": [[20, 0.25], [24, 0.5]]},
+    "res_schedule_16_to_28": {"res_schedule": [[16, 0.2], [20, 0.4], [24, 0.6], [28, 0.8]]},
+    "res_schedule_jitter": {"res_schedule": [[20, 0.3], [28, 0.6]], "jitter": 0.3},
+    "res_schedule_indexed_crop": {"res_schedule": [[20, 0.5]], "crop_mode": "indexed"},
+    "filter": {"filter_start": 1, "filter_keep": 0.5},
+    "filter_nonfinite": {"filter_start": 1, "filter_keep": 0.5, "count_nonfinite": True},
+    "filter_res_schedule": {
+        "filter_start": 1,
+        "filter_keep": 0.5,
+        "res_schedule": [[20, 0.25], [24, 0.5]],
     },
     # his (must keep running after the port)
     "indexed_crop": {"crop_mode": "indexed"},
@@ -124,11 +141,11 @@ def main() -> int:
         if k in reference.DEFAULTS and reference.DEFAULTS[k] != v and k not in BASE
     }
     ours_only = {k: v for k, v in new.DEFAULTS.items() if k not in reference.DEFAULTS}
-    off = {"jitter": 0.0, "count_nonfinite": False}
+    off = {k: v for k, v in OFF.items() if k not in reference.DEFAULTS}
     if shared:
         print(f"promoted defaults vs {REFERENCE_REF}: {shared}", flush=True)
     if ours_only:
-        print(f"switches only in our file: {ours_only}", flush=True)
+        print(f"switches only in our file: {ours_only} (control turns off {off})", flush=True)
     a = trial(reference, {**BASE, **shared})
     b = trial(new, {**BASE, **shared, **off})
     same = (
@@ -146,7 +163,7 @@ def main() -> int:
     check("shared-parameter path prints nothing on stderr", b.stderr.strip() == "")
     d = trial(new, BASE)  # our real defaults (plus the small BASE overrides)
     check("our defaults run with finite predictions and nothing on stderr", d.stderr.strip() == "")
-    if new.DEFAULTS.get("jitter"):
+    if "jitter" in off and new.DEFAULTS["jitter"]:
         check(
             "our defaults differ from the shared path only through jitter (own generator)",
             d.state.aug_generator is not None and not torch.equal(d.out, b.out),
@@ -161,7 +178,7 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             check(f"variant {name}: {type(exc).__name__}: {exc}", False)
 
-    for name in ("count_nonfinite", "jitter_res24_nonfinite"):
+    for name in ("count_nonfinite", "jitter_res24_nonfinite", "filter_nonfinite"):
         if name in runs:
             run = runs[name]
             check(
@@ -174,6 +191,48 @@ def main() -> int:
             "jitter: per-trial generator exists and is re-seeded by prepare",
             state.aug_generator is not None and state.aug_generator.initial_seed() == 7,
         )
+    check(
+        "every run of our file took exactly total_steps optimizer steps (state.steps_taken)",
+        all(r.state.steps_taken == r.state.total_steps for r in (b, d, *runs.values())),
+    )
+    for name, run in runs.items():
+        hyp, delta = run.state.hyp, VARIANTS[name]
+        if "res_schedule" in delta or "train_resolution" in delta:
+            if hyp["res_schedule"] is None:
+                expected = sorted({hyp["train_resolution"], 32})
+            else:
+                expected = sorted({r for r, _ in hyp["res_schedule"]} | {32})
+            low = [r for r in expected if r < 32]
+            small = run.state.small_images
+            side = {r: r + 2 * hyp["translate"] for r in low}
+            check(
+                f"{name}: _resolutions {expected}; small_images has one channels-last copy per "
+                f"low resolution with sides {side}",
+                new._resolutions(hyp) == expected
+                and sorted(small) == low
+                and all(
+                    tuple(small[r].shape) == (count, 3, side[r], side[r])
+                    and small[r].is_contiguous(memory_format=torch.channels_last)
+                    for r in low
+                ),
+            )
+        if hyp["filter_start"]:
+            # BASE trains whole epochs: count // batch_size steps per epoch before filter_start,
+            # round(filter_keep * count) // batch_size from then on.
+            expected = sum(
+                (round(hyp["filter_keep"] * count) if e >= hyp["filter_start"] else count)
+                // BASE["batch_size"]
+                for e in range(int(BASE["epochs"]))
+            )
+            check(
+                f"{name}: total_steps == steps_taken == {expected} on the filtered schedule",
+                run.state.total_steps == run.state.steps_taken == expected,
+            )
+            check(
+                f"{name}: every training example has a finite loss score after train",
+                tuple(run.state.scores.shape) == (count,)
+                and bool(torch.isfinite(run.state.scores).all()),
+            )
     print(f"\n{sum(results)}/{len(results)} checks passed", flush=True)
     return 0 if all(results) else 1
 
