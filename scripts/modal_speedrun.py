@@ -1726,12 +1726,15 @@ def profile(
     epochs: int = 2,
     require_gpu: str = DEFAULT_REQUIRE_GPU,
     require_power: str = DEFAULT_REQUIRE_POWER,
+    compiled: bool = False,
 ):
-    """Where does prepare+train time go? Runs scripts/profile_recipe.py on the real data."""
+    """Where does prepare+train time go? Runs scripts/profile_recipe.py on the real data.
+    With --compiled it traces one full trial exactly as the harness runs it (compiled, fp16)."""
     spec = {
         "kind": "profile",
         "label": tag,
-        "args": ["--params", params, "--epochs", str(epochs)],
+        "args": ["--params", params, "--epochs", str(epochs)]
+        + (["--compiled"] if compiled else []),
         "params": params,
     }
     _check_budget(3.0)

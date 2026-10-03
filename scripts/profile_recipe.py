@@ -71,9 +71,18 @@ def main() -> None:
     parser.add_argument("--params", default="{}")
     parser.add_argument("--epochs", type=int, default=2, help="epochs to time (schedule unchanged)")
     parser.add_argument("--profile-steps", type=int, default=12)
+    parser.add_argument(
+        "--compiled",
+        action="store_true",
+        help="trace ONE full real trial as the harness runs it (compiled, fp16, every resolution "
+        "phase): busy fraction, idle gaps, top kernels, host syncs, conv backends, BN+GELU fusion",
+    )
     args = parser.parse_args()
     torch.set_num_threads(4)
     device = torch.device("cuda")
+    if args.compiled:
+        compiled_profile(args, device)
+        return
     params = {**json.loads(args.params), "compile": ""}  # eager: see the module docstring
     report: dict = {"params": params, "gpu": torch.cuda.get_device_name(0), "eager": True}
 
@@ -315,6 +324,209 @@ def main() -> None:
     print("top kernels by device time:")
     for k in report["top_kernels"]:
         print(f"  {k['device_ms']:9.2f} ms  {k['share']:6.1%}  x{k['calls']:<5d} {k['name']}")
+    print("PROFILE_JSON " + json.dumps(report), flush=True)
+
+
+# ---------------------------------------------------------------- compiled-mode trial profile
+
+
+def _cuda_event_times(events):
+    """(start_us, end_us, name) of every CUDA kernel/memcpy event in a torch.profiler trace."""
+    out = []
+    for e in events:
+        if getattr(e, "device_type", None) is None or e.device_type.name != "CUDA":
+            continue
+        tr = e.time_range
+        if tr.end > tr.start:
+            out.append((tr.start, tr.end, e.name))
+    out.sort()
+    return out
+
+
+def _gap_stats(kernels, thresholds=(50.0, 200.0, 1000.0)):
+    """Idle gaps between consecutive kernels (merging overlaps): totals above each threshold."""
+    gaps = []
+    end = None
+    for start, stop, _ in kernels:
+        if end is not None and start > end:
+            gaps.append((start - end, start))
+        end = stop if end is None else max(end, stop)
+    stats = {}
+    for t in thresholds:
+        sel = [g for g, _ in gaps if g >= t]
+        stats[f">={t:.0f}us"] = {"count": len(sel), "total_ms": round(sum(sel) / 1e3, 2)}
+    largest = sorted(gaps, reverse=True)[:8]
+    return stats, [(round(g / 1e3, 3), round(at / 1e6, 3)) for g, at in largest]
+
+
+def compiled_profile(args, device) -> None:
+    """Profile the recipe exactly as the harness runs it (compiled graphs, fp16, the full
+    resolution schedule): one build, one prepare, one complete train() under torch.profiler."""
+    params = json.loads(args.params)
+    report: dict = {"params": params, "gpu": torch.cuda.get_device_name(0), "eager": False}
+    module = load_submission(Path(args.submission_path).resolve())
+    train = load_split(Path(args.data_root), train=True)
+    holder: dict = {}
+
+    def do_build() -> None:
+        holder["state"] = module.build(BuildContext(device, params))
+
+    report["build_s"] = round(timed(do_build), 2)
+    state = holder["state"]
+    hyp = state.hyp
+
+    # ---- prepare, and its pieces (the downsampling matmuls included) ----------------------------
+    seed_everything(0)
+    report["prepare_s"] = round(timed(lambda: module.prepare(state, train, 0)), 4)
+    pieces: dict = {}
+    pieces["reset"] = timed(state.net.reset)
+
+    def stage() -> None:
+        raw = train.images.to(device, non_blocking=True).float().div_(255)
+        mean = raw.mean(dim=(0, 2, 3), keepdim=True)
+        std = raw.std(dim=(0, 2, 3), keepdim=True)
+        holder["images"] = ((raw - mean) / std).to(state.dtype, memory_format=torch.channels_last)
+
+    pieces["h2d_normalize"] = timed(stage)
+    pieces["whitening_init"] = timed(lambda: state.net.init_whiten(holder["images"][:5000]))
+    pieces["flip"] = timed(lambda: module.batch_flip_lr(holder["images"]))
+    for resolution, matrix in getattr(state, "resize", {}).items():
+        pieces[f"downsample_{resolution}px_matmul_pad"] = timed(
+            lambda m=matrix: F.pad(
+                torch.matmul(torch.matmul(m, holder["images"]), m.T),
+                (hyp["translate"],) * 4,
+                "reflect",
+            ).to(memory_format=torch.channels_last)
+        )
+    pieces["pad_32px"] = timed(lambda: F.pad(holder["images"], (hyp["translate"],) * 4, "reflect"))
+    pieces["ema_copy"] = timed(lambda: torch._foreach_copy_(state.ema, state.float_state))
+    report["prepare_pieces_s"] = {k: round(v, 4) for k, v in pieces.items()}
+
+    # ---- per-epoch augmentation (eager, outside the compiled graph), per resolution ---------------
+    seed_everything(0)
+    module.prepare(state, train, 0)
+    aug: dict = {}
+    crop = module.batch_crop if hyp["crop_mode"] == "masked" else module.indexed_crop
+    for resolution in sorted({r for r, _ in hyp["resolution_schedule"]} | {32}):
+        source = state.small_images[resolution] if resolution < 32 else state.images
+
+        def one_epoch_aug(src=source, r=resolution) -> None:
+            images = crop(src, r) if hyp["translate"] else src
+            images = images.flip(-1)
+            if any(hyp["color_jitter"]):
+                images = module.color_jitter(images, *hyp["color_jitter"])
+            holder["aug"] = images
+
+        aug[f"{resolution}px_crop_flip_jitter"] = round(timed(one_epoch_aug), 4)
+    aug["randperm"] = round(timed(lambda: torch.randperm(len(state.labels), device=device)), 5)
+    report["per_epoch_augmentation_s"] = aug
+    report["epochs"] = hyp["epochs"]
+
+    # ---- one full trial under the profiler ------------------------------------------------------
+    seed_everything(0)
+    module.prepare(state, train, 0)
+    total_steps = state.total_steps
+    activities = [torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA]
+    sync()
+    with torch.profiler.profile(activities=activities, record_shapes=False) as prof:
+        w0 = time.perf_counter()
+        module.train(state)
+        sync()
+        wall_s = time.perf_counter() - w0
+    events = prof.events()
+    kernels = _cuda_event_times(events)
+    busy_us = 0.0
+    end = None
+    for start, stop, _ in kernels:  # union of kernel intervals (overlaps counted once)
+        if end is None or start >= end:
+            busy_us += stop - start
+            end = stop
+        elif stop > end:
+            busy_us += stop - end
+            end = stop
+    busy_s = busy_us / 1e6
+    gaps, largest = _gap_stats(kernels)
+    report.update(
+        total_steps=total_steps,
+        train_wall_s=round(wall_s, 3),
+        gpu_busy_s=round(busy_s, 3),
+        gpu_busy_fraction=round(busy_s / wall_s, 3) if wall_s else None,
+        idle_s=round(wall_s - busy_s, 3),
+        idle_per_step_ms=round((wall_s - busy_s) / total_steps * 1e3, 3) if total_steps else None,
+        idle_gaps=gaps,
+        largest_gaps_ms_at_s=largest,
+        cuda_kernel_events=len(kernels),
+    )
+    # host syncs and device-to-host traffic seen by the CPU side
+    sync_names = ("cudaStreamSynchronize", "cudaDeviceSynchronize", "cudaEventSynchronize")
+    cpu_events = [e for e in events if e.device_type.name == "CPU"]
+    report["host_syncs"] = {
+        name: sum(1 for e in cpu_events if e.name == name) for name in sync_names
+    }
+    report["host_syncs"]["aten::item/_local_scalar_dense"] = sum(
+        1 for e in cpu_events if e.name in ("aten::item", "aten::_local_scalar_dense")
+    )
+    report["memcpy_dtoh_events"] = sum(1 for _, _, n in kernels if "DtoH" in n)
+    report["cpu_op_events_per_step"] = (
+        round(len(cpu_events) / total_steps, 1) if total_steps else None
+    )
+    # top kernels (by total device time) and what they tell about backends and fusion
+    totals: dict = {}
+    counts: dict = {}
+    for start, stop, name in kernels:
+        totals[name] = totals.get(name, 0.0) + (stop - start)
+        counts[name] = counts.get(name, 0) + 1
+    top = sorted(totals.items(), key=lambda kv: kv[1], reverse=True)[:15]
+    report["top_kernels"] = [
+        {
+            "name": name[:90],
+            "calls": counts[name],
+            "device_ms": round(us / 1e3, 1),
+            "share_of_busy": round(us / busy_us, 3) if busy_us else None,
+        }
+        for name, us in top
+    ]
+
+    def total_matching(*needles):
+        return round(
+            sum(us for name, us in totals.items() if all(n in name.lower() for n in needles)) / 1e3,
+            1,
+        )
+
+    report["conv_backend_ms"] = {
+        "cudnn_or_xmma": total_matching("xmma") + total_matching("cudnn"),
+        "triton_conv_templates": total_matching("triton", "convolution"),
+        "implicit_gemm_other": total_matching("implicit_gemm"),
+    }
+    fused = [n for n in totals if "batch_norm" in n.lower() and "gelu" in n.lower()]
+    bn_only = [n for n in totals if "batch_norm" in n.lower() and "gelu" not in n.lower()]
+    gelu_only = [n for n in totals if "gelu" in n.lower() and "batch_norm" not in n.lower()]
+    report["bn_gelu_fusion"] = {
+        "fused_bn_gelu_kernels": len(fused),
+        "fused_calls_per_step": round(sum(counts[n] for n in fused) / total_steps, 2),
+        "bn_without_gelu_kernels": len(bn_only),
+        "bn_without_gelu_calls_per_step": round(sum(counts[n] for n in bn_only) / total_steps, 2),
+        "gelu_without_bn_kernels": len(gelu_only),
+        "gelu_without_bn_calls_per_step": round(sum(counts[n] for n in gelu_only) / total_steps, 2),
+        "examples": [n[:80] for n in (fused[:3] + bn_only[:3] + gelu_only[:3])],
+    }
+    report["kernels_per_step"] = round(len(kernels) / total_steps, 1) if total_steps else None
+
+    print(
+        f"compiled trial: build {report['build_s']} s, prepare {report['prepare_s']} s, train wall "
+        f"{wall_s:.3f} s, GPU busy {busy_s:.3f} s ({report['gpu_busy_fraction']}), idle "
+        f"{report['idle_s']} s = {report['idle_per_step_ms']} ms/step over {total_steps} steps; "
+        f"{report['kernels_per_step']} kernels/step; syncs {report['host_syncs']}; "
+        f"DtoH copies {report['memcpy_dtoh_events']}",
+        flush=True,
+    )
+    print(f"idle gaps: {gaps}; largest (ms, at s): {largest}", flush=True)
+    print("prepare pieces (s):", report["prepare_pieces_s"], flush=True)
+    print("per-epoch augmentation (s):", aug, flush=True)
+    print("conv backends (ms):", report["conv_backend_ms"], flush=True)
+    print("BN+GELU fusion:", report["bn_gelu_fusion"], flush=True)
+    for row in report["top_kernels"]:
+        print(f"  {row['device_ms']:8.1f} ms  {row['calls']:6d} x  {row['name']}", flush=True)
     print("PROFILE_JSON " + json.dumps(report), flush=True)
 
 
