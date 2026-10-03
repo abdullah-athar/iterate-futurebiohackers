@@ -43,6 +43,10 @@ DEFAULTS = {
     # Multi-stage schedule, e.g. [[24, 0.33], [28, 0.67]]: resolution until that
     # fraction of steps, then 32. Overrides train_resolution/resolution_switch.
     "resolution_schedule": [],
+    # Batch-size schedule, e.g. [[512, 0.5]]: batch size until that fraction of the
+    # training examples, then batch_size. Chosen per epoch. Weight decay per step
+    # scales with the batch so the per-example decay is unchanged.
+    "batch_schedule": [],
     "crop_mode": "indexed",  # one gather per epoch; "masked" is airbench's 25 masked copies
     "fused_sgd": True,  # one fused CUDA kernel for the SGD step
     "compile_loss": False,
@@ -395,6 +399,8 @@ def build(context: BuildContext):
         raise ValueError("inner_kernels must contain three values of 1 or 3")
     if hyp["stem"] not in ("patch2", "patch4s2"):
         raise ValueError("stem must be patch2 or patch4s2")
+    if any(b <= 0 or not 0 <= f <= 1 for b, f in hyp["batch_schedule"]):
+        raise ValueError("batch_schedule entries must be [positive batch, fraction]")
     if hyp["global_pool"] not in ("adaptive", "amax", "max"):
         raise ValueError("global_pool must be adaptive, amax, or max")
     if hyp["optimizer"] not in ("sgd", "muon") or len(hyp["color_jitter"]) != 2:
@@ -482,13 +488,16 @@ def build(context: BuildContext):
             torch.randint(0, 256, (count, 3, 32, 32), dtype=torch.uint8),
             torch.randint(0, context.num_classes, (count,)),
         )
-        for resolution in sorted({r for r, _ in hyp["resolution_schedule"]} | {32}):
-            state.warmup_resolution = resolution
-            for _ in range(2):
-                prepare(state, synthetic, seed=0)
-                state.whiten_bias_steps = 3
-                _fit(state, total_steps=6)
-        del state.warmup_resolution
+        batches = sorted({b for b, _ in hyp["batch_schedule"]} | {hyp["batch_size"]})
+        resolutions = sorted({r for r, _ in hyp["resolution_schedule"]} | {32})
+        for batch in batches:
+            for resolution in resolutions:
+                state.warmup_batch, state.warmup_resolution = batch, resolution
+                for _ in range(2):
+                    prepare(state, synthetic, seed=0)
+                    state.whiten_bias_steps = 3
+                    _fit(state, total_steps=6)
+        del state.warmup_batch, state.warmup_resolution
         state.classifier.eval()
         with torch.inference_mode():
             for size in (context.eval_batch_size, 10_000 % context.eval_batch_size, 1):
@@ -567,6 +576,7 @@ def _make_optimizer(net, lr, lr_biases, wd, hyp, device):
     )
     for group in optimizer.param_groups:
         group["initial_lr"] = group["lr"]
+        group["initial_weight_decay"] = group["weight_decay"]
     return optimizer
 
 
@@ -608,23 +618,43 @@ def train(state) -> nn.Module:
 
 def _fit(state, total_steps, proxy_only=False):
     hyp, net, optimizers = state.hyp, state.net, state.optimizers
-    labels, batch_size, steps_per_epoch = state.labels, state.batch_size, state.steps_per_epoch
-    warmup_steps = int(total_steps * hyp["warmup"])
-    ema_decay = (0.95**5 * (torch.arange(total_steps + 1) / total_steps) ** 3).tolist()
+    labels, base_batch = state.labels, state.batch_size
+    # Schedules run on progress = examples seen / total examples, so a batch-size
+    # schedule changes the step count but not the learning-rate curve. With a
+    # constant batch this equals step / total_steps exactly.
+    total_examples = total_steps * base_batch
+    warmup_frac = int(total_steps * hyp["warmup"]) / total_steps
+    whiten_frac = state.whiten_bias_steps / total_steps
+    ema_scale = 0.95**5
     step = 0
+    seen = 0
     net.train()
-    for epoch in range(math.ceil(total_steps / steps_per_epoch)):
+    epoch = 0
+    while seen < total_examples:
+        progress = seen / total_examples
+        batch_size = getattr(state, "warmup_batch", None) or next(
+            (b for b, end in hyp["batch_schedule"] if progress < end), base_batch
+        )
+        batch_size = min(batch_size, len(labels))
+        if batch_size != base_batch or hyp["batch_schedule"]:
+            for optimizer in optimizers:
+                for group in optimizer.param_groups:
+                    if "initial_weight_decay" in group:
+                        group["weight_decay"] = (
+                            group["initial_weight_decay"] * batch_size / base_batch
+                        )
+        steps_per_epoch = len(labels) // batch_size
         images = None
         current_resolution = None
         order = torch.randperm(len(labels), device=labels.device)
         for i in range(steps_per_epoch):
-            if step >= total_steps:
+            if seen >= total_examples:
                 break
+            progress = seen / total_examples
             resolution = getattr(state, "warmup_resolution", None)
             if resolution is None:
                 resolution = next(
-                    (r for r, end in hyp["resolution_schedule"] if step < int(total_steps * end)),
-                    32,
+                    (r for r, end in hyp["resolution_schedule"] if progress < end), 32
                 )
             if resolution != current_resolution:
                 source = state.small_images[resolution] if resolution < 32 else state.images
@@ -666,7 +696,7 @@ def _fit(state, total_steps, proxy_only=False):
                 if update_proxy:
                     state.proxy_optimizer.zero_grad(set_to_none=True)
                     proxy_losses[chosen].sum().backward()
-                    proxy_frac = step / max(1, total_steps)
+                    proxy_frac = progress
                     proxy_scale = min(1.0, 0.2 + 8 * proxy_frac) * (1 - proxy_frac)
                     for group in state.proxy_optimizer.param_groups:
                         group["lr"] = group["initial_lr"] * proxy_scale
@@ -675,18 +705,19 @@ def _fit(state, total_steps, proxy_only=False):
                 if proxy_only:
                     state.masks.append(chosen)
                     step += 1
+                    seen += batch_size
                     continue
-            loss = state.forward_loss(inputs, targets, step < state.whiten_bias_steps)
+            loss = state.forward_loss(inputs, targets, progress < whiten_frac)
             for optimizer in optimizers:
                 optimizer.zero_grad(set_to_none=True)
             loss.backward()
-            if step < warmup_steps:
-                frac = step / warmup_steps
+            if progress < warmup_frac:
+                frac = progress / warmup_frac
                 scale = 0.2 * (1 - frac) + frac
             else:
-                frac = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+                frac = (progress - warmup_frac) / max(1e-9, 1 - warmup_frac)
                 scale = (1 - frac) + hyp["final_lr"] * frac
-            whiten_scale = max(0.0, 1 - step / max(1, state.whiten_bias_steps))
+            whiten_scale = max(0.0, 1 - progress / max(1e-9, whiten_frac))
             for optimizer in optimizers:
                 for group in optimizer.param_groups:
                     group["lr"] = group["initial_lr"] * (
@@ -694,8 +725,10 @@ def _fit(state, total_steps, proxy_only=False):
                     )
                 optimizer.step()
             step += 1
+            seen += batch_size
             if hyp["ema_every"] and step % hyp["ema_every"] == 0:
-                _lookahead(state, ema_decay[step])
+                _lookahead(state, ema_scale * min(1.0, seen / total_examples) ** 3)
+        epoch += 1
     if hyp["ema_every"] and not proxy_only:
         _lookahead(state, 1.0)
     if hyp["bn_recal_batches"] and not proxy_only:
