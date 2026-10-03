@@ -1,0 +1,33 @@
+{
+  "returncode": 0,
+  "wall_seconds": 139.3,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T222437Z-d9fccf1a",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 16 --params '{\"count_nonfinite\": true, \"epochs\": 10.0, \"g3_pair\": \"inner512\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "g3-inner512-e10.0-n16",
+    "n": 16,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "16",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 10.0, \"g3_pair\": \"inner512\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 10.0, \"g3_pair\": \"inner512\"}",
+    "delta": {
+      "g3_pair": "inner512",
+      "epochs": 10.0
+    },
+    "hypothesis": "n=16 paired confirmation: group 3 pair through 512 channels at 10 epochs vs candidate B (n=8: -0.04 pp, -0.10 s)",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 10.0, \"g3_pair\": \"inner512\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
