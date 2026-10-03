@@ -1,0 +1,17 @@
+{
+  "round": "r11",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "d2-c",
+      "control_index": 1,
+      "variants": [
+        {"label": "d222-skip", "params": {"depths": [2, 2, 2], "depth2_residual": true}, "hypothesis": "depth 2 everywhere with a skip connection over the second conv (keeps a residual path)"},
+        {"label": "d222-skip-w128-320-896", "params": {"depths": [2, 2, 2], "depth2_residual": true, "widths": [128, 320, 896]}, "hypothesis": "depth 2 + skip, widened to recover capacity"},
+        {"label": "d222-skip-e9.5", "params": {"depths": [2, 2, 2], "depth2_residual": true, "epochs": 9.5}, "hypothesis": "depth 2 + skip with 0.75 epoch bought back"}
+      ]
+    }
+  ]
+}

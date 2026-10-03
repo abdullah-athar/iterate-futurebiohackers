@@ -1,0 +1,16 @@
+{
+  "round": "r12",
+  "n": 16,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "confirm16-S3",
+      "control_index": 1,
+      "variants": [
+        {"label": "S3-e9.25", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "compile_loss": true, "fused_sgd": true, "epochs": 9.25}, "hypothesis": "n=16 confirmation vs the promoted recipe: w64 + bias 16 + lr 12 + wd x1.4 + compiled loss + fused SGD at 9.25 epochs (r10: 75.24% / 5.11 s)"},
+        {"label": "S3-e9.5", "params": {"widths": [64, 256, 768], "bias_scaler": 16.0, "lr": 12.0, "weight_decay": 0.0168, "compile_loss": true, "fused_sgd": true, "epochs": 9.5}, "hypothesis": "n=16 confirmation: same at 9.5 epochs (r10: 75.53% / 5.16 s)"}
+      ]
+    }
+  ]
+}
