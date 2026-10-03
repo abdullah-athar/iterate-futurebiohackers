@@ -124,7 +124,9 @@ just autoresearch-swarm-smoke                                   # 2 agents, 1 ge
 just autoresearch-swarm --run artifacts/runs/swarm-1            # 32 agents/generation, 20 min
 just autoresearch-swarm --run artifacts/runs/long-1 --problem median_string_long   # MSA-scale 1500 bp instances
 just autoresearch-swarm --run artifacts/runs/swarm-1 --agents 8 --budget-min 10 --model opus
+just autoresearch-swarm --run artifacts/runs/simple-1 --modes tune --exploit 1.0   # control: plain incumbent-only loop (no archive/merge/bandit)
 just autoresearch-viz serve artifacts/runs/swarm-1 --open      # live dashboard (run in a second terminal)
+just autoresearch-viz render artifacts/runs/swarm-1 artifacts/runs/simple-1 -o artifacts/viz/ablation.html   # offline comparison for the demo
 
 # single-agent mode (tell the agent: "read autoresearch/program.md and start a research run")
 just autoresearch --run artifacts/runs/demo init
@@ -188,10 +190,18 @@ loop handles it.
 7. **Agents can game their own evaluation.**
    - *The problem:* an agent that grades itself, or can read the test generator, can fake progress.
    - *What we do:*
-     - agents only return source code;
-     - the harness re-scores it in a separate process or a separate Modal container;
-     - an import guard blocks `os`, `subprocess`, the benchmark generator, `exec` and `open`;
-     - only the orchestrator writes the ledger.
+     - agents only return source code; the harness evaluates it in a separate process or Modal container;
+     - inside that evaluation, the candidate's code runs in its own process
+       (`autoresearch/candidate_runner.py`) that receives only a copy of the strings, alphabet, metric,
+       length constraint and CPU budget: no planted answer, no reference score, no generator seed, no
+       `AUTORESEARCH_*` secrets. It returns one string per instance. Validation, distances and baselines
+       are computed by the parent from its own copy of the inputs, so reading the answer, mutating the
+       inputs or monkeypatching `median_string.metrics` cannot change a score
+       (`scripts/test_autoresearch.py::test_evaluator_boundary` checks each of these);
+     - an import guard blocks `os`, `subprocess`, the benchmark generator, `exec` and `open`: a readable
+       check, not a security sandbox;
+     - only the orchestrator writes the ledger, and `config.json` records an `evaluator_hash` so runs made
+       with different evaluator versions are not compared by accident.
 8. **Serial loops are slow.**
    - *The problem:* one agent at a time gives roughly one hypothesis a minute.
    - *What we do:* N agents work in parallel each generation, and every evaluation runs in its own
