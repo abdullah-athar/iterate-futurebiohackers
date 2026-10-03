@@ -71,6 +71,17 @@ also work from WSL.
   with the judges' machine.
 - `SPEEDRUN_IMAGE=dockerfile` switches to `modal.Image.from_dockerfile` on the organizer
   Dockerfile (experimental; may be rejected by Modal's builder, and bakes the code in).
+- First image build measured on 3 October 2026: about 3 min wall (CUDA base 81 s, apt 21 s,
+  torch sync 55 s); later runs reuse the cached image and reach the function in a few seconds.
+- Modal refuses `A100-80GB` functions until the workspace has a payment method on file
+  ("Please add a payment method to use A100-80GB GPU functions"). Because `modal run`
+  validates every function of the app, this also blocks `::download_data` and `::smoke`.
+  Check `uv run modal profile list` points at the workspace holding the hackathon credits
+  (`uv run modal token new` to add another workspace, `uv run modal profile activate NAME`),
+  and its Billing page at modal.com/settings.
+- Windows hosts: set `PYTHONUTF8=1` (`$env:PYTHONUTF8 = "1"`) before Modal commands, or the
+  CLI can die with `'charmap' codec can't encode character` after an otherwise successful
+  step (seen with `modal setup`, which had already written the token).
 
 ## Submitting upstream
 
