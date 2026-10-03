@@ -1,0 +1,16 @@
+{
+  "round": "r1",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "muon",
+      "variants": [
+        {"label": "muon0.18", "params": {"optimizer": "muon", "muon_lr": 0.18}, "hypothesis": "Muon on conv filters (airbench94_muon split), lower lr; teammate found Muon lost to SGD at 8.5 epochs"},
+        {"label": "muon0.24", "params": {"optimizer": "muon", "muon_lr": 0.24}, "hypothesis": "Muon at the airbench94_muon learning rate"},
+        {"label": "muon0.32", "params": {"optimizer": "muon", "muon_lr": 0.32}, "hypothesis": "Muon with a higher lr for the short schedule"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "requested_trials": 8,
+  "number_of_trials": 8,
+  "successful_trials": 8,
+  "failed_trials": 0,
+  "complete": true,
+  "accuracy_target": 0.75,
+  "run_error": null,
+  "mean_accuracy": 0.7496875,
+  "accuracy_std": 0.0030530722231876515,
+  "mean_training_time": 6.945156878749987,
+  "training_time_std": 0.018913180833681764,
+  "mean_evaluation_time": 0.1104589563749947,
+  "evaluation_time_std": 0.010273517766100701,
+  "qualified": false,
+  "official": false,
+  "dataset": "CIFAR-100",
+  "run_id": "20261003T160119Z-4a6db5fe"
+}

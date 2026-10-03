@@ -1,0 +1,39 @@
+{
+  "round": "r1",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "lowres-26",
+      "variants": [
+        {"label": "lr26x1", "params": {"low_res": 26, "low_res_epochs": 1}, "hypothesis": "progressive resizing: 1 epoch at 26x26 (~30% cheaper) costs little accuracy early"},
+        {"label": "lr26x2", "params": {"low_res": 26, "low_res_epochs": 2}, "hypothesis": "2 epochs at 26x26"},
+        {"label": "lr26x3", "params": {"low_res": 26, "low_res_epochs": 3}, "hypothesis": "3 epochs at 26x26"}
+      ]
+    },
+    {
+      "name": "lowres-28",
+      "variants": [
+        {"label": "lr28x1", "params": {"low_res": 28, "low_res_epochs": 1}, "hypothesis": "progressive resizing: 1 epoch at 28x28 (~24% cheaper)"},
+        {"label": "lr28x2", "params": {"low_res": 28, "low_res_epochs": 2}, "hypothesis": "2 epochs at 28x28"},
+        {"label": "lr28x3", "params": {"low_res": 28, "low_res_epochs": 3}, "hypothesis": "3 epochs at 28x28"}
+      ]
+    },
+    {
+      "name": "lowres-4-relu",
+      "variants": [
+        {"label": "lr26x4", "params": {"low_res": 26, "low_res_epochs": 4}, "hypothesis": "4 epochs at 26x26: largest saving, largest accuracy risk"},
+        {"label": "lr28x4", "params": {"low_res": 28, "low_res_epochs": 4}, "hypothesis": "4 epochs at 28x28 (PCIe screen: -0.70 s, -0.30 pp); now with the low-res graph in default mode"},
+        {"label": "relu", "params": {"activation": "relu"}, "hypothesis": "ReLU is the cheapest activation; airbench94 uses GELU but the gap may be small at 100 classes"}
+      ]
+    },
+    {
+      "name": "filter",
+      "variants": [
+        {"label": "filt5-0.75", "params": {"filter_start": 5, "filter_keep": 0.75}, "hypothesis": "late-epoch data filtering (airbench96_faster): from epoch 5 skip the 25% most confident examples"},
+        {"label": "filt6-0.5", "params": {"filter_start": 6, "filter_keep": 0.5}, "hypothesis": "from epoch 6 train on the hardest half only"}
+      ]
+    }
+  ]
+}

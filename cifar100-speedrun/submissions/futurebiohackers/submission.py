@@ -11,6 +11,7 @@ them, and initializes the patch-whitening layer from training images.
 """
 
 import math
+import sys
 from types import SimpleNamespace
 
 import torch
@@ -41,12 +42,22 @@ DEFAULTS = {
     "compile": "max-autotune",  # torch.compile mode; "" runs eagerly
     # Experimental switches (the defaults reproduce the recipe above exactly).
     "depths": None,  # per-group convs, e.g. [3, 2, 4]; None uses "depth" for every group
-    "activation": "gelu",  # or "silu"
+    "activation": "gelu",  # or "silu", "relu"
     "whiten_svd": False,  # whitening basis from an SVD instead of eigh
     "crop_gather": False,  # vectorized random crop (one gather, same shift distribution)
     "low_res": 0,  # progressive resizing: train epochs with index < low_res_epochs at this size
     "low_res_epochs": 0,
+    "low_res_compile": "default",  # torch.compile mode of the separate static low-res graph
     "jitter": 0.0,  # per-image brightness/contrast jitter strength (own RNG, seeded per trial)
+    "count_nonfinite": False,  # count non-finite step losses on the GPU; train() prints the total
+    "filter_start": 0,  # first epoch that trains only the filter_keep hardest examples; 0 = off
+    "filter_keep": 0.75,  # fraction of the training set kept in filtered epochs (highest last loss)
+    "optimizer": "sgd",  # or "muon" (airbench94_muon): Muon on conv filters, SGD on biases and head
+    "muon_lr": 0.24,
+    "muon_momentum": 0.6,
+    "bias_lr": 0.053,  # muon only: SGD learning rate of the whitening and BatchNorm biases
+    "head_lr": 0.67,  # muon only: SGD learning rate of the head
+    "muon_wd": 2e-6,  # muon only: SGD weight decay per example
 }
 
 
@@ -72,7 +83,7 @@ class Conv(nn.Conv2d):
 
 
 def _activation(name):
-    return {"gelu": nn.GELU, "silu": nn.SiLU}[name]()
+    return {"gelu": nn.GELU, "silu": nn.SiLU, "relu": nn.ReLU}[name]()
 
 
 class ConvGroup(nn.Module):
@@ -126,12 +137,16 @@ class Net(nn.Module):
         self.head = nn.Linear(w3, num_classes, bias=False)
         self.scaling_factor = hyp["scaling_factor"]
         self.whiten_svd = hyp["whiten_svd"]
+        # airbench94_muon: unit-std head weights and logits scaled by 1 / features instead.
+        self.muon_head = hyp["optimizer"] == "muon"
 
     def reset(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d | nn.BatchNorm2d | nn.Linear):
                 m.reset_parameters()
         self.whiten.bias.data.zero_()
+        if self.muon_head:
+            self.head.weight.data /= self.head.weight.data.std()
 
     @torch.no_grad()
     def init_whiten(self, images, eps=5e-4):
@@ -152,6 +167,8 @@ class Net(nn.Module):
         b = self.whiten.bias
         x = F.conv2d(x, self.whiten.weight, b if whiten_bias_grad else b.detach())
         x = self.layers(x).flatten(1)
+        if self.muon_head:
+            return self.head(x) / x.size(-1)
         return self.head(x) * self.scaling_factor
 
 
@@ -168,6 +185,52 @@ class Classifier(nn.Module):
     def forward(self, x):
         x = ((x - self.mean) / self.std).to(self.dtype, memory_format=torch.channels_last)
         return self.net(x).float()
+
+
+#############################################
+#                   Muon                    #
+#############################################
+
+
+def zeropower_via_newtonschulz5(G, steps: int = 3, eps: float = 1e-7):
+    """Approximately orthogonalize G with a quintic Newton-Schulz iteration in bfloat16."""
+    a, b, c = (3.4445, -4.7750, 2.0315)
+    X = G.bfloat16()
+    X /= X.norm() + eps
+    if G.size(0) > G.size(1):
+        X = X.T
+    for _ in range(steps):
+        A = X @ X.T
+        B = b * A + c * A @ A
+        X = a * X + B @ X
+    if G.size(0) > G.size(1):
+        X = X.T
+    return X
+
+
+class Muon(torch.optim.Optimizer):
+    """Nesterov momentum, then an orthogonalized update on norm-preserving conv filters
+    (airbench94_muon). Pure PyTorch; prepare re-creates it, so its buffers reset per trial."""
+
+    def __init__(self, params, lr, momentum, zeropower):
+        super().__init__(params, dict(lr=lr, momentum=momentum))
+        self.zeropower = zeropower
+
+    @torch.no_grad()
+    def step(self):
+        for group in self.param_groups:
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                state = self.state[p]
+                if "momentum_buffer" not in state:
+                    state["momentum_buffer"] = torch.zeros_like(p.grad)
+                buf = state["momentum_buffer"]
+                buf.mul_(group["momentum"]).add_(p.grad)
+                g = p.grad.add(buf, alpha=group["momentum"])
+                p.mul_(len(p) ** 0.5 / p.norm())
+                update = self.zeropower(g.reshape(len(g), -1)).view(g.shape)
+                p.add_(update, alpha=-group["lr"])
 
 
 #############################################
@@ -253,6 +316,10 @@ def build(context: BuildContext):
     # The 2x2 whitening conv and three pools need (size - 1) // 8 >= 3 for the final 3x3 pool.
     if hyp["low_res"] and (hyp["low_res"] - 1) // 8 < 3:
         raise ValueError("low_res must be at least 25 (28 or 26 recommended)")
+    if hyp["filter_start"] and not 0 < hyp["filter_keep"] <= 1:
+        raise ValueError("filter_keep must be in (0, 1]")
+    if hyp["optimizer"] not in ("sgd", "muon"):
+        raise ValueError(f"optimizer must be 'sgd' or 'muon', got {hyp['optimizer']!r}")
     device = context.device
     cuda = device.type == "cuda"
     dtype = torch.float16 if cuda else torch.float32
@@ -262,7 +329,17 @@ def build(context: BuildContext):
     for m in net.modules():
         if isinstance(m, nn.BatchNorm2d):
             m.float()
-    train_net = torch.compile(net, mode=hyp["compile"]) if cuda and hyp["compile"] else net
+    if cuda and hyp["compile"] and len(_resolutions(hyp)) > 1:
+        # Progressive resizing: one static graph per resolution over the same eager net.
+        # dynamic=False keeps dynamo from switching to dynamic shapes on the second size, and
+        # the low-res graph compiles in the (cheaper) low_res_compile mode.
+        train_net = torch.compile(net, mode=hyp["compile"], dynamic=False)
+        low_net = torch.compile(net, mode=hyp["low_res_compile"], dynamic=False)
+    elif cuda and hyp["compile"]:
+        train_net = low_net = torch.compile(net, mode=hyp["compile"])
+    else:
+        train_net = low_net = net
+    muon = hyp["optimizer"] == "muon"
     float_state = [t for t in net.state_dict().values() if t.is_floating_point()]
     state = SimpleNamespace(
         hyp=hyp,
@@ -270,9 +347,16 @@ def build(context: BuildContext):
         dtype=dtype,
         net=net,
         train_net=train_net,
+        low_net=low_net,
         classifier=Classifier(net, dtype).to(device),
         float_state=float_state,
         ema=[t.clone() for t in float_state],
+        muon=None,  # the Muon optimizer (optimizer == "muon"), created per trial in prepare
+        zeropower=(
+            torch.compile(zeropower_via_newtonschulz5)
+            if muon and cuda and hyp["compile"]
+            else zeropower_via_newtonschulz5
+        ),
     )
 
     # Untimed warmup on random synthetic images: compiles both whitening-bias graphs,
@@ -329,31 +413,63 @@ def prepare(state, data: TrainingData, seed: int) -> None:
 
     batch_size = min(hyp["batch_size"], len(data.labels))
     momentum = hyp["momentum"]
-    kilostep_scale = 1024 * (1 + 1 / (1 - momentum))
-    lr = hyp["lr"] / kilostep_scale
-    wd = hyp["weight_decay"] * batch_size / kilostep_scale
-    lr_biases = lr * hyp["bias_scaler"]
     norm_biases = [p for name, p in net.named_parameters() if "norm" in name and p.requires_grad]
-    others = [p for name, p in net.named_parameters() if "norm" not in name and p.requires_grad]
-    state.optimizer = torch.optim.SGD(
-        [
+    if hyp["optimizer"] == "muon":
+        # airbench94_muon split: SGD on the whitening bias (own group, learning rate decaying
+        # linearly to 0 over whiten_bias_steps), BatchNorm biases and the head; Muon on filters.
+        wd = hyp["muon_wd"] * batch_size
+        bias_lr, head_lr = hyp["bias_lr"], hyp["head_lr"]
+        filters = [p for p in net.parameters() if p.ndim == 4 and p.requires_grad]
+        groups = [
+            dict(params=[net.whiten.bias], lr=bias_lr, weight_decay=wd / bias_lr, whiten=True),
+            dict(params=norm_biases, lr=bias_lr, weight_decay=wd / bias_lr),
+            dict(params=[net.head.weight], lr=head_lr, weight_decay=wd / head_lr),
+        ]
+        state.muon = Muon(filters, hyp["muon_lr"], hyp["muon_momentum"], state.zeropower)
+    else:
+        kilostep_scale = 1024 * (1 + 1 / (1 - momentum))
+        lr = hyp["lr"] / kilostep_scale
+        wd = hyp["weight_decay"] * batch_size / kilostep_scale
+        lr_biases = lr * hyp["bias_scaler"]
+        others = [p for name, p in net.named_parameters() if "norm" not in name and p.requires_grad]
+        groups = [
             dict(params=norm_biases, lr=lr_biases, weight_decay=wd / lr_biases),
             dict(params=others, lr=lr, weight_decay=wd / lr),
-        ],
-        momentum=momentum,
-        nesterov=True,
-    )
-    for group in state.optimizer.param_groups:
-        group["initial_lr"] = group["lr"]
+        ]
+        state.muon = None
+    state.optimizer = torch.optim.SGD(groups, momentum=momentum, nesterov=True)
+    for optimizer in _optimizers(state):
+        for group in optimizer.param_groups:
+            group["initial_lr"] = group["lr"]
 
+    count = len(data.labels)
     state.batch_size = batch_size
-    state.steps_per_epoch = len(data.labels) // batch_size
-    state.total_steps = math.ceil(hyp["epochs"] * state.steps_per_epoch)
+    state.steps_per_epoch = count // batch_size
     state.whiten_bias_steps = math.ceil(hyp["whiten_bias_epochs"] * state.steps_per_epoch)
+    if hyp["filter_start"]:
+        # Loss of every example the last time it was trained on, +inf until it has been seen:
+        # a filtered epoch keeps the filter_keep_count highest-scoring (hardest) examples.
+        state.scores = torch.full((count,), math.inf, device=device)
+        state.filter_keep_count = round(hyp["filter_keep"] * count)
+        if state.filter_keep_count < batch_size:
+            raise ValueError("filter_keep keeps fewer examples than one batch")
+        # Full epochs first, then the fractional last one; equals the unfiltered formula
+        # below whenever no epoch is filtered.
+        full_epochs = max(0, math.ceil(hyp["epochs"]) - 1)
+        state.total_steps = sum(_epoch_steps(state, e) for e in range(full_epochs)) + math.ceil(
+            (hyp["epochs"] - full_epochs) * _epoch_steps(state, full_epochs)
+        )
+    else:
+        state.total_steps = math.ceil(hyp["epochs"] * state.steps_per_epoch)
 
 
 def train(state) -> nn.Module:
     _fit(state, state.total_steps)
+    if state.hyp["count_nonfinite"]:
+        # One host read at the very end (the harness synchronizes here anyway). The worker's
+        # stderr is inherited, so the launcher can parse this line from the container log.
+        state.nonfinite_losses = int(state.nonfinite)
+        print(f"NONFINITE_LOSSES {state.nonfinite_losses}", file=sys.stderr, flush=True)
     return state.classifier
 
 
@@ -366,14 +482,30 @@ def _epoch_resolution(hyp, epoch):
     return hyp["low_res"] if hyp["low_res"] and epoch < hyp["low_res_epochs"] else 32
 
 
+def _epoch_steps(state, epoch):
+    """Optimizer steps in a full epoch: fewer once data filtering is active."""
+    hyp = state.hyp
+    if hyp["filter_start"] and epoch >= hyp["filter_start"]:
+        return state.filter_keep_count // state.batch_size
+    return state.steps_per_epoch
+
+
+def _optimizers(state):
+    return [state.optimizer] if state.muon is None else [state.optimizer, state.muon]
+
+
 def _fit(state, total_steps, force_resolution=None):
-    hyp, net, optimizer = state.hyp, state.net, state.optimizer
-    labels, batch_size, steps_per_epoch = state.labels, state.batch_size, state.steps_per_epoch
+    hyp, net, optimizers = state.hyp, state.net, _optimizers(state)
+    labels, batch_size = state.labels, state.batch_size
+    filtering = bool(hyp["filter_start"])
+    nonfinite = (
+        torch.zeros((), dtype=torch.int64, device=labels.device) if hyp["count_nonfinite"] else None
+    )
     warmup_steps = int(total_steps * hyp["warmup"])
     ema_decay = 0.95**5 * (torch.arange(total_steps + 1) / total_steps) ** 3
-    step = 0
+    step = epoch = 0
     net.train()
-    for epoch in range(math.ceil(total_steps / steps_per_epoch)):
+    while step < total_steps:
         if hyp["translate"]:
             crop = batch_crop_gather if hyp["crop_gather"] else batch_crop
             images = crop(state.images, 32)
@@ -390,19 +522,37 @@ def _fit(state, total_steps, force_resolution=None):
             images = F.interpolate(
                 images, size=(resolution, resolution), mode="bilinear", antialias=True
             ).contiguous(memory_format=torch.channels_last)
+        train_net = state.train_net if resolution == 32 else state.low_net
         order = torch.randperm(len(labels), device=labels.device)
-        for i in range(steps_per_epoch):
-            if step >= total_steps:
-                break
+        if filtering and epoch >= hyp["filter_start"]:
+            # Keep the hardest examples in the order the permutation drew them: the global RNG
+            # stream (and so the pairing with an unfiltered control) is untouched.
+            keep = torch.zeros_like(state.scores, dtype=torch.bool)
+            keep[state.scores.topk(state.filter_keep_count).indices] = True
+            order = order[keep[order]]
+        for i in range(min(_epoch_steps(state, epoch), total_steps - step)):
             idx = order[i * batch_size : (i + 1) * batch_size]
-            outputs = state.train_net(images[idx], step < state.whiten_bias_steps)
-            loss = F.cross_entropy(
-                outputs.float(),
-                labels[idx],
-                label_smoothing=hyp["label_smoothing"],
-                reduction="sum",
-            )
-            optimizer.zero_grad(set_to_none=True)
+            outputs = train_net(images[idx], step < state.whiten_bias_steps)
+            if filtering:
+                losses = F.cross_entropy(
+                    outputs.float(),
+                    labels[idx],
+                    label_smoothing=hyp["label_smoothing"],
+                    reduction="none",
+                )
+                loss = losses.sum()
+                state.scores[idx] = losses.detach()
+            else:
+                loss = F.cross_entropy(
+                    outputs.float(),
+                    labels[idx],
+                    label_smoothing=hyp["label_smoothing"],
+                    reduction="sum",
+                )
+            if nonfinite is not None:
+                nonfinite += (~torch.isfinite(loss.detach())).to(nonfinite.dtype)
+            for optimizer in optimizers:
+                optimizer.zero_grad(set_to_none=True)
             loss.backward()
             if step < warmup_steps:
                 frac = step / warmup_steps
@@ -410,14 +560,22 @@ def _fit(state, total_steps, force_resolution=None):
             else:
                 frac = (step - warmup_steps) / max(1, total_steps - warmup_steps)
                 scale = (1 - frac) + hyp["final_lr"] * frac
-            for group in optimizer.param_groups:
-                group["lr"] = group["initial_lr"] * scale
-            optimizer.step()
+            # Only the muon split has a "whiten" group (the whitening bias, decaying to 0).
+            whiten_scale = max(0.0, 1 - step / max(1, state.whiten_bias_steps))
+            for optimizer in optimizers:
+                for group in optimizer.param_groups:
+                    group["lr"] = group["initial_lr"] * (
+                        whiten_scale if "whiten" in group else scale
+                    )
+                optimizer.step()
             step += 1
             if hyp["ema_every"] and step % hyp["ema_every"] == 0:
                 _lookahead(state, ema_decay[step].item())
+        epoch += 1
     if hyp["ema_every"]:
         _lookahead(state, 1.0)
+    state.steps_taken = step
+    state.nonfinite = nonfinite
 
 
 @torch.no_grad()

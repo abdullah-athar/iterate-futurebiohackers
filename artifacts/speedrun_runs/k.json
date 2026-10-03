@@ -1,0 +1,6 @@
+{
+  "k": 0.445,
+  "unit": "accuracy percentage points per second of prepare+train",
+  "source": "calib/epochs: control 8.5 vs 8.0 (dacc -0.16 pp, dtime -0.41 s) vs 7.5 (dacc -0.38 pp, dtime -0.83 s), n=8 paired, A100-SXM4-80GB 400 W, least squares through the origin",
+  "time": "2026-10-03T17:35:00"
+}

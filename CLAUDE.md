@@ -29,16 +29,22 @@ AGENTS.md
   `just modal 3 --params '{"epochs": 10}'` or
   `uv run modal run scripts/modal_speedrun.py::main --n 3 --params '{"epochs": 10}'`;
   `::ab --n 8 --variants '[{...}, {...}]' --labels a,b [--control-params '{...}'] [--profile]`
-  runs control + variants sequentially in one container and prints paired Δacc ± SE / Δtime;
-  `::profile` shows where the time goes. Launcher flags: `--tag T`, `--no-require-pcie`,
-  `--no-pcie-fallback`. Env: `MODAL_TIMEOUT_MIN` (default 20, hard cap per container),
-  `MODAL_PCIE_ATTEMPTS` (default 4), `MODAL_GPU_BUDGET_MIN` (default 120, hard stop),
-  `MODAL_GPU_CHECKPOINTS` (60,100: report, then `MODAL_GPU_CONTINUE=1` to go on).
+  runs control + variants sequentially in one container and prints paired Δacc ± SE, Δtime
+  and Δtime_adj; `::screen --jobs artifacts/speedrun_runs/jobs/X.json --parallel 10` runs a
+  whole round (one container per job: control + up to 3 variants, warm compile cache,
+  rows into `registry.jsonl` + `LOG.md`, then `scripts/leaderboard.py`); `::profile` shows
+  where the time goes. Launcher flags: `--tag T`, `--require-gpu sxm|pcie|any` (default
+  sxm), `--require-power 400|500|any`, `--warm`, `--count-nonfinite`. Env: `MODAL_TIMEOUT_MIN`
+  (default 20, hard cap per container), `MODAL_GPU_ATTEMPTS` (11), `MODAL_GPU_BUDGET_MIN`
+  (1263 = hard stop), `MODAL_JOB_LIMIT_MIN` (20: bigger jobs need `--allow-big`, ask first).
   Windows: set `PYTHONUTF8=1` for every Modal command (`just modal` does).
-- The PCIe guard is on by default: Modal's `A100-80GB` pool mixes the judges' PCIe card with
-  SXM4 parts; non-PCIe containers abort before build and are retried, then the run falls
-  back to SXM with the GPU name on every result row. `GPU used: X/120 min` is printed after
-  every call from `artifacts/speedrun_runs/gpu_ledger.jsonl`.
+- GPU guard: judging is on an A100-SXM4-80GB, so every run requires that card (no fallback;
+  wrong cards abort before build and are retried, each miss costs ~0.3 min and is logged).
+  Modal's SXM cards come at 400 W and 500 W power limits (500 W is ~7% faster): the power
+  limit is recorded with every result and comparisons are only valid within one container.
+  `GPU used: X/1263 min` is printed after every call from `artifacts/speedrun_runs/gpu_ledger.jsonl`.
+- Scripts: `scripts/check_reset.py` (reset rules), `scripts/check_variants.py` (control path
+  bit-identical to HEAD, every experimental switch runs), both via WSL on Windows.
 - Results: `cifar100-speedrun/results/<team>/<run_id>/` (for `just last`, gitignored) and
   `artifacts/speedrun_runs/<timestamp>_<tag>/` (summary.json, trials.jsonl, config.json,
   modal_run.json, `ab_summary.md`; `source/` is gitignored). Add a row to

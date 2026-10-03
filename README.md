@@ -19,7 +19,7 @@ Working folders: `scripts/` for experiments, `notebooks/` for exploration, `data
 
 We are competing in the [CIFAR-100 speedrun](https://github.com/AIDDA-Institute/CIFAR-100-speedrun): reach 75% mean test accuracy in the lowest preparation + training time on an A100. The organizer repo lives in `cifar100-speedrun/` as a git subtree; read its `README.md` and `RULES.md`. Our recipe is `cifar100-speedrun/submissions/futurebiohackers/submission.py`.
 
-Our recipe adapts [airbench](https://github.com/KellerJordan/cifar10-airbench) to CIFAR-100. Over 40 trials on a Modal A100-SXM4-80GB it averaged **75.29%** accuracy in **8.11 s** of prepare + train time. The organizer baseline is 75.36% in 59.30 s. The architecture, hyperparameters and results table are in `cifar100-speedrun/submissions/futurebiohackers/README.md`. The defaults in `submission.py` are the recipe we plan to submit. To experiment, override them with `--params`.
+Our recipe adapts [airbench](https://github.com/KellerJordan/cifar10-airbench) to CIFAR-100. Over 40 trials with the official accuracy target and a cold build on a Modal A100-SXM4-80GB it averaged **75.20%** accuracy in **7.41 s** of prepare + train time at the 400 W power limit (75.19% in 6.94 s on a 500 W card). The organizer baseline is 75.36% in 59.30 s. The architecture, hyperparameters and results table are in `cifar100-speedrun/submissions/futurebiohackers/README.md`. The defaults in `submission.py` are the recipe we plan to submit. To experiment, override them with `--params`.
 
 | Config | Accuracy | Time |
 |---|---:|---:|
@@ -53,7 +53,7 @@ just modal 40                               # full official-style run with the 7
 just last                                   # results are copied back locally
 ```
 
-Modal needs a payment method on the workspace before it will start any GPU function, even when credits cover the cost. Modal's `A100-80GB` is the SXM part (400 W), but official judging uses the A100 80GB PCIe (300 W), so official times will probably be slower than our Modal times. Set `MODAL_GPU` to pick another GPU type. An empty `MODAL_GPU` runs on CPU only.
+Modal needs a payment method on the workspace before it will start any GPU function, even when credits cover the cost. Modal's `A100-80GB` pool mixes A100-SXM4-80GB cards at 400 W and 500 W power limits with A100 80GB PCIe cards (300 W); judging is on an A100 SXM4 80GB, so the launcher requires an SXM card by default (`--require-gpu sxm|pcie|any`, `--require-power 400|500|any`) and records the power limit of every run, because the 500 W cards are about 7% faster than the 400 W ones. Set `MODAL_GPU` to pick another GPU type. An empty `MODAL_GPU` runs on CPU only.
 
 CIFAR-100 is cached in the `cifar100-data` volume. Every run is also kept in the `cifar100-results` volume, so after a dropped connection you can fetch results with `uv run modal volume get --force cifar100-results futurebiohackers/ cifar100-speedrun/results/`. Script: `scripts/modal_speedrun.py`.
 

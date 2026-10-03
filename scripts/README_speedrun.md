@@ -55,8 +55,9 @@ also work from WSL.
 | Command | What it does |
 | --- | --- |
 | `::env_check` | nvidia-smi (name, memory, power limit, MIG) and the container's task id, region and cloud; no training |
-| `::main [--tag T] [--no-require-pcie] [--no-pcie-fallback] <harness flags>` | one `benchmark.run` with the harness flags passed straight through (`--n N`, `--params JSON`, `--no-accuracy-target`, `--seed S`, `--build-timeout S`, `--submission-path P`, ...; default `--n 1`). `just modal [n] [flags]` calls this. Results in `artifacts/speedrun_runs/<ts>_<T>/` and `cifar100-speedrun/results/` (for `just last`). |
-| `::ab --tag T --n N --variants '[{...}, {...}]' [--labels a,b] [--control-params JSON] [--seed S] [--profile]` | control + variants **sequentially in one container on one card**, each its own `benchmark.run` (fresh build, cold compile cache, nothing shared); table with mean acc, std, mean prepare+train, build time, GPU and the **paired** per-seed Δacc ± SE and Δtime vs the control, saved as `ab_summary.{md,json}` in `<ts>_<T>/NN_<label>/`. Variants are parameter deltas merged over the control. The default way to compare recipes. |
+| `::main [--tag T] [--require-gpu sxm\|pcie\|any] [--require-power 400\|500\|any] [--warm] [--count-nonfinite] <harness flags>` | one `benchmark.run` with the harness flags passed straight through (`--n N`, `--params JSON`, `--no-accuracy-target`, `--seed S`, `--build-timeout S`, `--submission-path P`, ...; default `--n 1`, cold build). `just modal [n] [flags]` calls this. Results in `artifacts/speedrun_runs/<ts>_<T>/` and `cifar100-speedrun/results/` (for `just last`); a row goes to `registry.jsonl` and `LOG.md`. Use it for references and finalists (n=40, cold build). |
+| `::ab --tag T --n N --variants '[{...}, {...}]' [--labels a,b] [--hypotheses "a;b"] [--control-params JSON] [--seed S] [--warm] [--profile]` | control + variants **sequentially in one container on one card**, each its own `benchmark.run`; table with mean acc, std, mean prepare+train, build time, GPU @ power limit, non-finite losses and the **paired** per-seed Δacc ± SE, Δtime and Δtime_adj vs the control, saved as `ab_summary.{md,json}`. Variants are parameter deltas merged over the control. |
+| `::screen --jobs FILE [--parallel 10] [--only a,b] [--no-warm] [--allow-big]` | a whole round from a jobs file (`artifacts/speedrun_runs/jobs/*.json`: `{"round", "n", "seed", "control", "jobs": [{"name", "variants": [{"label", "params", "hypothesis"}]}]}`); one container per job (control + up to 3 variants), up to `--parallel` containers at once, warm compile cache, every variant appended to `registry.jsonl` and `LOG.md`, then `scripts/leaderboard.py` regenerates `leaderboard.md` and `pareto.svg`. |
 | `::profile [--params JSON] [--epochs E]` | runs `scripts/profile_recipe.py` on the real data: prepare breakdown, per-step forward/backward/optimizer time, per-group compute split, top kernels |
 
 - CIFAR-100 is downloaded into the `cifar100-data` Volume on first use; `TEAM` picks the
@@ -65,21 +66,31 @@ also work from WSL.
 - Every GPU function has a hard Modal timeout of `MODAL_TIMEOUT_MIN` minutes (default 20),
   so a hung run cannot burn more. Inside the container each run has a deadline (the harness
   gets SIGINT and keeps its finished trials) and runs that no longer fit are skipped, so the
-  payload always comes back.
-- PCIe guard (default on): Modal's `A100-80GB` pool mixes the judges' PCIe card (300 W) with
-  SXM4 cards (400-500 W). The container checks nvidia-smi before build; on a non-PCIe card it
-  returns at once (about 0.3 GPU-min) and the launcher retries, up to `MODAL_PCIE_ATTEMPTS`
-  calls (default 4), logging every attempt with the GPU name, Modal task id, region and cloud.
-  GPU functions are single-use containers, so a retry is never served by the container that
-  just failed. After the last attempt the run continues on whatever card it gets and every
-  result row and LOG.md row carries the GPU name (`--no-pcie-fallback` aborts instead;
-  `--no-require-pcie` skips the guard). PCIe cards have so far come from Azure us-west.
-- Each `benchmark.run` gets its own empty `TORCHINDUCTOR_CACHE_DIR`, so compiled variants
-  report cold build times like the judges' container; builds over 300 s are flagged.
+  payload always comes back. Before launching, every job's GPU time is estimated from its
+  specs and jobs above `MODAL_JOB_LIMIT_MIN` (20) are refused unless `--allow-big` is given.
+- GPU guard (default: require an A100-SXM4-80GB, any power limit): Modal's `A100-80GB` pool
+  mixes SXM4 cards at 400 W and 500 W with PCIe cards (300 W), and the 500 W cards are about
+  7% faster. The container checks nvidia-smi before build; on the wrong card it returns at
+  once (about 0.3 GPU-min) and the launcher retries, up to `MODAL_GPU_ATTEMPTS` calls
+  (default 11 = one try + 10 retries), logging every attempt with the GPU name, power limit,
+  Modal task id, region and cloud. GPU functions are single-use containers, so a retry is
+  never served by the container that just failed. There is no fallback: a job that never
+  gets the card fails. `--require-power 400` pins the power limit (references, finalists).
+  Timing comparisons are only valid within one container (same card, same power limit).
+- Compile caches: `::main` builds cold (an empty `TORCHINDUCTOR_CACHE_DIR` per run, like the
+  judges' container; builds over 300 s are flagged). `::screen` (and `--warm`) copies the
+  persistent cache Volume `cifar100-inductor-cache` into the container, enables the inductor
+  FX graph cache, and merges new files back at the end, so only new graphs pay a compile.
+- Non-finite losses: with `count_nonfinite` the recipe prints `NONFINITE_LOSSES n` at the end
+  of every trial; the launcher sums them per run (`nonfinite` column; any value above 0
+  disqualifies a variant). `::screen` and `::ab` turn it on by default.
+- Exchange rate: `artifacts/speedrun_runs/k.json` (`{"k": pp per second}`) comes from the
+  epoch calibration (control at 8.5 / 8.0 / 7.5 epochs) and converts accuracy into time:
+  `dtime_adj = dtime - dacc_pp / k`. The leaderboard recomputes it from the current k.
 - GPU budget: `artifacts/speedrun_runs/gpu_ledger.jsonl` records every container attempt (wall
   time + 15 s start allowance, failed and timed-out calls included) and the launcher prints
-  `GPU used: X/120 min` before and after every call. `MODAL_GPU_BUDGET_MIN` (120) is a hard
-  stop; `MODAL_GPU_CHECKPOINTS` (60,100) are report lines that need `MODAL_GPU_CONTINUE=1`.
+  `GPU used: X/1263 min` before and after every call. `MODAL_GPU_BUDGET_MIN` (1263 = the 63
+  minutes used when the 1200-minute cap was set, plus the cap) is a hard stop.
 - The image is `debian_slim` + `uv_sync` on the organizer lock, built once; the speedrun code
   is mounted at start, so recipe edits never rebuild it.
 - Exit code 1 from `benchmark.run` means below target or incomplete, not a crash: read

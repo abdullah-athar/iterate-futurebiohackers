@@ -24,9 +24,12 @@ submitted recipe.
 
 ## Development results
 
-40 trials on a Modal NVIDIA A100-SXM4-80GB (400 W), so timings will differ on the official
-A100 80GB PCIe:
+40 trials (seeds 0-39) with the official accuracy target and a cold `build`, on Modal
+NVIDIA A100-SXM4-80GB cards at the two power limits Modal hands out:
 
-| Mean accuracy | Accuracy std | Mean prepare + train | Time std |
-| ---: | ---: | ---: | ---: |
-| 75.29% | 0.25 pp | 8.11 s | 0.02 s |
+| GPU | Mean accuracy | Accuracy std | Mean prepare + train | Time std |
+| --- | ---: | ---: | ---: | ---: |
+| A100-SXM4-80GB, 400 W | 75.20% | 0.28 pp | 7.41 s | 0.01 s |
+| A100-SXM4-80GB, 500 W | 75.19% | 0.25 pp | 6.94 s | 0.01 s |
+
+The cold `build` (compile and warmup, untimed) took 133 s and 95 s respectively.

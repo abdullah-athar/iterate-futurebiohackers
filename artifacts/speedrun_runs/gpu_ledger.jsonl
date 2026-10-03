@@ -33,3 +33,4 @@
 {"time": "2026-10-03T16:45:27", "label": "ref-sxm400-n40 (gpu-guard miss 1)", "gpu": "NVIDIA A100 80GB PCIe", "power": "300.00 W", "container_seconds": 0.1, "gpu_minutes": 0.25, "note": "aborted before build: GPU 'NVIDIA A100 80GB PCIe' is not 'NVIDIA A100-SXM4-80GB'"}
 {"time": "2026-10-03T16:52:03", "label": "ref-sxm500-n40", "gpu": "NVIDIA A100-SXM4-80GB", "power": "500.00 W", "container_seconds": 388.6, "gpu_minutes": 6.73, "note": ""}
 {"time": "2026-10-03T16:53:03", "label": "ref-sxm400-n40", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 450.6, "gpu_minutes": 7.76, "note": ""}
+{"time": "2026-10-03T17:04:27", "label": "calib/epochs", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 399.7, "gpu_minutes": 6.91, "note": ""}
