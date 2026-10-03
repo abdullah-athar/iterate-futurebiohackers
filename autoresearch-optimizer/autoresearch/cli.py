@@ -30,7 +30,10 @@ def cmd_init(args) -> None:
     store = RunStore(args.run)
     cfg = LoopConfig(problem=args.problem, novelty_threshold=args.novelty_threshold, patience=args.patience)
     seed_src = Path(args.seed).read_text() if args.seed else None
-    run = ResearchRun.create(store, cfg, seed_source=seed_src)
+    try:
+        run = ResearchRun.create(store, cfg, seed_source=seed_src)
+    except FileExistsError as e:
+        sys.exit(f"{e}. Use `status` to continue it, or choose another --run directory.")
     e = run.entries()[0]
     print(f"Initialised run at {store.root} (problem={args.problem})")
     print(ResearchRun.describe_entry(e))
