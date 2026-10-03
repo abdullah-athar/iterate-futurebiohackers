@@ -32,7 +32,7 @@ works the same way). The loop owns evaluation and the ledger, so an agent can on
 ### How a run works
 
 ```mermaid
-flowchart LR
+flowchart TD
     A["1. Decide what to ask for<br/>small tweak, fix weak spots,<br/>new approach, or combine two"]
     B["2. Agents write ideas<br/>many Claude Code agents<br/>on your laptop, in parallel"]
     C["3. Drop repeats<br/>ideas we've already tried<br/>are skipped"]
