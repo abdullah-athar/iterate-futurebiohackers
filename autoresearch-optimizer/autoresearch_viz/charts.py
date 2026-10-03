@@ -20,6 +20,8 @@ def fmt_num(v: float, unit: str = "") -> str:
         return f"{v / 60:.1f}m" if v >= 60 else f"{v:.0f}s"
     if unit == "pct":
         return f"{v:+.1f}%"
+    if unit == "usd":
+        return f"${v:,.2f}"
     return f"{v:,.0f}" if abs(v) >= 100 or float(v).is_integer() else f"{v:.2f}"
 
 
@@ -126,6 +128,33 @@ class BarGroup:
     color: str
     values: dict[str, float]  # category -> value
     tips: dict[str, str] = field(default_factory=dict)
+
+
+def metric_bars(rows: list[tuple[str, float, str]], *, unit: str = "", higher_is_better: bool = True, width: int = 420) -> str:
+    """One bar per run from zero, `rows` = [(label, value, color)]; the winner's label and value are bold with a star."""
+    vals = [v for _, v, _ in rows if v is not None and math.isfinite(v)]
+    if not vals:
+        return "<p class='muted'>—</p>"
+    best = max(vals) if higher_is_better else min(vals)
+    ml, mr, row_h, mt = 92, 96, 26, 4
+    pw = width - ml - mr
+    hi = max(max(vals), 0) or 1
+    out = [f'<svg class="chart" viewBox="0 0 {width} {mt + row_h * len(rows) + 4}" role="img">',
+           f'<line class="axis" x1="{ml}" x2="{ml}" y1="{mt}" y2="{mt + row_h * len(rows)}"/>']
+    for i, (label, v, color) in enumerate(rows):
+        y = mt + i * row_h
+        if v is None or not math.isfinite(v):
+            out.append(f'<text class="cat" x="{ml - 8}" y="{y + 17}" text-anchor="end">{escape(label)}</text>')
+            continue
+        win = v == best
+        w = max(pw * max(v, 0) / hi, 2)
+        weight = ' font-weight="700"' if win else ""
+        out.append(f'<text class="cat" x="{ml - 8}" y="{y + 17}" text-anchor="end"{weight}>{escape(label)}</text>')
+        out.append(f'<rect x="{ml}" y="{y + 5}" width="{w:.1f}" height="15" rx="3" fill="{color}" '
+                   f'data-tip="{escape(f"{label}: {fmt_num(v, unit)}", quote=True)}"/>')
+        out.append(f'<text class="val" x="{ml + w + 6:.1f}" y="{y + 17}"{weight}>{fmt_num(v, unit)}{" ★" if win else ""}</text>')
+    out.append("</svg>")
+    return "\n".join(out)
 
 
 def grouped_hbars(

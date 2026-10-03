@@ -16,13 +16,14 @@ class Point:
     seconds: float  # cumulative wall-clock
     best: float  # best objective so far
     improved: bool  # this entry set a new global best
+    cost: float = 0.0  # cumulative agent cost in USD (Claude Code's estimate)
 
 
 def best_so_far(run: Run) -> list[Point]:
     pts: list[Point] = []
     best = math.inf
     evals = tokens = 0
-    seconds = 0.0
+    seconds = cost = 0.0
     t0 = None
     stamps = [e.timestamp for e in run.entries if e.timestamp is not None]
     use_stamps = len(stamps) == len(run.entries) and stamps == sorted(stamps) and len(stamps) > 1
@@ -30,6 +31,7 @@ def best_so_far(run: Run) -> list[Point]:
         if e.was_evaluated and not e.is_seed:
             evals += 1
         tokens += e.tokens
+        cost += e.cost
         if use_stamps:
             t0 = e.timestamp if t0 is None else t0
             seconds = max(seconds, e.timestamp - t0)
@@ -39,7 +41,7 @@ def best_so_far(run: Run) -> list[Point]:
         if improved:
             best = e.objective
         if math.isfinite(best):
-            pts.append(Point(e.id, evals, tokens, seconds, best, improved and not e.is_seed))
+            pts.append(Point(e.id, evals, tokens, seconds, best, improved and not e.is_seed, cost))
     return pts
 
 

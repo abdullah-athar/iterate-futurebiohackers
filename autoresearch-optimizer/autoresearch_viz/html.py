@@ -6,7 +6,8 @@ import math
 from datetime import UTC, datetime
 from html import escape
 
-from .charts import BarGroup, DagEdge, DagNode, RefLine, Series, dag_chart, fmt_num, grouped_hbars, stacked_hbars, step_chart
+from .charts import (BarGroup, DagEdge, DagNode, RefLine, Series, dag_chart, fmt_num, grouped_hbars, metric_bars, stacked_hbars,
+                     step_chart)
 from .load import STATUS_LABELS, STATUS_ORDER, STATUS_REJECTED_DUPLICATE, Run
 from .metrics import Summary, best_delta_text, best_so_far, per_instance, summarize
 
@@ -63,6 +64,8 @@ select{font:inherit;padding:5px 8px;border-radius:8px;border:1px solid var(--lin
 #tip{position:fixed;pointer-events:none;background:#0f172a;color:#fff;padding:6px 9px;border-radius:6px;font-size:12px;max-width:360px;display:none;z-index:9;white-space:pre-line}
 .note-syn{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:13.5px}
 footer{color:var(--muted);font-size:12px;margin-top:30px}
+.qe{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:18px}.qe-grp{border:1px solid var(--line);border-radius:10px;padding:4px 14px 10px}
+.qe-fig{margin:8px 0 0}.qe-fig figcaption{display:flex;justify-content:space-between;gap:8px;font-size:13px}.qe-fig figcaption span{color:var(--muted);font-size:12px}
 .events{margin:0;padding-left:18px;font-size:12.5px;color:#334155}.events li{margin:2px 0}
 @media print{.tabs{display:none}.panel{display:block!important}}
 """
@@ -156,6 +159,8 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
         ("tokens", "cumulative agent tokens (prompt + completion)", "tokens"),
         ("seconds", "wall-clock", "seconds"),
     ]
+    if any(e.cost for r in runs for e in r.entries):
+        axes.append(("cost", "cumulative agent cost (Claude Code's estimate)", "usd"))
     panels, buttons = [], []
     for i, (key, xl, unit) in enumerate(axes):
         series = []
@@ -183,6 +188,53 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
         + _legend([(r.label, colors[r.label]) for r in runs])
         + "".join(panels)
         + "</section>"
+    )
+
+
+def _quality_efficiency_card(summaries: list[Summary], colors: dict[str, str], runs: list[Run]) -> str:
+    """Two or more runs (e.g. one per model): what each one found versus what it cost, with the winner of each measure."""
+    pairs = [(s, r) for s, r in zip(summaries, runs) if math.isfinite(s.best_objective)]
+    if len(pairs) < 2:
+        return ""
+
+    def held_out_gain(s: Summary, r: Run) -> float:
+        seed = r.seed.evals.get("holdout") if r.seed else None
+        if s.holdout_score is None or not seed or not seed.ok or not seed.score:
+            return math.nan
+        return 100.0 * (seed.score - s.holdout_score) / seed.score
+
+    def per_dollar(s: Summary) -> float:
+        return (s.seed_objective - s.best_objective) / s.cost_usd if s.cost_usd else math.nan
+
+    def block(title: str, note: str, value, unit: str, higher: bool) -> str:
+        rows = [(s.label, value(s, r), colors[s.label]) for s, r in pairs]
+        return (f"<figure class='qe-fig'><figcaption><b>{escape(title)}</b><span>{escape(note)}</span></figcaption>"
+                + metric_bars(rows, unit=unit, higher_is_better=higher) + "</figure>")
+
+    quality = [("gain over the seed", f"{pairs[0][0].objective_split} split · higher is better",
+                lambda s, r: s.gain_vs_seed_pct, "pct", True),
+               ("held-out gain over the seed", "instances the search never saw · higher is better", held_out_gain, "pct", True)]
+    efficiency = [("total agent cost", "Claude Code's estimate · lower is better", lambda s, r: s.cost_usd or math.nan, "usd", False),
+                  ("wall-clock", "first to last ledger entry · lower is better", lambda s, r: s.seconds, "seconds", False),
+                  ("objective points gained per dollar", "higher is better", lambda s, r: per_dollar(s), "", True)]
+    best_q = min(pairs, key=lambda p: p[0].best_objective)[0]
+    costed = [p for p in pairs if p[0].cost_usd]
+    cheap = min(costed, key=lambda p: p[0].cost_usd)[0] if costed else None
+    lead = (f"<b>{escape(best_q.label)}</b> finds the best solver ({fmt_num(best_q.best_objective)}, "
+            f"{fmt_num(best_q.gain_vs_seed_pct, 'pct')} vs the seed)")
+    if cheap:
+        lead += (f"; <b>{escape(cheap.label)}</b> is the cheapest run ({fmt_num(cheap.cost_usd, 'usd')}, "
+                 f"{fmt_num(cheap.gain_vs_seed_pct, 'pct')} vs the seed in {fmt_num(cheap.seconds, 'seconds')})")
+    models = " · ".join(f"{escape(s.label)}: <code>{escape(r.proposals[0].proposer if r.proposals else '?')}</code>" for s, r in pairs)
+    return (
+        "<section class='card'><h2>Quality vs efficiency</h2>"
+        f"<p class='lead'>{lead}. A ★ marks the winner of each measure. Proposers: {models}.</p><div class='qe'>"
+        f"<div class='qe-grp'><h3>Quality · {escape(best_q.label)} wins</h3>"
+        + "".join(block(*q) for q in quality)
+        + f"</div><div class='qe-grp'><h3>Efficiency{(' · ' + escape(cheap.label) + ' wins') if cheap else ''}</h3>"
+        + "".join(block(*e) for e in efficiency)
+        + "</div></div><p class='muted' style='font-size:12.5px;margin:10px 0 0'>The 'vs cost' tab of <i>Research progress</i> "
+        "shows the same trade-off over the run. With one run per flavour, differences of a few percent are within noise.</p></section>"
     )
 
 
@@ -568,6 +620,7 @@ def render_main(runs: list[Run], title: str) -> str:
         f"updated {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}</p>",
         _live_card(runs),
         _kpis(summaries, runs),
+        _quality_efficiency_card(summaries, colors, runs),
         _progress_card(runs, colors, summaries),
         _scoreboard(summaries, colors, runs),
         _baselines_card(runs),

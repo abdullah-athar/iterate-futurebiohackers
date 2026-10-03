@@ -276,6 +276,38 @@ def test_viz_lineage():
     print("  Lineage chart test passed!")
 
 
+def test_viz_quality_efficiency():
+    print("Testing the dashboard's quality vs efficiency card and cost axis...")
+    from autoresearch_viz.html import render
+    from autoresearch_viz.load import load_run
+
+    def ev(score):
+        return {"split": "validate", "score": score, "baseline": 100, "instances": []}
+
+    def run(dir_, best, cost):
+        rows = [{"id": 0, "parent_ids": [], "mode": "seed", "status": "seed", "objective": 90, "evals": {"validate": ev(90)},
+                 "timestamp": 1.0},
+                {"id": 1, "parent_ids": [0], "mode": "tune", "status": "kept", "objective": best, "improved_global": True,
+                 "evals": {"validate": ev(best)}, "timestamp": 61.0, "usage": {"cost_usd": cost}, "proposer": "claude-code:x"}]
+        dir_.mkdir()
+        (dir_ / "ledger.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        return load_run(dir_)
+
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-viz-qe-"))
+    try:
+        strong, cheap = run(tmp / "strong", 70, 2.0), run(tmp / "cheap", 80, 0.5)
+        strong.label, cheap.label = "Strong", "Cheap"
+        html = render([strong, cheap])
+        card = html[html.index("<h2>Quality vs efficiency</h2>"):html.index("<h2>Research progress</h2>")]
+        assert "Quality · Strong wins" in card and "Efficiency · Cheap wins" in card
+        assert "+22.2% ★" in card and "$0.50 ★" in card and "20 ★" in card  # gain, cost, points per dollar (10 / 0.5)
+        assert 'data-key="cost">vs cost</button>' in html
+        assert "<h2>Quality vs efficiency</h2>" not in render([strong]), "the card needs two runs"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Quality vs efficiency card test passed!")
+
+
 if __name__ == "__main__":
     random.seed(0)
     test_novelty_gate()
@@ -286,4 +318,5 @@ if __name__ == "__main__":
     test_swarm()
     test_swarm_hypothesis_first()
     test_viz_lineage()
+    test_viz_quality_efficiency()
     print("\nAll autoresearch tests passed!")

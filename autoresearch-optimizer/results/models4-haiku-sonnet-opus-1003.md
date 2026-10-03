@@ -3,9 +3,9 @@
 Settings: `swarm --agents 4 --generations 2 --eval local --max-budget-usd 1 --seed 0 --model <m>`, run one
 after the other on the default `median_string` objective (`mid` tier: four DNA instances of 280–688 bp +
 one 320 aa protein) with the trusted evaluator from #20. One run per model, so differences of a few
-percent are within noise. Dashboard: [models4-haiku-sonnet-opus-1003.html](models4-haiku-sonnet-opus-1003.html)
-("Research progress" card, "vs tokens" tab for objective against tokens). Quality vs efficiency view:
-[models4-comparison-1003.html](models4-comparison-1003.html), made with `scripts/compare_models.py`.
+percent are within noise. Dashboard: [models4-dashboard-1003.html](models4-dashboard-1003.html), with the
+"Quality vs efficiency" card and the "vs tokens" / "vs cost" tabs of "Research progress"
+(`just autoresearch-viz render Haiku=<run> Sonnet=<run> Opus=<run> -o <file>.html`).
 
 | | Haiku | Sonnet | Opus |
 |---|---|---|---|

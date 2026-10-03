@@ -268,8 +268,11 @@ autoresearch-optimizer/
 A self-contained HTML dashboard: no network access is needed, so it also works offline in a demo.
 It shows:
 - a live "Now" panel: generation, agents back, elapsed time, cost, latest events;
-- best objective against evaluations, agent tokens and wall clock, with the hypothesis behind
-  every improvement;
+- with two or more runs (e.g. one per model), a quality vs efficiency card: gain over the seed on
+  the objective and held-out splits next to total cost, wall clock and objective points per dollar,
+  with the winner of each measure marked;
+- best objective against evaluations, agent tokens, wall clock and agent cost, with the hypothesis
+  behind every improvement;
 - a scoreboard per run, including held-out gain;
 - per-instance bars;
 - the outcome mix of all proposals;
