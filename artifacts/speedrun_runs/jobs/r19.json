@@ -297,7 +297,13 @@
             "lr": 14.0
           },
           "hypothesis": "batch 512 during the 24 px half with lr 14"
-        },
+        }
+      ]
+    },
+    {
+      "name": "k19-g",
+      "control_index": 1,
+      "variants": [
         {
           "label": "aten-only",
           "params": {
