@@ -1,0 +1,93 @@
+{
+  "round": "r27",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "d-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "g3-inner448",
+          "params": {
+            "g3_pair": "inner448"
+          },
+          "hypothesis": "D: group 3 pair through 448 channels (record: 512)"
+        },
+        {
+          "label": "g3-inner384",
+          "params": {
+            "g3_pair": "inner384"
+          },
+          "hypothesis": "D: group 3 pair through 384 channels"
+        }
+      ]
+    },
+    {
+      "name": "d-b",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "g3-inner448-e10.25",
+          "params": {
+            "g3_pair": "inner448",
+            "epochs": 10.25
+          },
+          "hypothesis": "D ladder: 448 pair with a quarter epoch back"
+        },
+        {
+          "label": "g3-inner448-e10.5",
+          "params": {
+            "g3_pair": "inner448",
+            "epochs": 10.5
+          },
+          "hypothesis": "D ladder: 448 pair with half an epoch back"
+        }
+      ]
+    },
+    {
+      "name": "d-c",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "g3-inner384-e10.5",
+          "params": {
+            "g3_pair": "inner384",
+            "epochs": 10.5
+          },
+          "hypothesis": "D ladder: 384 pair with half an epoch back"
+        },
+        {
+          "label": "g3-inner384-e10.75",
+          "params": {
+            "g3_pair": "inner384",
+            "epochs": 10.75
+          },
+          "hypothesis": "D ladder: 384 pair with 0.75 epoch back"
+        }
+      ]
+    },
+    {
+      "name": "d-d",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "g2-inner192",
+          "params": {
+            "g2_pair": "inner192"
+          },
+          "hypothesis": "D: group 2 residual pair through 192 channels (256 -> 192 -> 256), on the record (g3 512)"
+        },
+        {
+          "label": "g2-inner192-e10.25",
+          "params": {
+            "g2_pair": "inner192",
+            "epochs": 10.25
+          },
+          "hypothesis": "D ladder: group 2 pair at 192 with a quarter epoch back"
+        }
+      ]
+    }
+  ]
+}

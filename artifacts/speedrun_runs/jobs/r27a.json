@@ -1,0 +1,60 @@
+{
+  "round": "r27",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "b1-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "se-g3",
+          "params": {
+            "se_groups": [
+              2
+            ]
+          },
+          "hypothesis": "A: squeeze-and-excitation on group 3's output (768 -> 48 -> 768, sigmoid channel scale)"
+        },
+        {
+          "label": "se-g23",
+          "params": {
+            "se_groups": [
+              1,
+              2
+            ]
+          },
+          "hypothesis": "A: squeeze-and-excitation on groups 2 and 3"
+        },
+        {
+          "label": "multiscale",
+          "params": {
+            "multiscale_head": true
+          },
+          "hypothesis": "B: multi-scale head: max-pooled group-2 features (256) concatenated with group 3's (768) -> linear 1024 -> 100"
+        }
+      ]
+    },
+    {
+      "name": "b1-b",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "pool-maxmean-cat",
+          "params": {
+            "global_pool": "maxmean_cat"
+          },
+          "hypothesis": "C: head pooling max + mean concatenated (1536 -> 100)"
+        },
+        {
+          "label": "pool-maxmean-sum",
+          "params": {
+            "global_pool": "maxmean_sum"
+          },
+          "hypothesis": "C: head pooling max + mean summed (768 -> 100)"
+        }
+      ]
+    }
+  ]
+}
