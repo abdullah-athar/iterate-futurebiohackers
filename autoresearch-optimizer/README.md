@@ -33,32 +33,49 @@ works the same way). The loop owns evaluation and the ledger, so an agent can on
 
 ```mermaid
 flowchart TD
-    A["1. Decide what to ask for<br/>small tweak, fix weak spots,<br/>new approach, or combine two"]
-    B["2. Agents write ideas<br/>many Claude Code agents<br/>on your laptop, in parallel"]
-    C["3. Drop repeats<br/>ideas we've already tried<br/>are skipped"]
-    D["4. Test in the cloud<br/>each idea runs on Modal,<br/>1 second per test case"]
-    E["5. Keep real wins<br/>a new best must also win<br/>on fresh test cases"]
-    F["6. Final check<br/>score the best idea on<br/>test cases nobody saw"]
+    A["1. Mode selection<br/>UCB1 multi-armed bandit over prompt modes<br/>tune · fix_losers · new_family · merge"]
+    B["2. Parallel proposals<br/>N headless Claude Code agents, local<br/>each writes solve() + a falsifiable hypothesis"]
+    C["3. Novelty gate + import guard<br/>near-duplicates and disallowed imports<br/>rejected before any evaluation"]
+    D["4. Cascade evaluation on Modal<br/>screen → validate → confirm<br/>1000 ms CPU budget per instance"]
+    E["5. Archive update + verdict<br/>Pareto-per-instance archive<br/>append-only ledger"]
+    F["6. Holdout evaluation<br/>best vs seed on hidden-seed instances"]
     A --> B --> C --> D --> E
-    E -->|time left| A
-    E -->|time up| F
+    E -->|budget left: next generation| A
+    E -->|wall-clock budget spent| F
 ```
 
-1. **Decide what to ask for.** The loop tracks which kinds of request have produced
-   improvements so far and asks for more of those.
-2. **Agents write ideas.** Each agent reads what has been tried, what worked and what failed.
-   It then writes one solver and a one-line hypothesis explaining why it should be better.
-3. **Drop repeats.** A solver that is basically a copy of an earlier one is thrown out
-   without being run.
-4. **Test in the cloud.** Every solver runs on Modal, with a fixed 1-second compute limit per
-   test case, so ideas compete on quality *within* the same budget.
-5. **Keep real wins.** A solver counts as the new best only if its win also holds on fresh
-   test cases, so lucky results are filtered out. Every result is logged, and the next round
-   sees everything.
-6. **Final check.** When time runs out, the best solver is scored on a hidden set of test
-   cases that the search never used.
+1. **Mode selection (multi-armed bandit).** Each prompt mode is an arm of a UCB1 bandit.
+   - **Reward:** 1 for a confirmed new global best, 0.5 for a new best on some instance only.
+   - **Allocation:** each generation's agents are split across the arms by UCB score, so modes
+     that pay off get more agents while rarely-tried modes keep an exploration bonus.
+   - **Plateau detector:** `tune` is switched off after a plateau.
+   - **Merge:** offered only when the archive holds complementary solvers.
+2. **Parallel proposals.** N headless Claude Code agents run per generation, each in its own
+   workspace, each with a mode, a parent from the archive and a research direction. Agents see:
+   - per-instance diagnostics;
+   - the research ledger;
+   - the falsified hypotheses;
+   - a `./try` self-test that runs on Modal.
 
-You can watch all of this live in the dashboard (`just autoresearch-viz serve ...`).
+   Each writes one `solve(instance)` and a falsifiable hypothesis.
+3. **Novelty gate + import guard.** Candidates are AST-normalised (comments and docstrings
+   stripped, locals α-renamed) and compared with every earlier candidate, including those from
+   the same generation. Near-duplicates and disallowed imports/calls are rejected without being
+   evaluated.
+4. **Cascade evaluation on Modal.** The cheap `screen` split runs first. Then comes `validate`
+   (the objective), then `confirm` on fresh instances. Each candidate runs in its own Modal
+   container, and a `SIGPROF` CPU timer enforces the per-instance budget.
+5. **Archive update + verdict.**
+   - **Pareto archive:** keeps the global best and every solver that is best on at least one instance.
+   - **New global best:** must also not regress on the confirm split (a *confirmation re-test*),
+     otherwise it is `unconfirmed`.
+   - **Verdict:** every proposal gets one (`supported` / `partial` / `falsified` / `unconfirmed` /
+     `inconclusive` / `untested`), recorded in the ledger. The next generation sees all of it.
+6. **Holdout evaluation.** When the wall-clock budget can't fit another generation, the best
+   solver and the seed are scored on a holdout split. Its seeds live in a Modal secret that only
+   the evaluators read.
+
+Watch it live with `just autoresearch-viz serve ...`.
 
 ### Budgets
 
