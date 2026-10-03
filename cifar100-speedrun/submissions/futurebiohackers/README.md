@@ -2,17 +2,34 @@
 
 This is a convolutional image classifier based on Keller Jordan's
 [airbench](https://github.com/KellerJordan/cifar10-airbench), trained from scratch.
-The selected model uses three convolution blocks with 96, 256 and 768 channels.
+The selected model uses three convolution blocks with 128, 256 and 768 channels;
+the first block has two convolutions and the others three.
 It makes the first two blocks smaller, where images are largest and processing is
 expensive, and gives the final block more capacity to distinguish the 100 classes.
 
-Training uses 8.5 epochs, batches of 1024 images, half precision, channels-last
+Training uses 8.25 epochs, batches of 1024 images, half precision, channels-last
 memory layout, Nesterov SGD and label smoothing. A moving average stabilizes the
 weights. Training-image normalization and patch whitening happen inside the timer.
 The final spatial pooling now covers the whole feature map, so experimental
 smaller-crop training also works.
 
 ## Development results
+
+Paired 40-trial runs on a Hugging Face Jobs NVIDIA A100-SXM4-80GB (400 W), seeds 0-39,
+each job running the recipes back to back in one container
+(`scripts/hf_ab.sh 40 '[...]'` from the repository root):
+
+| Recipe | Mean accuracy | Mean preparation + training |
+| --- | ---: | ---: |
+| Selected: depths 2/3/3, widths 128/256/768, lr 11.5, wd 0.017, BN momentum 0.5, 8.25 epochs | 75.10% (± 0.25 pp) | 5.843 s |
+| Selected, second job | 75.19% (± 0.18 pp) | 5.865 s |
+| Selected at 8.5 epochs | 75.27% (± 0.22 pp) | 6.004 s |
+| Previous 96/256/768, lr 9.0, wd 0.012, BN momentum 0.6, 8.5 epochs | 74.91% (± 0.25 pp) | 6.114 s |
+
+The accuracy margin is small; 8.5 epochs is the safer fallback. Timings on the official
+A100 80GB PCIe will differ.
+
+### Earlier Modal screen
 
 The latest completed screen compares both recipes on the same Modal A100 SXM GPU
 allocation, with three trials each:
