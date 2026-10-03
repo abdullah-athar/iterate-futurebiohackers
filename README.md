@@ -32,6 +32,18 @@ just last           # print the latest summary.json
 just sync           # pull organizer updates
 ```
 
+### Modal
+
+No GPU machine needed: `just modal` runs the same harness on a [Modal](https://modal.com/apps/abdullahmuhammadathar786/main) A100-80GB from your laptop, using an image built from the harness's `uv.lock`. Log in once with `uv run modal token new`, then:
+
+```sh
+just modal                                  # one trial
+just modal 3 --params '{"epochs": 10}'      # same flags as just run
+just last                                   # results are copied back locally
+```
+
+CIFAR-100 is cached in the `cifar100-data` volume. Every run is also kept in the `cifar100-results` volume, so after a dropped connection you can fetch results with `uv run modal volume get --force cifar100-results futurebiohackers/ cifar100-speedrun/results/`. Script: `scripts/modal_speedrun.py`.
+
 To submit, fork the upstream repo and open a PR that adds only `submissions/futurebiohackers/`.
 
 ## Science skills
