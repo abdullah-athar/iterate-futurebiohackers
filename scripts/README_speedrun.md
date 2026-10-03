@@ -71,10 +71,13 @@ also work from WSL.
   comes back. `--build-timeout` defaults to 300 s (the 5-minute rule for compile builds).
 - PCIe guard (`--require-pcie`, default on for `main` and `ab`): Modal's `A100-80GB` pool mixes
   the judges' PCIe card (300 W) with SXM4 cards (500 W). The container checks nvidia-smi
-  before build; on a non-PCIe card it returns at once and the launcher retries, up to 3
-  retries, logging every attempt with the GPU name and Modal task id. GPU functions are
-  single-use containers, so a retry is never served by the container that just failed (it
-  can still land on the same host). `--no-require-pcie` disables the guard.
+  before build; on a non-PCIe card it returns at once (about 0.35 GPU-min) and the launcher
+  retries, up to `SPEEDRUN_PCIE_ATTEMPTS` calls in total (default 8), logging every attempt
+  with the GPU name, Modal task id, region and cloud. GPU functions are single-use containers,
+  so a retry is never served by the container that just failed. `SPEEDRUN_REGION` /
+  `SPEEDRUN_CLOUD` (aws, gcp, oci) pin the placement once a PCIe region is known;
+  `SPEEDRUN_SCHEDULE_WAIT_S` bounds the wait for a pinned pool. `--no-require-pcie` disables
+  the guard (fine for relative A/B comparisons: control and variants share one card).
 - Each `benchmark.run` in an A/B gets its own empty `TORCHINDUCTOR_CACHE_DIR`, so compiled
   variants report cold build times like the judges' container.
 - GPU budget: `artifacts/speedrun_runs/gpu_ledger.jsonl` records every container attempt (wall

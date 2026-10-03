@@ -21,10 +21,11 @@ Run everything from the team environment (Python 3.11 + modal), repo root
 PCIe guard (on by default for main and ab, --no-require-pcie to disable): Modal's
 A100-80GB pool mixes PCIe (300 W, the judges' card) and SXM4 (500 W) parts. The
 container checks nvidia-smi BEFORE build; on a non-PCIe card it returns at once
-and the launcher retries, up to 3 retries. GPU functions are single-use
-containers, so a retry can never be served by the container that just failed
-(it may still land on the same host; the attempt count is the real knob). Every
-attempt is logged with the GPU name and Modal task id.
+(about 0.35 GPU-min with the start-up allowance) and the launcher retries, up to
+SPEEDRUN_PCIE_ATTEMPTS calls in total (default 8). GPU functions are single-use
+containers, so a retry is never served by the container that just failed. Every
+attempt is logged with the GPU name, Modal task id, region and cloud, so a region
+that hands out PCIe cards can later be pinned with SPEEDRUN_REGION.
 
 A/B mode (::ab): the control (the submission's defaults, or --control-params) and
 every --variants entry (a JSON list of parameter deltas merged over the control)
@@ -108,8 +109,21 @@ CONTAINER_START_S = 15.0  # billed start-up allowance per container, not measura
 ENV_CHECK_S = 20.0  # nvidia-smi + torch import at the start of every container (estimate)
 HARNESS_OVERHEAD_S = 15.0  # process start, dataset load, eval and copy per harness run (estimate)
 OFFICIAL_GPU = "NVIDIA A100 80GB PCIe"
-PCIE_ATTEMPTS = 4  # first call + up to 3 automatic retries
+PCIE_ATTEMPTS = int(os.environ.get("SPEEDRUN_PCIE_ATTEMPTS", "8"))  # calls before giving up
 DEFAULT_BUILD_TIMEOUT = 300.0  # the 5-minute rule for torch.compile builds (harness default 600)
+# Optional placement pins for the GPU functions (Modal cloud=/region=), e.g. SPEEDRUN_CLOUD=azure
+# SPEEDRUN_REGION=us-east: used to find and then pin the pool that hands out PCIe cards.
+PLACEMENT = {
+    key: value
+    for key, value in (
+        ("cloud", os.environ.get("SPEEDRUN_CLOUD")),
+        ("region", os.environ.get("SPEEDRUN_REGION")),
+    )
+    if value
+}
+SCHEDULE_WAIT_S = float(
+    os.environ.get("SPEEDRUN_SCHEDULE_WAIT_S", "240")
+)  # pinned pools can lack capacity
 
 APP_DIR = "/app"  # speedrun code, mounted at container start
 LOCK_DIR = "/opt/speedrun-lock"  # pyproject.toml + uv.lock + .python-version, baked in
@@ -353,7 +367,7 @@ def _run(spec: dict, results_root: str, deadline: float | None = None) -> dict:
     }
 
 
-@app.function(gpu=GPU, cpu=4, memory=8192, timeout=180, single_use_containers=True)
+@app.function(gpu=GPU, cpu=4, memory=8192, timeout=180, single_use_containers=True, **PLACEMENT)
 def gpu_environment() -> dict:
     """GPU + versions on the A100, no training."""
     started = time.time()
@@ -399,6 +413,7 @@ def smoke(submission: str = TEAM, submission_path: str = "") -> int:
     timeout=RUN_TIMEOUT,
     single_use_containers=True,
     volumes={DATA_ROOT: data_volume, RESULTS_ROOT: results_volume},
+    **PLACEMENT,
 )
 def run_benchmarks(specs: list, require_pcie: bool = True, budget_s: float = 900.0) -> dict:
     """Run each spec sequentially in THIS container (one card), each as a fresh harness run.
@@ -532,7 +547,7 @@ def _call_gpu(specs: list[dict], require_pcie: bool, label: str) -> dict:
     print(
         f"estimate: ~{estimate_s:.0f} s in the container, ~{estimate_min:.1f} GPU-min "
         f"(ledger {total:.1f} -> ~{total + estimate_min:.1f}/{GPU_BUDGET_MIN:.0f} min); "
-        f"container cap {RUN_TIMEOUT} s"
+        f"container cap {RUN_TIMEOUT} s; placement {PLACEMENT or 'any'}"
         + ("; NEEDS APPROVAL: over 10 GPU-min" if estimate_min > 10 else ""),
         flush=True,
     )
@@ -545,12 +560,23 @@ def _call_gpu(specs: list[dict], require_pcie: bool, label: str) -> dict:
     landed: list[str] = []
     for attempt in range(1, PCIE_ATTEMPTS + 1):
         t0 = time.time()
+        call = run_benchmarks.spawn(specs, require_pcie, float(RUN_TIMEOUT))
         try:
-            payload = run_benchmarks.remote(specs, require_pcie, float(RUN_TIMEOUT))
+            payload = call.get(timeout=RUN_TIMEOUT + SCHEDULE_WAIT_S)
         except modal.exception.FunctionTimeoutError:
             _ledger_add(f"{label} (TIMEOUT)", "?", float(RUN_TIMEOUT), note="Modal timeout")
             raise SystemExit(
                 f"Modal killed the container after {RUN_TIMEOUT} s. {RECOVERY_HINT}"
+            ) from None
+        except (TimeoutError, modal.exception.TimeoutError):
+            call.cancel()
+            _ledger_add(
+                f"{label} (NO START)", "?", float(RUN_TIMEOUT), note="cancelled: never got a result"
+            )
+            raise SystemExit(
+                f"no result after {RUN_TIMEOUT + SCHEDULE_WAIT_S:.0f} s (placement "
+                f"{PLACEMENT or 'any'} may lack capacity); the call was cancelled. "
+                "Check the Modal dashboard."
             ) from None
         except BaseException as exc:
             _ledger_add(
@@ -782,11 +808,19 @@ def _spec(
 def env_check():
     """GPU name/memory/power limit, versions and CPUs; logs the container to the ledger."""
     t0 = time.time()
+    call = gpu_environment.spawn()
     try:
-        info = gpu_environment.remote()
+        info = call.get(timeout=180 + SCHEDULE_WAIT_S)
+    except (TimeoutError, modal.exception.TimeoutError):
+        call.cancel()
+        _ledger_add("env_check (NO START)", "?", 0.0, note=f"placement {PLACEMENT or 'any'}")
+        raise SystemExit(f"env_check: no container within {SCHEDULE_WAIT_S:.0f} s; cancelled")
     except BaseException as exc:
         _ledger_add(f"env_check (FAILED {type(exc).__name__})", "?", min(time.time() - t0, 180.0))
         raise
+    print(
+        f"placement {PLACEMENT or 'any'} -> region={info.get('region')} cloud={info.get('cloud')}"
+    )
     _ledger_add("env_check", info.get("gpu_name", "?"), info.get("container_seconds", 0.0))
     print(json.dumps({k: v for k, v in info.items() if k != "versions"}, indent=2))
 

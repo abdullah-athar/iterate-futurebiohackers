@@ -1,0 +1,92 @@
+{
+  "tag": "ab-noise",
+  "environment": {
+    "task_id": "ta-01M40ZD1QA65WQ0N0GHGS8PR7R",
+    "hostname": "modal",
+    "region": "us-west",
+    "cloud": "CLOUD_PROVIDER_AZURE",
+    "gpu_name": "NVIDIA A100 80GB PCIe",
+    "gpu_memory": "81920 MiB",
+    "gpu_power_limit": "300.00 W",
+    "driver": "580.95.05",
+    "mig": "Disabled",
+    "versions": "python 3.12.10 torch 2.4.0+cu124 torchvision 0.19.0+cu124 cuda_runtime 12.4 cudnn 90100 cuda_available True\ncuda_devices ['NVIDIA A100 80GB PCIe']",
+    "cpu_count": 20,
+    "cpu_affinity": 20
+  },
+  "pcie_attempts": [
+    "NVIDIA A100-SXM4-80GB [task ta-01M40ZCQSYP6JN48NQERA56ZCR]",
+    "NVIDIA A100 80GB PCIe [task ta-01M40ZD1QA65WQ0N0GHGS8PR7R]"
+  ],
+  "container_seconds": 151.5,
+  "rows": [
+    {
+      "label": "control",
+      "params": "{}",
+      "config": "futurebiohackers",
+      "returncode": 0,
+      "folder": "artifacts/speedrun_runs/20261003-143412_ab-noise/00_control",
+      "gpu": "NVIDIA A100 80GB PCIe",
+      "power_limit": "300.00 W",
+      "container_wall": 70.1,
+      "deadline_hit": false,
+      "complete": true,
+      "qualified": true,
+      "run_error": null,
+      "n": 1,
+      "trials_ok": 1,
+      "mean_acc": 0.7555,
+      "acc_std": null,
+      "mean_time": 54.695511353,
+      "time_std": null,
+      "mean_eval": 0.22544116299999928,
+      "build_time": 3.7479489979999983,
+      "mean_prepare": 0.1489744999999978,
+      "mean_train": 54.546536853000006,
+      "accs": [
+        0.7555
+      ],
+      "times": [
+        54.695511353
+      ],
+      "evals": [
+        0.22544116299999928
+      ],
+      "verdict": "QUALIFIED (>= 75%)"
+    },
+    {
+      "label": "control-again",
+      "params": "{}",
+      "config": "futurebiohackers",
+      "returncode": 0,
+      "folder": "artifacts/speedrun_runs/20261003-143412_ab-noise/01_control-again",
+      "gpu": "NVIDIA A100 80GB PCIe",
+      "power_limit": "300.00 W",
+      "container_wall": 71.6,
+      "deadline_hit": false,
+      "complete": true,
+      "qualified": true,
+      "run_error": null,
+      "n": 1,
+      "trials_ok": 1,
+      "mean_acc": 0.7566,
+      "acc_std": null,
+      "mean_time": 55.73146367000001,
+      "time_std": null,
+      "mean_eval": 0.21762604200000624,
+      "build_time": 3.52068534899999,
+      "mean_prepare": 0.14832197200000508,
+      "mean_train": 55.583141698000006,
+      "accs": [
+        0.7566
+      ],
+      "times": [
+        55.73146367000001
+      ],
+      "evals": [
+        0.21762604200000624
+      ],
+      "verdict": "QUALIFIED (>= 75%)"
+    }
+  ]
+}
