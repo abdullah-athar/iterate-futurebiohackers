@@ -59,6 +59,7 @@ DEFAULTS = {
     "activation": "gelu",  # or "silu"
     "bn_dtype": "float",  # or "half"
     "color_jitter": [0.0, 0.0],  # per-image brightness and contrast ranges
+    "bn_recal_batches": 0,  # re-estimate BN statistics on center crops after training
     "stem": "patch2",  # "patch2": 2x2 whitening at 31x31; "patch4s2": 4x4 stride-2 at 15x15
     "inner_kernels": [3, 3, 3],  # kernel size of conv2/conv3 in each group (1 or 3)
     "global_pool": "adaptive",  # "adaptive", "amax", or "max" over the final feature map
@@ -685,6 +686,31 @@ def _fit(state, total_steps, proxy_only=False):
                 _lookahead(state, ema_decay[step])
     if hyp["ema_every"] and not proxy_only:
         _lookahead(state, 1.0)
+    if hyp["bn_recal_batches"] and not proxy_only:
+        _recalibrate_bn(state)
+
+
+@torch.no_grad()
+def _recalibrate_bn(state):
+    """Re-estimate BatchNorm running statistics on unaugmented training images.
+
+    Training batches are translated and flipped; evaluation sees plain 32x32
+    images. A few forward passes over center crops align the statistics with
+    that. This runs inside train() and uses only training images.
+    """
+    net, t = state.net, state.hyp["translate"]
+    norms = [m for m in net.modules() if isinstance(m, nn.BatchNorm2d)]
+    for m in norms:
+        m.reset_running_stats()
+        m.momentum = None  # cumulative average over the recalibration batches
+    images = state.images[:, :, t : t + 32, t : t + 32] if t else state.images
+    batch = state.batch_size
+    order = torch.randperm(len(images), device=images.device)
+    net.train()
+    for i in range(min(state.hyp["bn_recal_batches"], len(images) // batch)):
+        net(images[order[i * batch : (i + 1) * batch]], False)
+    for m in norms:
+        m.momentum = 1 - state.hyp["bn_momentum"]
 
 
 @torch.no_grad()
