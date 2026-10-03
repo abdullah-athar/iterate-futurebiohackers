@@ -45,6 +45,20 @@ def best_so_far(run: Run) -> list[Point]:
     return pts
 
 
+def model_switches(run: Run) -> list[tuple[Point, str, str]]:
+    """(point just before the switch, old proposer, new proposer) each time a run's proposer changes,
+    e.g. a `--model sonnet,opus` schedule handing generation 2 to Opus."""
+    pts = {p.entry_id: p for p in best_so_far(run)}
+    out, prev = [], None
+    for e in run.entries:
+        if e.is_seed:
+            continue
+        if prev is not None and e.proposer != prev.proposer and prev.id in pts:
+            out.append((pts[prev.id], prev.proposer, e.proposer))
+        prev = e
+    return out
+
+
 @dataclass
 class ModeStat:
     tried: int = 0

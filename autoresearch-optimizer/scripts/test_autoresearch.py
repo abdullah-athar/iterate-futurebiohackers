@@ -326,6 +326,15 @@ def test_viz_quality_efficiency():
         assert "<button class='on' aria-pressed='true' data-run='Strong'>" in html and "data-run='Cheap'>" in html
         assert card.count('<g class="mb" data-run="Cheap"') >= 4 and "class='card qe-card' data-runs=" in html
         assert "class='runtoggles'" not in render([strong])
+        # a model schedule: the hand-over is marked on the curve with the time and cost spent so far
+        rows = [json.loads(l) for l in (tmp / "strong" / "ledger.jsonl").read_text().splitlines()]
+        rows.append({**rows[1], "id": 2, "parent_ids": [1], "objective": 65, "evals": {"validate": ev(65)}, "timestamp": 121.0,
+                     "proposer": "claude-code:opus"})
+        rows[1]["proposer"] = "claude-code:sonnet"
+        (tmp / "sched").mkdir()
+        (tmp / "sched" / "ledger.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        assert "Sonnet → Opus · 1.0m · $2.00" in render([load_run(tmp / "sched")])
+        assert "A ring marks" not in html, "no ring note without a model switch"
         assert "<h2>Quality vs efficiency</h2>" not in render([strong]), "the card needs two runs"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

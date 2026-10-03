@@ -10,7 +10,7 @@ from html import escape
 from .charts import (BarGroup, DagEdge, DagNode, RefLine, Series, dag_chart, fmt_num, grouped_hbars, metric_bars, stacked_hbars,
                      step_chart)
 from .load import STATUS_LABELS, STATUS_ORDER, STATUS_REJECTED_DUPLICATE, Run
-from .metrics import Summary, best_delta_text, best_so_far, per_instance, summarize
+from .metrics import Summary, best_delta_text, best_so_far, model_switches, per_instance, summarize
 
 PALETTE = ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#0891b2", "#be185d", "#4d7c0f"]
 STATUS_COLORS = {
@@ -46,7 +46,7 @@ h1{font-size:28px;margin:0 0 4px}h2{font-size:19px;margin:0 0 4px}h3{font-size:1
 svg.chart{max-width:100%;height:auto;display:block}
 svg .grid{stroke:#eef2f7;stroke-width:1}svg .axis{stroke:#cbd5e1;stroke-width:1}
 svg .tick,svg .val,svg .seg{font-size:11px;fill:#64748b}svg .seg{fill:#fff;font-weight:600}svg .label{font-size:12px;fill:#334155}
-svg .ref{font-size:11px}svg .end{font-size:11px;fill:var(--ink)}svg .cat{font-size:12px;fill:#0f172a}
+svg .ref{font-size:11px}svg .end{font-size:11px;fill:var(--ink)}svg .swbg{fill:var(--card);stroke-width:1.2}svg .cat{font-size:12px;fill:#0f172a}
 svg [data-tip]{cursor:pointer}svg.chart circle[data-tip]:hover{r:7}
 .linbar{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;margin:0 0 4px}.linbar .tabs{margin:0;align-items:center}.linbar .tabs>span{font-size:13px;color:var(--muted);margin-right:2px}
 .linzoom button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 10px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted);margin-left:4px}
@@ -208,7 +208,14 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
                     e = next(x for x in run.entries if x.id == p.entry_id)
                     marks.append((getattr(p, key), p.best, f"#{e.id} [{e.mode}] → {fmt_num(p.best)}\n{e.hypothesis}"))
             end = max((x for x, _ in xy), default=None) if key != "evals" and len(runs) > 1 else None
-            series.append(Series(run.label, colors[run.label], xy, marks, end))
+            switches = []
+            for p, old, new in model_switches(run):
+                when = f"{fmt_num(p.seconds, 'seconds')} · {fmt_num(p.cost, 'usd')}"
+                switches.append((getattr(p, key), p.best, f"{_model_name(old)} → {_model_name(new)} · {when}",
+                                 f"{run.label} switches from {_model_name(old)} to {_model_name(new)} after #{p.entry_id}: "
+                                 f"{fmt_num(p.seconds, 'seconds')} into the run, {fmt_num(p.cost, 'usd')} spent, "
+                                 f"{fmt_num(p.tokens, 'tokens')} tokens, best so far {fmt_num(p.best)}"))
+            series.append(Series(run.label, colors[run.label], xy, marks, end, switches))
         max_x = max((getattr(p, key) for r in runs for p in best_so_far(r)), default=0)
         panels.append(
             f'<div class="panel {"on" if i == 0 else ""}" data-group="x" data-key="{key}">'
@@ -219,7 +226,10 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
         )
         buttons.append(f'<button class="{"on" if i == 0 else ""}" data-key="{key}">vs {key if key != "seconds" else "wall-clock"}</button>')
     return (
-        '<section class="card"><h2>Research progress</h2><p class="lead">Best objective found so far. Dots mark proposals that set a new global best; hover for the hypothesis.</p>'
+        '<section class="card"><h2>Research progress</h2><p class="lead">Best objective found so far. Dots mark proposals that set a new global best; hover for the hypothesis.'
+        + (" A ring marks where a run hands over to another model (<code>--model sonnet,opus</code>), with the time and cost spent at that moment."
+           if any(model_switches(r) for r in runs) else "")
+        + "</p>"
         f'<div class="tabs" data-group="x">{"".join(buttons)}</div>'
         + _legend([(r.label, colors[r.label]) for r in runs], frozenset(r.label for r in runs))
         + "".join(panels)
@@ -275,6 +285,12 @@ def _quality_efficiency_card(summaries: list[Summary], colors: dict[str, str], r
         + "</div></div><p class='muted' style='font-size:12.5px;margin:10px 0 0'>The 'vs cost' tab of <i>Research progress</i> "
         "shows the same trade-off over the run. With one run per flavour, differences of a few percent are within noise.</p></section>"
     )
+
+
+def _model_name(proposer: str) -> str:
+    """'claude-code:sonnet' -> 'Sonnet'."""
+    name = proposer.split(":", 1)[-1]
+    return name[:1].upper() + name[1:]
 
 
 def _proposers(run: Run) -> str:

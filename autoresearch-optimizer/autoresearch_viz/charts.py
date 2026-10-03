@@ -48,6 +48,7 @@ class Series:
     points: list[tuple[float, float]]
     markers: list[tuple[float, float, str]] = field(default_factory=list)  # (x, y, tooltip)
     end: float | None = None  # where the run really stopped spending; drawn as a dashed vertical line
+    switches: list[tuple[float, float, str, str]] = field(default_factory=list)  # (x, y, label, tooltip): model hand-overs
 
 
 @dataclass
@@ -128,6 +129,15 @@ def step_chart(
         for x, y, tip in s.markers:
             out.append(
                 f'<circle cx="{X(x):.1f}" cy="{Y(y):.1f}" r="5" fill="{s.color}" stroke="#fff" stroke-width="1.5" data-tip="{escape(tip, quote=True)}"/>'
+            )
+        for x, y, label, tip in s.switches:
+            w = 6.2 * len(label) + 10
+            bx = min(X(x) + 10, ml + pw - w)
+            out.append(
+                f'<circle cx="{X(x):.1f}" cy="{Y(y):.1f}" r="8" fill="#fff" stroke="{s.color}" stroke-width="2.5" data-tip="{escape(tip, quote=True)}"/>'
+                f'<circle cx="{X(x):.1f}" cy="{Y(y):.1f}" r="3" fill="{s.color}" pointer-events="none"/>'
+                f'<rect class="swbg" x="{bx:.1f}" y="{Y(y) - 30:.1f}" width="{w:.0f}" height="17" rx="4" stroke="{s.color}"/>'
+                f'<text class="end" x="{bx + 5:.1f}" y="{Y(y) - 18:.1f}">{escape(label)}</text>'
             )
         out.append("</g>")
     out.append("</svg>")
