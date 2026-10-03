@@ -59,6 +59,7 @@ DEFAULTS = {
     "activation": "gelu",  # or "silu"
     "bn_dtype": "float",  # or "half"
     "color_jitter": [0.0, 0.0],  # per-image brightness and contrast ranges
+    "stem": "patch2",  # "patch2": 2x2 whitening at 31x31; "patch4s2": 4x4 stride-2 at 15x15
     "inner_kernels": [3, 3, 3],  # kernel size of conv2/conv3 in each group (1 or 3)
     "global_pool": "adaptive",  # "adaptive", "amax", or "max" over the final feature map
     # "muon" follows hiverge/cifar10-speedrun: Muon on conv filters, SGD on biases and head.
@@ -108,10 +109,12 @@ class Conv(nn.Conv2d):
 
 
 class ConvGroup(nn.Module):
-    def __init__(self, channels_in, channels_out, depth, bn_momentum, act, pool_first, kernel=3):
+    def __init__(
+        self, channels_in, channels_out, depth, bn_momentum, act, pool_first, kernel=3, pool=True
+    ):
         super().__init__()
         self.conv1 = Conv(channels_in, channels_out)
-        self.pool = nn.MaxPool2d(2)
+        self.pool = nn.MaxPool2d(2) if pool else nn.Identity()
         self.pool_first = pool_first
         self.norm1 = BatchNorm(channels_out, bn_momentum)
         self.conv2 = Conv(channels_out, channels_out, kernel)
@@ -137,17 +140,22 @@ class Net(nn.Module):
         depths = hyp["depths"] or [hyp["depth"]] * 3
         bn_momentum = hyp["bn_momentum"]
         self.act = make_activation(hyp)
-        self.whiten = nn.Conv2d(3, 24, kernel_size=2, padding=0, bias=True)
+        # The stride-2 stem whitens 4x4 patches straight to 15x15, so the first
+        # group skips its pool and never runs a conv at 31x31.
+        patch, self.whiten_stride = (4, 2) if hyp["stem"] == "patch4s2" else (2, 1)
+        stem_width = 2 * 3 * patch * patch
+        self.whiten = nn.Conv2d(3, stem_width, kernel_size=patch, padding=0, bias=True)
         self.whiten.weight.requires_grad = False
         self.layers = nn.Sequential(
             *(
-                ConvGroup(c_in, c_out, depth, bn_momentum, self.act, pool_first, kernel)
-                for c_in, c_out, depth, pool_first, kernel in zip(
-                    (24, w1, w2),
+                ConvGroup(c_in, c_out, depth, bn_momentum, self.act, pool_first, kernel, pool)
+                for c_in, c_out, depth, pool_first, kernel, pool in zip(
+                    (stem_width, w1, w2),
                     (w1, w2, w3),
                     depths,
                     hyp["pool_first"],
                     hyp["inner_kernels"],
+                    (self.whiten_stride == 1, True, True),
                     strict=True,
                 )
             )
@@ -179,7 +187,8 @@ class Net(nn.Module):
 
     def forward(self, x, whiten_bias_grad: bool = True):
         b = self.whiten.bias
-        x = self.act(F.conv2d(x, self.whiten.weight, b if whiten_bias_grad else b.detach()))
+        b = b if whiten_bias_grad else b.detach()
+        x = self.act(F.conv2d(x, self.whiten.weight, b, stride=self.whiten_stride))
         x = self.layers(x)
         if self.global_pool == "adaptive":
             x = F.adaptive_max_pool2d(x, 1).flatten(1)
@@ -375,6 +384,8 @@ def build(context: BuildContext):
         raise ValueError("resolution_schedule entries must be [16|20|24|28, fraction]")
     if len(hyp["inner_kernels"]) != 3 or any(k not in (1, 3) for k in hyp["inner_kernels"]):
         raise ValueError("inner_kernels must contain three values of 1 or 3")
+    if hyp["stem"] not in ("patch2", "patch4s2"):
+        raise ValueError("stem must be patch2 or patch4s2")
     if hyp["global_pool"] not in ("adaptive", "amax", "max"):
         raise ValueError("global_pool must be adaptive, amax, or max")
     if hyp["optimizer"] not in ("sgd", "muon") or len(hyp["color_jitter"]) != 2:
