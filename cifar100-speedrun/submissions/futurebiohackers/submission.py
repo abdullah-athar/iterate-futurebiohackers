@@ -21,11 +21,11 @@ from benchmark.api import BuildContext, TrainingData
 
 # Override any value with --params, e.g. '{"epochs": 9, "widths": [128, 384, 768]}'.
 DEFAULTS = {
-    "epochs": 8.5,
+    "epochs": 8.25,
     "batch_size": 1024,
-    "lr": 9.0,  # per 1024 examples, decoupled from momentum (airbench convention)
+    "lr": 11.5,  # per 1024 examples, decoupled from momentum (airbench convention)
     "momentum": 0.85,
-    "weight_decay": 0.012,  # per 1024 examples, decoupled from the learning rate
+    "weight_decay": 0.017,  # per 1024 examples, decoupled from the learning rate
     "bias_scaler": 64.0,  # learning-rate multiplier for BatchNorm biases
     "label_smoothing": 0.3,
     "warmup": 0.23,  # fraction of steps spent ramping the learning rate up
@@ -33,9 +33,9 @@ DEFAULTS = {
     "whiten_bias_epochs": 3,
     "translate": 2,
     "cutout": 0,
-    "widths": [96, 256, 768],
+    "widths": [128, 256, 768],
     "depth": 3,  # convs per group; the third adds a residual connection
-    "depths": None,  # optional per-group depths, e.g. [2, 3, 3]
+    "depths": [2, 3, 3],  # per-group convs; None uses depth for every group
     "train_resolution": 32,  # reduced resolution for the first training stage
     "resolution_switch": 0.5,  # fraction of steps before returning to 32 pixels
     "crop_mode": "masked",  # "indexed" preserves channels-last with one gather
@@ -49,7 +49,7 @@ DEFAULTS = {
     "autotune_backends": "ATEN,TRITON",  # ATen/cuDNN and Inductor Triton candidates
     "pool_first": [False, False, False],  # move selected group pools before conv1
     "scaling_factor": 1 / 9,
-    "bn_momentum": 0.6,
+    "bn_momentum": 0.5,
     "ema_every": 5,  # lookahead EMA period in steps; 0 disables it
     "compile": "max-autotune",  # torch.compile mode; "" runs eagerly
 }
