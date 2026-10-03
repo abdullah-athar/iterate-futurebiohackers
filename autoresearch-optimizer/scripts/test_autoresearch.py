@@ -333,7 +333,8 @@ def test_viz_quality_efficiency():
         rows[1]["proposer"] = "claude-code:sonnet"
         (tmp / "sched").mkdir()
         (tmp / "sched" / "ledger.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
-        assert "Sonnet → Opus · 1.0m · $2.00" in render([load_run(tmp / "sched")])
+        sched = render([load_run(tmp / "sched")])
+        assert ">Sonnet → Opus</text>" in sched and "1.0m into the run, $2.00 spent" in sched
         assert "A ring marks" not in html, "no ring note without a model switch"
         assert "<h2>Quality vs efficiency</h2>" not in render([strong]), "the card needs two runs"
     finally:

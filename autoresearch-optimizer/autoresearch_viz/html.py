@@ -210,8 +210,7 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
             end = max((x for x, _ in xy), default=None) if key != "evals" and len(runs) > 1 else None
             switches = []
             for p, old, new in model_switches(run):
-                when = f"{fmt_num(p.seconds, 'seconds')} · {fmt_num(p.cost, 'usd')}"
-                switches.append((getattr(p, key), p.best, f"{_model_name(old)} → {_model_name(new)} · {when}",
+                switches.append((getattr(p, key), p.best, f"{_model_name(old)} → {_model_name(new)}",
                                  f"{run.label} switches from {_model_name(old)} to {_model_name(new)} after #{p.entry_id}: "
                                  f"{fmt_num(p.seconds, 'seconds')} into the run, {fmt_num(p.cost, 'usd')} spent, "
                                  f"{fmt_num(p.tokens, 'tokens')} tokens, best so far {fmt_num(p.best)}"))
@@ -227,7 +226,7 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
         buttons.append(f'<button class="{"on" if i == 0 else ""}" data-key="{key}">vs {key if key != "seconds" else "wall-clock"}</button>')
     return (
         '<section class="card"><h2>Research progress</h2><p class="lead">Best objective found so far. Dots mark proposals that set a new global best; hover for the hypothesis.'
-        + (" A ring marks where a run hands over to another model (<code>--model sonnet,opus</code>), with the time and cost spent at that moment."
+        + (" A ring marks where a run hands over to another model (<code>--model sonnet,opus</code>); hover it for the time and cost spent at that moment."
            if any(model_switches(r) for r in runs) else "")
         + "</p>"
         f'<div class="tabs" data-group="x">{"".join(buttons)}</div>'
