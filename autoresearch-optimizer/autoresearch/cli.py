@@ -111,7 +111,12 @@ def cmd_swarm(args) -> None:
         print(f"Initialised run at {store.root}\n" + ResearchRun.describe_entry(run.entries()[0]))
     run = ResearchRun(store)
     emit = swarm.Events(run, time.time())
-    propose = swarm.claude_proposer(args.model, args.turn_s, args.eval, args.max_budget_usd, emit)
+    gate = None
+    if args.hypothesis_first:
+        from .hypothesis_gate import claude_judge, lexical_judge
+        gate = lexical_judge() if args.gate == "lexical" else claude_judge(args.gate_model)
+    propose = swarm.claude_proposer(args.model, args.turn_s, args.eval, args.max_budget_usd, emit,
+                                    hypothesis_first=args.hypothesis_first, hyp_turn_s=args.hyp_turn_s, gate=gate)
     budget_ms = run.config.time_budget_ms
     evaluate = (swarm.modal_evaluator(run.problem_name, budget_ms) if args.eval == "modal"
                 else swarm.local_evaluator(run.problem_name, budget_ms))
@@ -192,6 +197,11 @@ def main(argv=None) -> None:
     s.add_argument("--problem", default="median_string", help="problem for a new run")
     s.add_argument("--budget-ms", type=int, default=1000, help="CPU ms per instance for a new run")
     s.add_argument("--seed", type=int, default=0)
+    s.add_argument("--hypothesis-first", action="store_true",
+                   help="agents state a one-line hypothesis first; repeated ideas stop before any code is written")
+    s.add_argument("--hyp-turn-s", type=int, default=60, help="timeout of each one-line hypothesis call")
+    s.add_argument("--gate", choices=["llm", "lexical"], default="llm", help="how hypotheses are compared")
+    s.add_argument("--gate-model", default="haiku", help="Claude Code --model for the llm gate")
     s.set_defaults(fn=cmd_swarm)
 
     s = sub.add_parser("report", help="render report.md (optionally with held-out evaluation)")

@@ -17,13 +17,14 @@ STATUS_REJECTED_DUPLICATE = "rejected_duplicate"   # novelty gate; not evaluated
 STATUS_REJECTED_SCREEN = "rejected_screen"         # failed/invalid/worse-than-baseline on screen
 STATUS_FAILED = "failed"              # crash or timeout on the objective split
 STATUS_REJECTED_GUARD = "rejected_guard"           # disallowed imports/calls; not evaluated
+STATUS_REJECTED_HYPOTHESIS = "rejected_hypothesis" # hypothesis gate: same idea as an earlier one; no code written
 
 VERDICT_SUPPORTED = "supported"            # new global best, confirmed on fresh instances
 VERDICT_PARTIAL = "partial"                # better on some instances, not globally
 VERDICT_FALSIFIED = "falsified"            # evaluated, no gain
 VERDICT_UNCONFIRMED = "unconfirmed"        # won on validate but not on the fresh confirm set (noise/overfit)
 VERDICT_INCONCLUSIVE = "inconclusive"      # crashed/timed out/invalid: hypothesis never actually tested
-VERDICT_UNTESTED = "untested"              # rejected before evaluation (duplicate or guard)
+VERDICT_UNTESTED = "untested"              # rejected before evaluation (duplicate, guard or hypothesis gate)
 
 
 @dataclass

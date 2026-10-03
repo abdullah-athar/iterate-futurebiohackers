@@ -77,6 +77,26 @@ flowchart TD
 
 Watch it live with `just autoresearch-viz serve ...`.
 
+### Hypothesis-first mode (`swarm --hypothesis-first`)
+
+The novelty gate (step 3) saves evaluations, but by then each duplicate agent has already paid
+for a full coding session. In hypothesis-first mode each agent goes through three steps:
+
+1. **Hypothesis call** (timeout `--hyp-turn-s`, default 60 s): one tool-less call with a one-line
+   system prompt receives the agent's `STATUS.md`, mode and direction, and replies with a one-line
+   hypothesis. It skips the coding-agent instructions, which make up most of a session's input.
+2. **Hypothesis gate:** one small-model call per generation (`--gate llm --gate-model haiku`, about
+   4k input tokens) compares the new lines with each other in worker order and with the last 40
+   ledger hypotheses. `--gate lexical` compares content words instead. If the model call fails,
+   the gate falls back to the lexical comparison.
+3. **Coding session:** only agents with a distinct idea get a coding session, told to implement
+   the hypothesis already written in `hypothesis.txt`. The code novelty gate still runs.
+
+A repeated idea is recorded as `rejected_hypothesis` with no source, so later generations see the
+idea as taken and its cost is counted. It is not evidence for the mode bandit. The report shows
+how many ideas stopped and what the hypothesis phase and gate cost (`hyp_cost_usd`,
+`gate_cost_usd` in each entry's `usage`).
+
 ### Budgets
 
 | Budget | Default | Where to change |
@@ -101,6 +121,7 @@ uv run modal secret create autoresearch-heldout AUTORESEARCH_CONFIRM_SEED=<int> 
 just autoresearch-swarm-smoke                                   # 2 agents, 1 generation, ~1-2 min
 just autoresearch-swarm --run artifacts/runs/swarm-1            # 32 agents/generation, 20 min
 just autoresearch-swarm --run artifacts/runs/swarm-1 --agents 8 --budget-min 10 --model opus
+just autoresearch-swarm --run artifacts/runs/swarm-2 --agents 8 --hypothesis-first   # dedupe ideas before code
 just autoresearch-viz serve artifacts/runs/swarm-1 --open      # live dashboard (run in a second terminal)
 
 # single-agent mode (tell the agent: "read autoresearch/program.md and start a research run")

@@ -15,6 +15,7 @@ from .ledger import (
     STATUS_KEPT,
     STATUS_REJECTED_DUPLICATE,
     STATUS_REJECTED_GUARD,
+    STATUS_REJECTED_HYPOTHESIS,
     STATUS_REJECTED_SCREEN,
     STATUS_SEED,
     VERDICT_FALSIFIED,
@@ -35,6 +36,9 @@ from .prompts import (
     format_digest,
 )
 from .sandbox import get_evaluate
+
+# rejected before any evaluation: not evidence for the mode bandit or the plateau counter
+NOT_EVALUATED = (STATUS_REJECTED_DUPLICATE, STATUS_REJECTED_GUARD, STATUS_REJECTED_HYPOTHESIS)
 
 
 def evaluate_candidate(problem_name: str, source: str, budget_ms: int | None, evaluate=None) -> dict[str, dict]:
@@ -114,7 +118,7 @@ class ResearchRun:
                 break
             if e.improved_global:
                 break
-            if e.status not in (STATUS_REJECTED_DUPLICATE, STATUS_REJECTED_GUARD):
+            if e.status not in NOT_EVALUATED:
                 n += 1
         return n
 
@@ -125,7 +129,7 @@ class ResearchRun:
             eligible = [m for m in eligible if m != "tune"] or eligible
         stats = {m: [0, 0.0] for m in MODES}
         for e in entries:
-            if e.mode in stats and e.status not in (STATUS_SEED, STATUS_REJECTED_DUPLICATE, STATUS_REJECTED_GUARD):
+            if e.mode in stats and e.status != STATUS_SEED and e.status not in NOT_EVALUATED:
                 stats[e.mode][0] += 1
                 stats[e.mode][1] += 1.0 if e.improved_global else (0.5 if e.improved_instances else 0.0)
         total = sum(n for n, _ in stats.values()) or 1
@@ -243,6 +247,16 @@ class ResearchRun:
                     entry.verdict = VERDICT_FALSIFIED
             else:
                 entry.verdict = VERDICT_INCONCLUSIVE
+        self.store.append(entry)
+        return entry
+
+    def record_rejected_hypothesis(self, hypothesis: str, mode: str, parent_ids: list[int], proposer: str,
+                                   similar_to: str, reason: str, **fields) -> Entry:
+        """Hypothesis gate: the idea duplicates `similar_to`, so no code was written. Kept in the ledger
+        (no source) so later generations see the idea as taken and the session cost is counted."""
+        entry = Entry(id=self.store.next_id(), parent_ids=parent_ids, mode=mode, hypothesis=hypothesis,
+                      status=STATUS_REJECTED_HYPOTHESIS, proposer=proposer, verdict=VERDICT_UNTESTED,
+                      note=f"same idea as {similar_to}: {reason}; no code written", **fields)
         self.store.append(entry)
         return entry
 

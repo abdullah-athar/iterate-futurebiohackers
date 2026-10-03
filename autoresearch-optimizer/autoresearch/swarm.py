@@ -5,6 +5,10 @@ Per generation:  allocate modes/parents (UCB bandit) -> N agents write candidate
 hypothesis.txt in their own workspace -> guard + novelty gate (in arrival order) ->
 evaluate the survivors in parallel -> record in order -> next generation, until the wall-clock
 budget cannot fit another generation. Then the best and the seed are scored on holdout.
+
+With --hypothesis-first, each agent's idea is first stated by one cheap tool-less call, a
+hypothesis gate drops repeated ideas, and only the survivors get a coding session (see
+hypothesis_gate.py).
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from .hypothesis_gate import ask_claude
 from .loop import ResearchRun, evaluate_candidate
 from .prompts import MODES, build_user_prompt
 
@@ -83,7 +88,23 @@ Time limit: {turn_s} s of wall clock; you are stopped at the deadline. Have a co
 5. Stop when candidate.py and hypothesis.txt are final. Only candidate.py is submitted.
 """
 
+HYP_PROMPT = """You are worker {worker} of {n} agents proposing median-string solvers in parallel this generation
+({mix}). Your mode is `{mode}` and your research direction is: {direction}.
+Other agents cover the other directions, so stay on yours. Ideas already in the research ledger
+below count as taken: build on them or go elsewhere.
+
+Reply with ONE line and nothing else: the change you would make to the parent solver, why, and on
+which instances you expect a lower score. Name the technique precisely (e.g. "late-acceptance walk
+over insert/delete moves", not "improve the search"). A gate compares the lines of all agents; only
+distinct ideas get implemented.
+
+{status}"""
+HYP_SYSTEM = "You are a research agent. Propose one algorithmic change. Reply with one line only."
+
 PROMPT = "Read AGENT.md and STATUS.md in the current directory and follow them. Work only in this directory."
+CODE_PROMPT = ("Read AGENT.md and STATUS.md in the current directory and follow them. Work only in this directory. "
+               "Your hypothesis is already in hypothesis.txt and passed a gate that rejects ideas already taken: "
+               "skip step 2 and implement exactly that idea.")
 
 
 def write_workspace(run: ResearchRun, a: Assignment, gen: int, n: int, mix: str, turn_s: int, ws: Path,
@@ -103,9 +124,9 @@ def write_workspace(run: ResearchRun, a: Assignment, gen: int, n: int, mix: str,
     try_sh.chmod(0o755)
 
 
-def run_claude(ws: Path, turn_s: int, model: str, max_budget_usd: float | None = None) -> dict:
+def run_claude(ws: Path, turn_s: int, model: str, max_budget_usd: float | None = None, prompt: str = PROMPT) -> dict:
     """Run one headless Claude Code session in `ws`; kill its process group at the deadline."""
-    cmd = ["claude", "-p", PROMPT, "--output-format", "json", "--model", model,
+    cmd = ["claude", "-p", prompt, "--output-format", "json", "--model", model,
            "--permission-mode", "acceptEdits", "--allowedTools", "Bash,Read,Edit,Write,Glob,Grep"]
     if max_budget_usd:
         cmd += ["--max-budget-usd", str(max_budget_usd)]
@@ -140,42 +161,116 @@ def run_claude(ws: Path, turn_s: int, model: str, max_budget_usd: float | None =
     return usage
 
 
-def claude_proposer(model: str, turn_s: int, eval_backend: str, max_budget_usd: float | None, emit):
-    """propose_many backed by local headless Claude Code sessions (one thread each)."""
+def _read_hypothesis(ws: Path) -> str:
+    p = ws / "hypothesis.txt"
+    text = p.read_text().strip() if p.exists() else ""
+    return text.splitlines()[0] if text else ""
+
+
+def _merge_usage(hyp: dict, code: dict | None = None) -> dict:
+    """One ledger usage for a two-phase agent: totals (hypothesis call + gate share + coding session),
+    with the hypothesis call and the gate share also kept separately."""
+    code = code or {}
+    out = {**hyp, **code}
+    for k in ("prompt_tokens", "completion_tokens", "seconds", "num_turns"):
+        out[k] = (hyp.get(k) or 0) + (code.get(k) or 0)
+    out["cost_usd"] = (hyp.get("cost_usd") or 0) + (hyp.get("gate_cost_usd") or 0) + (code.get("cost_usd") or 0)
+    out.update({f"hyp_{k}": hyp.get(k) or 0 for k in ("cost_usd", "prompt_tokens", "completion_tokens", "seconds")})
+    out["gate_cost_usd"] = hyp.get("gate_cost_usd") or 0
+    return out
+
+
+def _first_line(text: str) -> str:
+    for line in text.splitlines():
+        line = line.strip().lstrip("-• ").strip("`*\"' ")
+        if line:
+            return line
+    return ""
+
+
+def claude_proposer(model: str, turn_s: int, eval_backend: str, max_budget_usd: float | None, emit,
+                    hypothesis_first: bool = False, hyp_turn_s: int = 60, gate=None):
+    """propose_many backed by local headless Claude Code sessions (one thread each).
+
+    With `hypothesis_first`, each agent's idea is first stated by one tool-less call over its
+    STATUS.md (a few k tokens instead of a coding session); `gate(new, prior)` drops ideas that
+    repeat an earlier one, and only the survivors get a coding session, told to implement it."""
 
     def propose_many(run: ResearchRun, gen: int, assignments: list[Assignment]) -> list[dict]:
         mix = ", ".join(f"{c} on {m}" for m, c in Counter(a.mode for a in assignments).items())
         agents_dir = run.store.root / "agents"
         agents_dir.mkdir(exist_ok=True)
+        n = len(assignments)
 
-        def one(a: Assignment) -> dict:
-            ws = Path(tempfile.mkdtemp(prefix=f"autoresearch-g{gen:02d}-w{a.worker:02d}-"))
-            write_workspace(run, a, gen, len(assignments), mix, turn_s, ws, eval_backend)
-            parent_src = (ws / "candidate.py").read_text()
-            usage = run_claude(ws, turn_s, model, max_budget_usd)
-            source = (ws / "candidate.py").read_text()
-            hyp_path = ws / "hypothesis.txt"
-            hypothesis = hyp_path.read_text().strip().splitlines()[0] if hyp_path.exists() and hyp_path.read_text().strip() else ""
-            if source == parent_src or not hypothesis:
+        def finish(a: Assignment, ws: Path, usage: dict, hypothesis: str, parent_src: str, **extra) -> dict:
+            source = (ws / "candidate.py").read_text() if "gate" not in extra else ""
+            if "gate" not in extra and (source == parent_src or not hypothesis):
                 source, usage["outcome"] = "", usage["outcome"] if usage["outcome"] != "ok" else "no_file"
             tag = f"g{gen:02d}-w{a.worker:02d}"
             for name in ("agent.json", "agent.err"):
                 if (ws / name).exists():
                     shutil.copy(ws / name, agents_dir / f"{tag}-{name}")
             shutil.rmtree(ws, ignore_errors=True)
-            return {"assignment": a, "source": source, "hypothesis": hypothesis, "usage": usage}
+            emit("agent_done", gen=gen, worker=a.worker, mode=a.mode, outcome=usage["outcome"],
+                 seconds=usage["seconds"], cost_usd=usage.get("cost_usd", 0.0), hypothesis=hypothesis[:160])
+            return {"assignment": a, "source": source, "hypothesis": hypothesis, "usage": usage, **extra}
 
-        results = []
-        with ThreadPoolExecutor(max_workers=len(assignments)) as pool:
-            futures = [pool.submit(one, a) for a in assignments]
-            for f in as_completed(futures):
-                r = f.result()
-                u = r["usage"]
-                emit("agent_done", gen=gen, worker=r["assignment"].worker, mode=r["assignment"].mode,
-                     outcome=u["outcome"], seconds=u["seconds"], cost_usd=u.get("cost_usd", 0.0),
-                     hypothesis=r["hypothesis"][:160])
-                results.append(r)
-        return results
+        def workspace(a: Assignment) -> tuple[Path, str]:
+            ws = Path(tempfile.mkdtemp(prefix=f"autoresearch-g{gen:02d}-w{a.worker:02d}-"))
+            write_workspace(run, a, gen, n, mix, turn_s, ws, eval_backend)
+            return ws, (ws / "candidate.py").read_text()
+
+        def one(a: Assignment) -> dict:
+            ws, parent_src = workspace(a)
+            usage = run_claude(ws, turn_s, model, max_budget_usd)
+            return finish(a, ws, usage, _read_hypothesis(ws), parent_src)
+
+        def hypothesis_only(a: Assignment) -> dict:
+            ws, parent_src = workspace(a)
+            prompt = HYP_PROMPT.format(worker=a.worker, n=n, mix=mix, mode=a.mode,
+                                       direction=a.direction or "your choice", status=(ws / "STATUS.md").read_text())
+            try:
+                text, usage = ask_claude(prompt, HYP_SYSTEM, model, hyp_turn_s)
+                hypothesis, usage["outcome"] = _first_line(text), "ok"
+            except (subprocess.SubprocessError, OSError, ValueError) as e:
+                hypothesis, usage = "", {"model": model, "seconds": float(hyp_turn_s), "outcome": f"hyp_error: {e}"[:200]}
+            if hypothesis:
+                (ws / "hypothesis.txt").write_text(hypothesis + "\n")
+            return {"assignment": a, "ws": ws, "parent_src": parent_src, "usage": usage, "hypothesis": hypothesis}
+
+        def implement(h: dict) -> dict:
+            code = run_claude(h["ws"], turn_s, model, max_budget_usd, prompt=CODE_PROMPT)
+            return finish(h["assignment"], h["ws"], _merge_usage(h["usage"], code),
+                          _read_hypothesis(h["ws"]) or h["hypothesis"], h["parent_src"])
+
+        def parallel(fn, items: list) -> list[dict]:
+            if not items:
+                return []
+            with ThreadPoolExecutor(max_workers=len(items)) as pool:
+                return [f.result() for f in as_completed([pool.submit(fn, x) for x in items])]
+
+        if not hypothesis_first:
+            return parallel(one, assignments)
+
+        hyps = sorted(parallel(hypothesis_only, assignments), key=lambda h: h["assignment"].worker)
+        stated = [h for h in hyps if h["hypothesis"]]
+        prior = [(f"#{e.id}", e.hypothesis) for e in run.entries()[-40:] if e.mode != "seed" and e.hypothesis]
+        verdicts, gate_usage = gate([(f"w{h['assignment'].worker:02d}", h["hypothesis"]) for h in stated], prior)
+        share = (gate_usage.get("cost_usd", 0.0) or 0.0) / max(len(stated), 1)
+        for h, v in zip(stated, verdicts):
+            h["verdict"] = v
+            h["usage"]["gate_cost_usd"] = share
+        rejected = [h for h in stated if not h["verdict"].keep]
+        emit("hypothesis_gate", gen=gen, stated=len(stated), kept=len(stated) - len(rejected), rejected=len(rejected),
+             judge=gate_usage.get("judge", "lexical"), fallback=gate_usage.get("fallback", ""),
+             cost_usd=round(gate_usage.get("cost_usd", 0.0) or 0.0, 4),
+             decisions=[{"worker": h["assignment"].worker, **h["verdict"].to_dict()} for h in stated])
+        results = [finish(h["assignment"], h["ws"], {**h["usage"], "outcome": "no_hypothesis"}, "", h["parent_src"])
+                   for h in hyps if not h["hypothesis"]]
+        for h in rejected:
+            results.append(finish(h["assignment"], h["ws"], {**_merge_usage(h["usage"]), "outcome": "rejected_hypothesis"},
+                                  h["hypothesis"], h["parent_src"], gate=h["verdict"].to_dict()))
+        return results + parallel(implement, [h for h in stated if h["verdict"].keep])
 
     return propose_many
 
@@ -222,8 +317,13 @@ def format_event(r: dict) -> str:
         return f"gen {r['gen']} start: {r['mix']}; best #{r['best_id']}={r['best']:g}"
     if k == "agent_done":
         return f"gen {r['gen']} w{r['worker']:02d} [{r['mode']}] {r['outcome']} {r['seconds']:.0f}s ${r['cost_usd'] or 0:.2f} — {r['hypothesis'][:90]}"
+    if k == "hypothesis_gate":
+        fb = f", fallback {r['fallback']}" if r.get("fallback") else ""
+        return (f"gen {r['gen']} hypothesis gate: {r['kept']} kept, {r['rejected']} same idea as an earlier one "
+                f"({r['judge']}{fb}, ${r['cost_usd']:.3f})")
     if k == "eval_start":
-        return f"gen {r['gen']} evaluating {r['n']} candidate(s) ({r['dup']} duplicate, {r['guard']} guard, {r['empty']} empty skipped)"
+        return (f"gen {r['gen']} evaluating {r['n']} candidate(s) ({r['dup']} duplicate, {r['guard']} guard, "
+                f"{r.get('hyp', 0)} hypothesis-gate, {r['empty']} empty skipped)")
     if k == "entry":
         star = " ** NEW BEST **" if r.get("new_best") else ""
         obj = "-" if r["objective"] is None else r["objective"]
@@ -260,8 +360,10 @@ def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propo
             r["pre"] = run.precheck(r["source"], extra_prior=arrivals)
             arrivals.append((next_id + len(arrivals), r["source"]))
         todo = [r for r in results if r["source"] and not r["pre"][0] and not r["pre"][1].is_duplicate]
+        gated = [r for r in results if r.get("gate")]
         emit("eval_start", gen=gen, n=len(todo), dup=sum(1 for r in results if r.get("pre") and r["pre"][1].is_duplicate),
-             guard=sum(1 for r in results if r.get("pre") and r["pre"][0]), empty=sum(1 for r in results if not r["source"]))
+             guard=sum(1 for r in results if r.get("pre") and r["pre"][0]), hyp=len(gated),
+             empty=sum(1 for r in results if not r["source"] and not r.get("gate")))
         te = time.time()
         for r, ev in zip(todo, evaluate_many([r["source"] for r in todo])):
             r["evals"] = ev if isinstance(ev, dict) else {}
@@ -275,6 +377,15 @@ def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propo
                            prompt_tokens=u.get("prompt_tokens", 0), completion_tokens=u.get("completion_tokens", 0))
             emit("entry", gen=gen, id=e.id, worker=a.worker, mode=a.mode, status=e.status, verdict=e.verdict,
                  objective=None if not e.scored else e.objective, new_best=e.improved_global)
+            proposals += 1
+        for r in gated:
+            a, u, g = r["assignment"], r["usage"], r["gate"]
+            e = run.record_rejected_hypothesis(r["hypothesis"], a.mode, a.parent_ids, f"claude-code:{u.get('model', '?')}",
+                                               g["similar_to"], g["reason"], generation=gen, usage=u,
+                                               elapsed=u.get("seconds", 0.0), prompt_tokens=u.get("prompt_tokens", 0),
+                                               completion_tokens=u.get("completion_tokens", 0))
+            emit("entry", gen=gen, id=e.id, worker=a.worker, mode=a.mode, status=e.status, verdict=e.verdict,
+                 objective=None, new_best=False)
             proposals += 1
         entries = run.entries()
         best = run.archive(entries).global_best

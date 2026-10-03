@@ -1,4 +1,4 @@
-"""Tests for the autoresearch loop: novelty gate, import guard, archive, agent-mode run."""
+"""Tests for the autoresearch loop: novelty gate, import guard, archive, agent-mode run, hypothesis gate."""
 
 import json
 import random
@@ -13,10 +13,12 @@ if str(repo_root) not in sys.path:
 
 from autoresearch.archive import Archive
 from autoresearch.guard import check_imports
+from autoresearch.hypothesis_gate import _parse_decisions, lexical_judge
 from autoresearch.ledger import (
     STATUS_KEPT,
     STATUS_REJECTED_DUPLICATE,
     STATUS_REJECTED_GUARD,
+    STATUS_REJECTED_HYPOTHESIS,
     STATUS_REJECTED_SCREEN,
     RunStore,
 )
@@ -87,6 +89,38 @@ def test_agent_run():
     print("  Agent-mode run test passed!")
 
 
+def test_hypothesis_gate():
+    print("Testing hypothesis gate (lexical judge, judge-answer parsing)...")
+    judge = lexical_judge()
+    prior = [("#3", "simulated annealing over insert and delete moves from the set median")]
+    new = [("w00", "Simulated annealing with insert/delete moves starting from the set median"),
+           ("w01", "bit-parallel Myers distance kernel to evaluate more neighbours within the CPU budget"),
+           ("w02", "Myers bit-parallel distance kernel so more neighbours are evaluated within CPU budget")]
+    verdicts, usage = judge(new, prior)
+    assert [v.keep for v in verdicts] == [False, True, False], verdicts
+    assert verdicts[0].similar_to == "#3" and verdicts[2].similar_to == "w01" and usage == {}
+
+    labels = ["w00", "w01", "w02", "w03"]
+    answer = ('noise {"decisions": [{"id": "w00", "duplicate_of": "#7", "reason": "same SA"}, '
+              '{"id": "w01", "duplicate_of": null}, {"id": "w02", "duplicate_of": "w01", "reason": "same kernel"}, '
+              '{"id": "w03", "duplicate_of": "w03"}]} trailing')
+    verdicts = _parse_decisions(answer, labels)
+    # a ledger id or an earlier kept proposal rejects; a self/forward reference keeps the idea
+    assert [v.keep for v in verdicts] == [False, True, False, True], verdicts
+    assert verdicts[2].similar_to == "w01" and verdicts[2].reason == "same kernel"
+
+    from autoresearch.swarm import _first_line, _merge_usage
+    hyp = {"model": "m", "seconds": 2.0, "cost_usd": 0.02, "prompt_tokens": 5000, "completion_tokens": 50, "gate_cost_usd": 0.005}
+    code = {"model": "m", "seconds": 40.0, "cost_usd": 0.10, "prompt_tokens": 90000, "completion_tokens": 3000,
+            "num_turns": 8, "outcome": "ok"}
+    u = _merge_usage(hyp, code)
+    assert abs(u["cost_usd"] - 0.125) < 1e-9 and u["hyp_cost_usd"] == 0.02 and u["gate_cost_usd"] == 0.005
+    assert u["prompt_tokens"] == 95000 and u["outcome"] == "ok"
+    assert abs(_merge_usage(hyp)["cost_usd"] - 0.025) < 1e-9
+    assert _first_line("\n- **Use Myers bit-parallel distance**\nbecause...") == "Use Myers bit-parallel distance"
+    print("  Hypothesis gate test passed!")
+
+
 def test_swarm():
     print("Testing swarm generations with a fake proposer (local evaluation)...")
     from autoresearch import swarm
@@ -116,10 +150,46 @@ def test_swarm():
     print("  Swarm test passed!")
 
 
+def test_swarm_hypothesis_first():
+    print("Testing swarm recording of hypothesis-gate rejections...")
+    from autoresearch import swarm
+
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-swarm-hyp-"))
+    try:
+        run = ResearchRun.create(RunStore(tmp / "run"), LoopConfig(problem="median_string"))
+
+        def propose_many(run, gen, assignments):
+            u = {"model": "fake", "seconds": 1.0, "outcome": "ok", "cost_usd": 0.03, "hyp_cost_usd": 0.01}
+            out = [{"assignment": assignments[0], "source": mp.FAST_DESCENT, "hypothesis": "fast descent", "usage": u}]
+            for a in assignments[1:]:
+                out.append({"assignment": a, "source": "", "hypothesis": "fast descent again",
+                            "usage": {**u, "outcome": "rejected_hypothesis", "cost_usd": 0.01},
+                            "gate": {"keep": False, "similar_to": "w00", "reason": "same idea"}})
+            return out
+
+        lines = []
+        emit = swarm.Events(run, 0.0, log=lines.append)
+        swarm.run_swarm(run, 3, 1, 1e9, propose_many, swarm.local_evaluator("median_string", 1000), emit,
+                        max_generations=1)
+        gen1 = [e for e in run.entries() if e.generation == 1]
+        assert [e.status for e in gen1] == [STATUS_KEPT, STATUS_REJECTED_HYPOTHESIS, STATUS_REJECTED_HYPOTHESIS]
+        assert all(not e.source_path and "same idea as w00" in e.note for e in gen1[1:])
+        # repeated ideas are not evidence for the mode bandit, and the report counts them apart
+        assert run.steps_since_improvement(run.entries()) == 0
+        text = render(run)
+        assert "1 evaluated" in text and "hypothesis gate: 2 of 3 ideas stopped" in text, text
+        assert any("1 hypothesis-gate" not in l and "2 hypothesis-gate" in l for l in lines), lines
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Swarm hypothesis-first test passed!")
+
+
 if __name__ == "__main__":
     random.seed(0)
     test_novelty_gate()
     test_import_guard()
     test_agent_run()
+    test_hypothesis_gate()
     test_swarm()
+    test_swarm_hypothesis_first()
     print("\nAll autoresearch tests passed!")

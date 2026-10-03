@@ -18,6 +18,7 @@ STATUS_COLORS = {
     "rejected_duplicate": "#fbbf24",
     "failed": "#ef4444",
     "rejected_guard": "#7c2d12",
+    "rejected_hypothesis": "#a78bfa",
     "seed": "#2563eb",
 }
 MODE_COLORS = {"tune": "#0ea5e9", "fix_losers": "#f97316", "new_family": "#8b5cf6", "merge": "#ec4899", "seed": "#2563eb"}
