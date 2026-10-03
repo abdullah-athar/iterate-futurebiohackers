@@ -1,0 +1,72 @@
+{
+  "round": "r3",
+  "n": 8,
+  "seed": 0,
+  "control": {"epochs": 8.5},
+  "jobs": [
+    {
+      "name": "calib2",
+      "variants": [
+        {"label": "e8.0", "params": {"epochs": 8.0}, "hypothesis": "k on Abdullah's 96/256/768 network: 0.5 fewer epochs"},
+        {"label": "e9.0", "params": {"epochs": 9.0}, "hypothesis": "k upward: 0.5 more epochs"},
+        {"label": "e9.5", "params": {"epochs": 9.5}, "hypothesis": "his selected recipe (75.25% / 6.86 s at n=40) in the same container as the 8.5-epoch control"}
+      ]
+    },
+    {
+      "name": "acc-a",
+      "variants": [
+        {"label": "bias32", "params": {"bias_scaler": 32.0}, "hypothesis": "old net: +0.32 pp at equal time; BN biases learn too fast at 64x"},
+        {"label": "ls0.25", "params": {"label_smoothing": 0.25}, "hypothesis": "old net: +0.21 pp at equal time"},
+        {"label": "lr10.8", "params": {"lr": 10.8}, "hypothesis": "old net: +0.17 pp at equal time"}
+      ]
+    },
+    {
+      "name": "acc-b",
+      "variants": [
+        {"label": "bn0.7", "params": {"bn_momentum": 0.7}, "hypothesis": "old net: +0.16 pp at equal time"},
+        {"label": "jitter0.3", "params": {"jitter": 0.3}, "hypothesis": "old net: +0.11 pp at equal time; own RNG keeps pairing"},
+        {"label": "mom0.8", "params": {"momentum": 0.8}, "hypothesis": "old net: +0.11 pp at equal time"}
+      ]
+    },
+    {
+      "name": "acc-c",
+      "variants": [
+        {"label": "cutout4", "params": {"cutout": 4}, "hypothesis": "old net: +0.08 pp at equal time"},
+        {"label": "scale0.1389", "params": {"scaling_factor": 0.1388888888888889}, "hypothesis": "old net: +0.10 pp at equal time (sharper logits)"},
+        {"label": "stack2", "params": {"bias_scaler": 32.0, "label_smoothing": 0.25}, "hypothesis": "the two strongest gainers together: additivity test"}
+      ]
+    },
+    {
+      "name": "stack",
+      "variants": [
+        {"label": "stack4", "params": {"bias_scaler": 32.0, "label_smoothing": 0.25, "lr": 10.8, "bn_momentum": 0.7}, "hypothesis": "four strongest gainers (old net sum +0.86 pp if additive)"},
+        {"label": "stack6", "params": {"bias_scaler": 32.0, "label_smoothing": 0.25, "lr": 10.8, "bn_momentum": 0.7, "jitter": 0.3, "momentum": 0.8}, "hypothesis": "six gainers"},
+        {"label": "stack6-e8", "params": {"bias_scaler": 32.0, "label_smoothing": 0.25, "lr": 10.8, "bn_momentum": 0.7, "jitter": 0.3, "momentum": 0.8, "epochs": 8.0}, "hypothesis": "six gainers with 0.5 epoch trimmed (k): aiming at ~75.35% faster than 5.8 s"}
+      ]
+    },
+    {
+      "name": "res-24",
+      "variants": [
+        {"label": "res24-s0.25", "params": {"train_resolution": 24, "resolution_switch": 0.25}, "hypothesis": "24 px for the first quarter of the steps; low-res graph compiled in default mode"},
+        {"label": "res24-s0.5", "params": {"train_resolution": 24, "resolution_switch": 0.5}, "hypothesis": "24 px for the first half (his 28 px/9 epochs attempt missed the target over 5 trials)"},
+        {"label": "res24-s0.75", "params": {"train_resolution": 24, "resolution_switch": 0.75}, "hypothesis": "24 px for three quarters: largest saving, largest accuracy risk"}
+      ]
+    },
+    {
+      "name": "res-28",
+      "variants": [
+        {"label": "res28-s0.5", "params": {"train_resolution": 28, "resolution_switch": 0.5}, "hypothesis": "28 px for the first half"},
+        {"label": "res28-s0.75", "params": {"train_resolution": 28, "resolution_switch": 0.75}, "hypothesis": "28 px for three quarters"},
+        {"label": "res24-s0.5-stack4", "params": {"train_resolution": 24, "resolution_switch": 0.5, "bias_scaler": 32.0, "label_smoothing": 0.25, "lr": 10.8, "bn_momentum": 0.7}, "hypothesis": "resizing paid for by the four gainers"}
+      ]
+    },
+    {
+      "name": "stack-trim",
+      "variants": [
+        {"label": "stack6-e7.5", "params": {"bias_scaler": 32.0, "label_smoothing": 0.25, "lr": 10.8, "bn_momentum": 0.7, "jitter": 0.3, "momentum": 0.8, "epochs": 7.5}, "hypothesis": "six gainers with 1 epoch trimmed"},
+        {"label": "stack6-res24-s0.5", "params": {"bias_scaler": 32.0, "label_smoothing": 0.25, "lr": 10.8, "bn_momentum": 0.7, "jitter": 0.3, "momentum": 0.8, "train_resolution": 24, "resolution_switch": 0.5}, "hypothesis": "six gainers plus half the steps at 24 px"},
+        {"label": "stack6-res28-s0.5", "params": {"bias_scaler": 32.0, "label_smoothing": 0.25, "lr": 10.8, "bn_momentum": 0.7, "jitter": 0.3, "momentum": 0.8, "train_resolution": 28, "resolution_switch": 0.5}, "hypothesis": "six gainers plus half the steps at 28 px"}
+      ]
+    }
+  ]
+}
