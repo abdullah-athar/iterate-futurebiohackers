@@ -1,0 +1,44 @@
+{
+  "returncode": 1,
+  "wall_seconds": 165.6,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T204025Z-022583ea",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"batch_size\": 512, \"count_nonfinite\": true, \"epochs\": 8.0, \"lr\": 16.0, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "r24q-28h-bs512",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"batch_size\": 512, \"count_nonfinite\": true, \"epochs\": 8.0, \"lr\": 16.0, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"batch_size\": 512, \"count_nonfinite\": true, \"epochs\": 8.0, \"lr\": 16.0, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.25
+        ],
+        [
+          28,
+          0.5
+        ]
+      ],
+      "batch_size": 512,
+      "lr": 16.0,
+      "epochs": 8.0
+    },
+    "hypothesis": "the 24 px quarter stacked with the README's batch-512 lead",
+    "env": {},
+    "config": "futurebiohackers {\"batch_size\": 512, \"epochs\": 8.0, \"lr\": 16.0, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
