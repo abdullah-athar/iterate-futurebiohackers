@@ -294,3 +294,5 @@
 {"time": "2026-10-03T23:24:24", "label": "cold4cpu-g3-512-e10 @4cpu (gpu-guard miss 1)", "gpu": "NVIDIA A100 80GB PCIe", "power": "300.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: GPU 'NVIDIA A100 80GB PCIe' is not 'NVIDIA A100-SXM4-80GB'"}
 {"time": "2026-10-03T23:29:16", "label": "cold4cpu-g3-512-e10 @4cpu", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 288.8, "gpu_minutes": 5.06, "note": ""}
 {"time": "2026-10-03T23:29:45", "label": "r23/confirm16-g3-512-e10", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 334.0, "gpu_minutes": 5.82, "note": ""}
+{"time": "2026-10-03T23:39:10", "label": "candC-g3-512-e10-seeds40", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 474.9, "gpu_minutes": 8.16, "note": ""}
+{"time": "2026-10-03T23:40:08", "label": "candC-g3-512-e10-seeds0", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 586.0, "gpu_minutes": 10.02, "note": ""}

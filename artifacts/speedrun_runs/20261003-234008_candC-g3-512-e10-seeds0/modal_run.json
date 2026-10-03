@@ -1,0 +1,30 @@
+{
+  "returncode": 0,
+  "wall_seconds": 584.2,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T223027Z-09cb34bc",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 40 --seed 0 --params '{\"count_nonfinite\": true, \"epochs\": 10.0, \"g3_pair\": \"inner512\"}'",
+  "spec": {
+    "label": "candC-g3-512-e10-seeds0",
+    "n": 40,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "40",
+      "--seed",
+      "0",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 10.0, \"g3_pair\": \"inner512\"}"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 10.0, \"g3_pair\": \"inner512\"}",
+    "delta": {
+      "g3_pair": "inner512",
+      "epochs": 10.0,
+      "count_nonfinite": true
+    },
+    "config": "futurebiohackers --n 40 --seed 0 --params {\"g3_pair\": \"inner512\", \"epochs\": 10.0}"
+  },
+  "nonfinite": 0,
+  "build_mode": "cold"
+}
