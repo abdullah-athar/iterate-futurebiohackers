@@ -1,0 +1,34 @@
+{
+  "returncode": 0,
+  "wall_seconds": 102.4,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T222033Z-fac42222",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"aug_off_last\": 0.5, \"count_nonfinite\": true, \"epochs\": 10.0, \"g3_pair\": \"inner512\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "g3-inner512-e10.0-augoff0.5",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"aug_off_last\": 0.5, \"count_nonfinite\": true, \"epochs\": 10.0, \"g3_pair\": \"inner512\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"aug_off_last\": 0.5, \"count_nonfinite\": true, \"epochs\": 10.0, \"g3_pair\": \"inner512\"}",
+    "delta": {
+      "g3_pair": "inner512",
+      "epochs": 10.0,
+      "aug_off_last": 0.5
+    },
+    "hypothesis": "inner512 pair at 10 epochs with the no-augmentation finish (last 0.5 epoch) stacked",
+    "env": {},
+    "config": "futurebiohackers {\"aug_off_last\": 0.5, \"epochs\": 10.0, \"g3_pair\": \"inner512\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

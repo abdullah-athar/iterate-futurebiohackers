@@ -1,0 +1,16 @@
+{
+  "round": "r23",
+  "n": 16,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "confirm16-g3-512-e10",
+      "control_index": 1,
+      "variants": [
+        {"label": "g3-inner512-e10.0-n16", "params": {"g3_pair": "inner512", "epochs": 10.0},
+         "hypothesis": "n=16 paired confirmation: group 3 pair through 512 channels at 10 epochs vs candidate B (n=8: -0.04 pp, -0.10 s)"}
+      ]
+    }
+  ]
+}
