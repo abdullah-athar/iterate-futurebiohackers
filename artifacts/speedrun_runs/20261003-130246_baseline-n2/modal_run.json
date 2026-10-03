@@ -1,0 +1,24 @@
+{
+  "returncode": 0,
+  "result_dir": "/__modal/volumes/vo-DeZzWP1Pou6XGy9Ow6ytCp/futurebiohackers/20261003T120042Z-f6dae59d",
+  "environment": {
+    "gpu_name": "NVIDIA A100 80GB PCIe",
+    "gpu_memory": "81920 MiB",
+    "gpu_power_limit": "300.00 W",
+    "driver": "580.95.05",
+    "mig": "Disabled",
+    "versions": "python 3.12.10 torch 2.4.0+cu124 torchvision 0.19.0+cu124 cuda_runtime 12.4 cudnn 90100 cuda_available True\ncuda_devices ['NVIDIA A100 80GB PCIe']",
+    "cpu_count": 20,
+    "cpu_affinity": 20
+  },
+  "command": "/opt/venv/bin/python -m benchmark.run --n 2 --device cuda --data-root /data --results-root /results --params '{}' --submission futurebiohackers",
+  "wall_seconds": 127.1,
+  "spec": {
+    "n": 2,
+    "submission": "futurebiohackers",
+    "submission_path": "",
+    "params": "{}",
+    "no_accuracy_target": false,
+    "seed": null
+  }
+}
