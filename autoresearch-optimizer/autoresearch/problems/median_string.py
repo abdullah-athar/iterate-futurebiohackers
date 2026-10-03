@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import signal
 import time
 from pathlib import Path
 
 from median_string import Evaluator, get_benchmark_suite
-from median_string.base_solver import FunctionalSolver
 
 from ..problem import EvalResult, InstanceDiag
-from ..sandbox import load_solve_function
+from ..sandbox import run_candidate
 
 SEED_PATH = Path(__file__).resolve().parent.parent / "seeds" / "median_string_seed.py"
 
@@ -19,65 +17,33 @@ PROBLEM: Median String / Steiner String (NP-hard).
 Given strings S over an alphabet (DNA "ACGT" or 20 amino acids), return a string t
 minimising sum_{s in S} d(t, s). d is Levenshtein distance, or Hamming distance when
 instance.metric == "hamming" (then keep len(t) == len of inputs). Lower is better.
-Baseline per instance = set median (best input string). Instances are planted motifs with
-substitution noise 15-38% and indel noise 0-10%; the planted string's score is reported as
+Baseline per instance = set median (best input string). Objective instances are planted motifs:
+four DNA instances (280-688 chars, k=20-40 strings) and one 320 aa protein (k=15), with substitution
+noise 25-38% and indel noise 5-10%; the planted string's score is reported as
 "best_known" (a strong but not necessarily optimal reference).
 
 SOLVER CONTRACT: a single Python file defining `def solve(instance) -> str`.
   instance.strings: list[str]      instance.alphabet: str
   instance.metric: "levenshtein" | "hamming"   instance.target_length: None (any length ok)
+  solve() receives a copy with exactly these fields plus instance.time_budget_ms; the planted string,
+  its score and the generator settings are not available, and scoring uses the evaluator's own copy.
 Allowed imports: Python stdlib and `from median_string.metrics import sum_distance,
-levenshtein_distance, hamming_distance, calculate_distance, compute_set_median`.
+levenshtein_distance, levenshtein_editops, hamming_distance, calculate_distance, compute_set_median`.
 No other third-party packages. Must be deterministic (seed any RNG).
 TIME BUDGET: each solve() call gets instance.time_budget_ms of CPU time (default 1000 ms).
 Going over by more than 25% makes that instance invalid (score = baseline + 1000), so check
-time.process_time() against the budget and return your best string so far. Levenshtein in
-pure Python is slow: a 40x40 DP is ~1 ms, so a full sum_distance on 15 strings is ~15 ms.
-Incremental scoring and early stopping matter as much as the search strategy.
+time.process_time() against the budget and return your best string so far.
+median_string.metrics.levenshtein_distance is a fast C++ implementation (~2 us at 40x40,
+~0.1 ms at 1500x1500); levenshtein_editops(a, b) returns an optimal edit script
+[(op, i, j), ...] for alignment-based methods. A DP written in pure Python is ~3000x slower.
 """
 
-BUDGET_GRACE = 1.25  # an instance is invalid once solve() uses more than budget * grace of CPU
-
-
-class _OverBudget(BaseException):
-    """Raised by the CPU timer inside a candidate; a BaseException so `except Exception` can't swallow it."""
-
-
-def _on_timer(signum, frame):
-    raise _OverBudget
-
-
-def _budgeted(solve, budget_ms: int, cpu_ms: dict[str, float]):
-    """Wrap `solve` with a per-call CPU limit (SIGPROF) and a wall-clock backstop (SIGALRM)."""
-    limit = budget_ms * BUDGET_GRACE / 1000
-
-    def wrapped(instance):
-        instance.time_budget_ms = budget_ms
-        handlers = signal.signal(signal.SIGPROF, _on_timer), signal.signal(signal.SIGALRM, _on_timer)
-        over = False
-        t0 = time.process_time()
-        try:
-            try:
-                signal.setitimer(signal.ITIMER_PROF, limit)
-                signal.setitimer(signal.ITIMER_REAL, 3 * limit + 1)  # sleeping/blocked solvers
-                out = solve(instance)
-            finally:
-                signal.setitimer(signal.ITIMER_PROF, 0)
-                signal.setitimer(signal.ITIMER_REAL, 0)
-        except _OverBudget:
-            over = True
-        finally:
-            signal.signal(signal.SIGPROF, handlers[0])
-            signal.signal(signal.SIGALRM, handlers[1])
-        used = time.process_time() - t0
-        cpu_ms[instance.name] = round(1000 * used, 1)
-        if over or used > limit:
-            raise TimeoutError(f"over budget: {1000 * used:.0f} ms CPU > {budget_ms} ms x {BUDGET_GRACE}")
-        return out
-
-    return wrapped
-
-
+LONG_DESCRIPTION = DESCRIPTION.replace(
+    "Objective instances are planted motifs:\nfour DNA instances (280-688 chars, k=20-40 strings) and one 320 aa protein (k=15), with substitution\n"
+    "noise 25-38% and indel noise 5-10%",
+    "Objective instances are MSA-scale: four 1500 bp DNA\ninstances (k=10-20 strings, substitution noise 10-30%, indel noise 2-8%) and one\n"
+    "500 aa protein instance (k=12). All use Levenshtein distance. A full single-edit neighbourhood of\n"
+    "a 1500-char center has ~13k moves (~6 s to score naively), so the budget forces targeted search")
 
 class MedianStringProblem:
     name = "median_string"
@@ -99,35 +65,35 @@ class MedianStringProblem:
     confirm_split = "confirm"
     allowed_imports = ("median_string.metrics",)
     timeouts = {"screen": 30.0, "validate": 120.0, "confirm": 120.0, "holdout": 300.0}  # noqa: RUF012
-    _tiers = {"screen": "small", "validate": "medium", "confirm": "confirm", "holdout": "holdout"}  # noqa: RUF012
+    _tiers = {"screen": "small", "validate": "mid", "confirm": "confirm", "holdout": "holdout"}  # noqa: RUF012
+
+    # classical (non-agent) solvers from median_string/solvers, scored once per run for reference
+    baseline_solvers = ("set_median", "frequency_consensus", "template")
 
     def describe(self) -> str:
         return DESCRIPTION
+
+    def baseline_source(self, solver: str) -> str:
+        return (f"from median_string.solvers import get_solver\n_SOLVER = get_solver({solver!r})\n\n\n"
+                "def solve(instance):\n    return _SOLVER.solve(instance)\n")
 
     def seed_source(self) -> str:
         return SEED_PATH.read_text()
 
     def evaluate(self, source: str, split: str, budget_ms: int | None = None) -> EvalResult:
+        """Candidate code runs in `candidate_runner` on the public view of each instance (CPU budget
+        enforced there); validation, distances and baselines are computed here on the originals."""
         tier = self._tiers[split]
+        instances = get_benchmark_suite(tier)
         t0 = time.perf_counter()
-        try:
-            solve = load_solve_function(source)
-        except Exception as e:  # noqa: BLE001 - any load error is a whole-split failure
-            instances = get_benchmark_suite(tier)
+        run = run_candidate(source, instances, budget_ms, timeout=max(5.0, self.timeouts.get(split, 120.0) - 5.0))
+        if run.error:  # load failure, crash or timeout of the candidate process: whole-split failure
             baseline = _baseline_total(instances)
             return EvalResult(split, baseline + 1000 * len(instances), baseline,
-                              elapsed=time.perf_counter() - t0,
-                              error=f"Failed to load solver: {type(e).__name__}: {e}")
-        cpu_ms: dict[str, float] = {}
-        if budget_ms:
-            solve = _budgeted(solve, budget_ms, cpu_ms)
-        summary = Evaluator().evaluate_solver(
-            FunctionalSolver(solve, name="candidate"), benchmark=tier, verbose=False
-        )
-        by_name = {i.name: i for i in get_benchmark_suite(tier)}
+                              elapsed=time.perf_counter() - t0, error=run.error)
+        summary = Evaluator().score(instances, run.outcomes, solver_name="candidate", tier=tier)
         diags = []
-        for r in summary.instance_results:
-            inst = by_name[r.instance_name]
+        for inst, r in zip(instances, summary.instance_results):
             lens = sorted(len(s) for s in inst.strings)
             diags.append(InstanceDiag(
                 name=r.instance_name,
@@ -137,7 +103,7 @@ class MedianStringProblem:
                 valid=r.is_valid,
                 error=r.error_message,
                 elapsed=round(r.elapsed_seconds, 3),
-                cpu_ms=cpu_ms.get(r.instance_name, 0.0),
+                cpu_ms=run.cpu_ms.get(r.instance_name, 0.0),
                 info=(f"k={inst.num_strings} len={lens[0]}-{lens[-1]} |alphabet|={len(inst.alphabet)} "
                       f"metric={inst.metric} mut={inst.metadata.get('mutation_rate')} "
                       f"indel={inst.metadata.get('indel_rate')}"),
@@ -149,3 +115,14 @@ class MedianStringProblem:
 def _baseline_total(instances) -> int:
     from median_string.metrics import compute_set_median
     return sum(compute_set_median(i.strings, metric=i.metric)[1] for i in instances)
+
+
+class MedianStringLongProblem(MedianStringProblem):
+    """Same contract with MSA-scale objective instances (1500 bp DNA, 500 aa protein)."""
+
+    name = "median_string_long"
+    timeouts = {"screen": 30.0, "validate": 120.0, "confirm": 120.0, "holdout": 120.0}  # noqa: RUF012
+    _tiers = {"screen": "small", "validate": "long", "confirm": "long_confirm", "holdout": "long_holdout"}  # noqa: RUF012
+
+    def describe(self) -> str:
+        return LONG_DESCRIPTION

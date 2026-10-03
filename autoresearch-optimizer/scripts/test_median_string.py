@@ -115,9 +115,31 @@ def test_solvers_and_evaluator():
     print("Solvers and evaluator test passed!")
 
 
+def test_public_view():
+    print("Testing the public view handed to solvers...")
+    inst = get_benchmark_suite("small")[1]
+    view = inst.public_view()
+    assert view.planted_consensus is None and view.known_best_score is None and view.metadata == {}
+    assert view.description == "" and view.strings == inst.strings and view.strings is not inst.strings
+    assert (view.num_strings, view.alphabet_set, view.metric) == (inst.num_strings, inst.alphabet_set, inst.metric)
+
+    def mutate(i):
+        i.strings[:] = i.strings[:1]
+        return i.strings[0]
+
+    evaluator = Evaluator()
+    honest = evaluator.evaluate_solver(lambda i: i.strings[0], benchmark=[inst], verbose=False)
+    mutated = evaluator.evaluate_solver(mutate, benchmark=[inst], verbose=False)
+    assert honest.total_score > 0
+    assert (mutated.total_score, mutated.total_baseline_score) == (honest.total_score, honest.total_baseline_score)
+    assert inst.strings == get_benchmark_suite("small")[1].strings  # the original was never touched
+    print("Public view test passed!")
+
+
 if __name__ == "__main__":
     test_metrics()
     test_validation()
     test_variable_length_benchmarks()
     test_solvers_and_evaluator()
+    test_public_view()
     print("\nAll tests passed successfully!")

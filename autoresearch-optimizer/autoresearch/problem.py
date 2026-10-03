@@ -104,6 +104,7 @@ class Problem(Protocol):
 
 PROBLEMS: dict[str, str] = {
     "median_string": "autoresearch.problems.median_string:MedianStringProblem",
+    "median_string_long": "autoresearch.problems.median_string:MedianStringLongProblem",
 }
 
 

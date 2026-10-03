@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
+    .pip_install("rapidfuzz==3.14.6")
     .env({"PYTHONPATH": "/root/ar"})
     .add_local_dir(ROOT, "/root/ar", ignore=["**/.venv", "**/__pycache__", "artifacts", "notebooks", "data", "**/.DS_Store"])
 )

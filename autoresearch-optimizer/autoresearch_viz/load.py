@@ -202,6 +202,7 @@ class Run:
     entries: list[Entry]
     objective_split: str
     events: list[dict[str, Any]] = field(default_factory=list)
+    baselines: dict[str, dict[str, Eval]] = field(default_factory=dict)  # classical solver -> split -> eval
 
     @property
     def problem(self) -> str:
@@ -290,6 +291,13 @@ def load_run(path: str | Path, label: str | None = None) -> Run:
                     by_id[rec["id"]].evals["holdout"] = Eval.from_dict("holdout", rec)
         except (json.JSONDecodeError, AttributeError):
             pass
+    baselines: dict[str, dict[str, Eval]] = {}
+    if (root / "baselines.json").exists():
+        try:
+            baselines = {name: {split: Eval.from_dict(split, d) for split, d in rec.items()}
+                         for name, rec in json.loads((root / "baselines.json").read_text()).items()}
+        except (json.JSONDecodeError, AttributeError):
+            baselines = {}
     return Run(
         label=label or str(config.get("label") or root.name),
         path=root,
@@ -297,6 +305,7 @@ def load_run(path: str | Path, label: str | None = None) -> Run:
         entries=entries,
         objective_split=_infer_objective_split(entries, config),
         events=events,
+        baselines=baselines,
     )
 
 

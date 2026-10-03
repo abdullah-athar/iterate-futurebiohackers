@@ -11,6 +11,8 @@ import ast
 import builtins
 import difflib
 import hashlib
+import re
+from collections import Counter
 from dataclasses import dataclass
 
 _KEEP = set(dir(builtins)) | {"solve", "instance", "self"}
@@ -52,13 +54,6 @@ def fingerprint(source: str) -> str:
     return hashlib.sha1(normalize(source).encode()).hexdigest()[:12]
 
 
-def similarity(a_norm: str, b_norm: str) -> float:
-    m = difflib.SequenceMatcher(None, a_norm, b_norm, autojunk=False)
-    if m.real_quick_ratio() < 0.5:
-        return m.real_quick_ratio()
-    return m.ratio()
-
-
 @dataclass
 class NoveltyVerdict:
     fingerprint: str
@@ -71,37 +66,42 @@ class NoveltyVerdict:
                 "nearest_id": self.nearest_id, "is_duplicate": self.is_duplicate}
 
 
-_NORM_CACHE: dict[str, str] = {}
+_TOKEN = re.compile(r"\w+|[^\w\s]")
+_FEATURES: dict[str, tuple[str, list[str], Counter]] = {}
 
 
-def _normalized(source: str) -> str:
+def _features(source: str) -> tuple[str, list[str], Counter]:
+    """Normalised text, its token sequence and token counts (cached by source hash)."""
     key = hashlib.sha1(source.encode()).hexdigest()
-    if key not in _NORM_CACHE:
-        _NORM_CACHE[key] = normalize(source)
-    return _NORM_CACHE[key]
+    if key not in _FEATURES:
+        norm = normalize(source)
+        toks = _TOKEN.findall(norm)
+        _FEATURES[key] = (norm, toks, Counter(toks))
+    return _FEATURES[key]
 
 
 def check_novelty(source: str, prior: list[tuple[int, str]], threshold: float = 0.95, exact_top: int = 5) -> NoveltyVerdict:
     """`prior` is a list of (candidate_id, raw_source) for everything already proposed.
 
-    quick_ratio() is a cheap upper bound on ratio(), so the exact (slow) ratio is only computed for
-    the `exact_top` closest candidates by that bound (and any whose bound reaches the threshold),
-    which keeps the gate fast with hundreds of priors.
+    Similarity is difflib's ratio over *token* sequences of the normalised sources (character-level
+    matching is ~100x slower on multi-KB solvers). The token-multiset overlap is a cheap upper
+    bound on that ratio, so the exact ratio is only computed for the `exact_top` closest candidates
+    by the bound (and any whose bound reaches the threshold).
     """
-    norm = _normalized(source)
+    norm, toks, counts = _features(source)
     fp = hashlib.sha1(norm.encode()).hexdigest()[:12]
     bounds = []
     for cid, src in prior:
-        other = _normalized(src)
+        other, otoks, ocounts = _features(src)
         if other == norm:
             return NoveltyVerdict(fp, 1.0, cid, True)
-        bounds.append((difflib.SequenceMatcher(None, norm, other, autojunk=False).quick_ratio(), cid, other))
+        bounds.append((2 * sum((counts & ocounts).values()) / max(len(toks) + len(otoks), 1), cid, otoks))
     bounds.sort(key=lambda b: -b[0])
     best_sim, best_id = 0.0, None
-    for i, (bound, cid, other) in enumerate(bounds):
+    for i, (bound, cid, otoks) in enumerate(bounds):
         if bound <= best_sim or (i >= exact_top and bound < threshold):
             break
-        sim = similarity(norm, other)
+        sim = difflib.SequenceMatcher(None, toks, otoks, autojunk=False).ratio()
         if sim > best_sim:
             best_sim, best_id = sim, cid
     return NoveltyVerdict(fp, best_sim, best_id, best_sim >= threshold)

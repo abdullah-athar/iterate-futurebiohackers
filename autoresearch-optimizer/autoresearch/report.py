@@ -112,6 +112,16 @@ def render(run: ResearchRun, holdout: bool = False, holdout_front: bool = False)
                 best_so_far = min(best_so_far, e.objective)
         hyp = e.hypothesis.replace("|", "/")[:110]
         out.append(f"| {e.id} | {','.join(map(str, e.parent_ids)) or '-'} | {e.mode} | {e.status} | {e.verdict or '-'} | {_obj(e)} | {delta} | {e.tokens} | {hyp} |")
+    classical = run.baselines()
+    if classical:
+        split = run.problem.objective_split
+        out += ["", "## Classical baselines (non-agent solvers, same CPU budget)", "",
+                f"| solver | {split} | Δ vs agents' best | holdout |", "|---|---|---|---|"]
+        for name, r in sorted(classical.items(), key=lambda kv: kv[1][split].score):
+            v, h = r[split], r.get("holdout")
+            gap = "" if not best else f"{100 * (v.score - best.objective) / max(v.score, 1):+.1f}% worse" if v.ok else "-"
+            out.append(f"| {name} | {'fail' if not v.ok else f'{v.score:g}'} | {gap} | "
+                       f"{'-' if h is None else ('fail' if not h.ok else f'{h.score:g}')} |")
     out += ["", "## Pareto front (best on at least one instance)", "",
             "| # | objective | wins on instances | hypothesis |", "|---|---|---|---|"]
     for e in archive.front:
