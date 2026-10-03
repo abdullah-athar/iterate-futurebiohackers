@@ -83,6 +83,24 @@ DEFAULTS = {
     # Diagnostic (off by default): count training steps whose loss was not finite on the
     # device and print "NONFINITE_LOSSES n" to stderr after train. One sync per trial.
     "count_nonfinite": False,
+    # Finish without augmentation (off at 0): the last aug_off_last epochs of example
+    # progress train on center crops without translation, color jitter or cutout; the
+    # alternating flip stays. Same shapes and layouts as the augmented batches, so no new
+    # compiled graph. Must be in [0, epochs).
+    "aug_off_last": 0.0,
+    # Progressive depth (off at 0): while progress < skip_residual_until the listed groups
+    # (indices 0/1/2, non-empty exactly when the fraction is > 0) run conv1 -> pool -> norm1
+    # -> act only, skipping conv2/conv3 and the residual add. The skip phase has its own
+    # forward+loss graph per shape, compiled in skip_compile mode ("default", "reduce-overhead",
+    # "max-autotune", "max-autotune-no-cudagraphs"; "" runs it eagerly) to keep the cold build
+    # short.
+    "skip_residual_until": 0.0,
+    "skip_residual_groups": [],
+    "skip_compile": "default",
+    # Label-smoothing schedule (off at null): linearly from label_smoothing to this value in
+    # [0, 1) over example progress. The value is a 0-dim device tensor input of the compiled
+    # graph, so the schedule adds no graph; null keeps F.cross_entropy at label_smoothing.
+    "label_smoothing_end": None,
 }
 
 
@@ -143,9 +161,11 @@ class ConvGroup(nn.Module):
         self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
         self.act = act
 
-    def forward(self, x):
+    def forward(self, x, skip: bool = False):
         x = self.conv1(self.pool(x)) if self.pool_first else self.pool(self.conv1(x))
         x = self.norm1.activate(x, self.act)
+        if skip:  # progressive depth: conv2/conv3 and the residual add are left out
+            return x
         if self.conv3 is None:
             return self.norm2.activate(self.conv2(x), self.act)
         x0 = x
@@ -184,6 +204,7 @@ class Net(nn.Module):
         self.scaling_factor = hyp["scaling_factor"]
         self.muon_head = hyp["optimizer"] == "muon"
         self.global_pool = hyp["global_pool"]
+        self.skip_groups = tuple(hyp["skip_residual_groups"])
 
     def reset(self):
         for m in self.modules():
@@ -205,11 +226,15 @@ class Net(nn.Module):
         )
         self.whiten.weight.copy_(torch.cat((scaled, -scaled)))
 
-    def forward(self, x, whiten_bias_grad: bool = True):
+    def forward(self, x, whiten_bias_grad: bool = True, skip: bool = False):
         b = self.whiten.bias
         b = b if whiten_bias_grad else b.detach()
         x = self.act(F.conv2d(x, self.whiten.weight, b, stride=self.whiten_stride))
-        x = self.layers(x)
+        if skip:  # progressive depth: the groups in skip_residual_groups run shallow
+            for index, group in enumerate(self.layers):
+                x = group(x, index in self.skip_groups)
+        else:
+            x = self.layers(x)
         if self.global_pool == "adaptive":
             x = F.adaptive_max_pool2d(x, 1).flatten(1)
         elif self.global_pool == "amax":
@@ -366,6 +391,38 @@ def indexed_crop(images, crop_size):
     return images.permute(0, 2, 3, 1)[batch, rows, cols].permute(0, 3, 1, 2)
 
 
+def center_crop(source, size, hyp):
+    """The un-augmented view: the original image inside its reflect-padded source.
+
+    Copied into the layout the augmented batches have (channels-last from the indexed and
+    Triton crops; NCHW after cutout or masked crops), so the static-shape graphs see the
+    strides they were compiled for and nothing recompiles in train.
+    """
+    t = hyp["translate"]
+    view = source[:, :, t : t + size, t : t + size] if t else source
+    if hyp["cutout"] or (hyp["crop_mode"] == "masked" and t):
+        return view.contiguous()
+    return view.contiguous(memory_format=torch.channels_last)
+
+
+#############################################
+#                   Loss                    #
+#############################################
+
+
+def smoothed_cross_entropy(outputs, labels, eps):
+    """Summed cross-entropy with the label smoothing eps given as a 0-dim tensor.
+
+    Equals F.cross_entropy(reduction="sum", label_smoothing=eps) for a scalar eps (about
+    1e-7 relative in float32, value and gradient); the tensor keeps a smoothing schedule
+    out of the compiled graph.
+    """
+    logp = F.log_softmax(outputs.float(), 1)
+    nll = -logp.gather(1, labels[:, None]).squeeze(1)
+    smooth = -logp.mean(1)
+    return ((1 - eps) * nll + eps * smooth).sum()
+
+
 #############################################
 #                 Interface                 #
 #############################################
@@ -417,6 +474,28 @@ def build(context: BuildContext):
         raise ValueError("optimizer must be sgd or muon; color_jitter needs two ranges")
     if type(hyp["count_nonfinite"]) is not bool:
         raise ValueError("count_nonfinite must be a boolean")
+    if not 0 <= hyp["aug_off_last"] < hyp["epochs"]:
+        raise ValueError("aug_off_last must be in [0, epochs)")
+    until, groups = hyp["skip_residual_until"], hyp["skip_residual_groups"]
+    if not 0 <= until <= 1:
+        raise ValueError("skip_residual_until must be in [0, 1]")
+    if any(type(g) is not int or g not in (0, 1, 2) for g in groups) or len(set(groups)) != len(
+        groups
+    ):
+        raise ValueError("skip_residual_groups must be distinct group indices from 0, 1, 2")
+    if bool(groups) != (until > 0):
+        raise ValueError(
+            "skip_residual_groups must be non-empty exactly when skip_residual_until > 0"
+        )
+    skip_modes = ("default", "reduce-overhead", "max-autotune", "max-autotune-no-cudagraphs", "")
+    if hyp["skip_compile"] not in skip_modes:
+        raise ValueError(
+            "skip_compile must be default, reduce-overhead, max-autotune, "
+            'max-autotune-no-cudagraphs, or ""'
+        )
+    end = hyp["label_smoothing_end"]
+    if end is not None and (type(end) not in (int, float) or not 0 <= end < 1):
+        raise ValueError("label_smoothing_end must be null or a number in [0, 1)")
     device = context.device
     cuda = device.type == "cuda"
     dtype = torch.float16 if cuda else torch.float32
@@ -449,7 +528,15 @@ def build(context: BuildContext):
         else net
     )
 
+    # With a smoothing schedule the value lives on the device and is filled in place before
+    # every step: an input of the compiled graph, not a constant baked into it.
+    smoothing = None
+    if hyp["label_smoothing_end"] is not None:
+        smoothing = torch.full((), hyp["label_smoothing"], dtype=torch.float32, device=device)
+
     def loss_fn(outputs, labels):
+        if smoothing is not None:
+            return smoothed_cross_entropy(outputs, labels, smoothing)
         return F.cross_entropy(
             outputs.float(), labels, label_smoothing=hyp["label_smoothing"], reduction="sum"
         )
@@ -461,6 +548,17 @@ def build(context: BuildContext):
 
     if compiled and hyp["compile_step"]:
         forward_loss = torch.compile(forward_loss, mode=hyp["compile"], dynamic=False)
+    forward_loss_skip = None
+    if hyp["skip_residual_until"]:
+        # The progressive-depth phase gets its own graphs (one per shape and whitening flag),
+        # compiled in skip_compile mode to keep the cold build short; "" runs them eagerly.
+        def forward_loss_skip(inputs, labels, whiten_bias_grad: bool):
+            return loss_fn(net(inputs, whiten_bias_grad, True), labels)
+
+        if compiled and hyp["skip_compile"]:
+            forward_loss_skip = torch.compile(
+                forward_loss_skip, mode=hyp["skip_compile"], dynamic=False
+            )
     float_state = [t for t in net.state_dict().values() if t.is_floating_point()]
     # Bilinear 32 -> r resize as two matmuls (A x A^T); F.interpolate on 50k fp16
     # channels-last images takes about 65 ms, the matmuls about 2 ms.
@@ -478,6 +576,8 @@ def build(context: BuildContext):
         train_net=train_net,
         loss_fn=loss_fn,
         forward_loss=forward_loss,
+        forward_loss_skip=forward_loss_skip,
+        smoothing=smoothing,
         zeropower=torch.compile(newton_schulz, dynamic=False) if compiled else newton_schulz,
         classifier=Classifier(net, dtype).to(device),
         float_state=float_state,
@@ -511,14 +611,23 @@ def build(context: BuildContext):
         )
         batches = sorted({b for b, _ in hyp["batch_schedule"]} | {hyp["batch_size"]})
         resolutions = sorted({r for r, _ in hyp["resolution_schedule"]} | {32})
+        skip_warmup = _skip_warmup(hyp)
         for batch in batches:
             for resolution in resolutions:
                 state.warmup_batch, state.warmup_resolution = batch, resolution
+                state.warmup_skip = False
                 for _ in range(2):
                     prepare(state, synthetic, seed=0)
                     state.whiten_bias_steps = 3
                     _fit(state, total_steps=6)
-        del state.warmup_batch, state.warmup_resolution
+                if (batch, resolution) in skip_warmup:
+                    # Skip graphs only for the shapes and whitening flags the skip phase sees.
+                    state.warmup_skip = True
+                    for _ in range(2):
+                        prepare(state, synthetic, seed=0)
+                        state.whiten_bias_steps = skip_warmup[batch, resolution]
+                        _fit(state, total_steps=6)
+        del state.warmup_batch, state.warmup_resolution, state.warmup_skip
         state.classifier.eval()
         with torch.inference_mode():
             for size in (context.eval_batch_size, 10_000 % context.eval_batch_size, 1):
@@ -551,6 +660,8 @@ def prepare(state, data: TrainingData, seed: int) -> None:
     torch._foreach_copy_(state.ema, state.float_state)
     if hyp["count_nonfinite"]:
         state.nonfinite = torch.zeros((), dtype=torch.int64, device=device)
+    if state.smoothing is not None:
+        state.smoothing.fill_(hyp["label_smoothing"])
 
     # Alternating flip: flip a random half once, then mirror everything on odd epochs.
     images = batch_flip_lr(images)
@@ -651,6 +762,16 @@ def _fit(state, total_steps, proxy_only=False):
     total_examples = total_steps * base_batch
     warmup_frac = int(total_steps * hyp["warmup"]) / total_steps
     whiten_frac = state.whiten_bias_steps / total_steps
+    # Progressive depth and the un-augmented finish also run on example progress. The
+    # warmup fits in build force the skip phase on or off (warmup_skip) and split their
+    # steps between the augmented and the un-augmented view, so train compiles nothing.
+    skip_frac = hyp["skip_residual_until"]
+    forced_skip = getattr(state, "warmup_skip", None)
+    skipped_before = False
+    aug_until = (hyp["epochs"] - hyp["aug_off_last"]) / hyp["epochs"]  # one rounding, == k / T
+    if hyp["aug_off_last"] and hasattr(state, "warmup_resolution"):
+        aug_until = 0.5
+    smoothing_end = hyp["label_smoothing_end"]
     ema_scale = 0.95**5
     step = 0
     seen = 0
@@ -671,7 +792,7 @@ def _fit(state, total_steps, proxy_only=False):
                         )
         steps_per_epoch = len(labels) // batch_size
         images = None
-        current_resolution = None
+        current_view = None
         order = torch.randperm(len(labels), device=labels.device)
         for i in range(steps_per_epoch):
             if seen >= total_examples:
@@ -682,20 +803,27 @@ def _fit(state, total_steps, proxy_only=False):
                 resolution = next(
                     (r for r, end in hyp["resolution_schedule"] if progress < end), 32
                 )
-            if resolution != current_resolution:
+            augment = progress < aug_until
+            if (resolution, augment) != current_view:
                 source = state.small_images[resolution] if resolution < 32 else state.images
-                if state.crop_kernel is not None:
-                    images = state.crop_kernel(source, resolution, flip=epoch % 2 == 1)
+                if not augment:
+                    # The finish: center crops, mirrored on odd epochs like everything else.
+                    images = center_crop(source, resolution, hyp)
+                    if epoch % 2 == 1:
+                        images = images.flip(-1)
                 else:
-                    crop = batch_crop if hyp["crop_mode"] == "masked" else indexed_crop
-                    images = crop(source, resolution) if hyp["translate"] else source
-                if epoch % 2 == 1 and state.crop_kernel is None:
-                    images = images.flip(-1)
-                if hyp["cutout"]:
-                    images = batch_cutout(images, hyp["cutout"])
-                if any(hyp["color_jitter"]):
-                    images = color_jitter(images, *hyp["color_jitter"])
-                current_resolution = resolution
+                    if state.crop_kernel is not None:
+                        images = state.crop_kernel(source, resolution, flip=epoch % 2 == 1)
+                    else:
+                        crop = batch_crop if hyp["crop_mode"] == "masked" else indexed_crop
+                        images = crop(source, resolution) if hyp["translate"] else source
+                    if epoch % 2 == 1 and state.crop_kernel is None:
+                        images = images.flip(-1)
+                    if hyp["cutout"]:
+                        images = batch_cutout(images, hyp["cutout"])
+                    if any(hyp["color_jitter"]):
+                        images = color_jitter(images, *hyp["color_jitter"])
+                current_view = (resolution, augment)
             idx = order[i * batch_size : (i + 1) * batch_size]
             inputs, targets = images[idx], labels[idx]
             offline_main = (
@@ -733,7 +861,22 @@ def _fit(state, total_steps, proxy_only=False):
                     step += 1
                     seen += batch_size
                     continue
-            loss = state.forward_loss(inputs, targets, progress < whiten_frac)
+            if smoothing_end is not None:
+                state.smoothing.fill_(
+                    hyp["label_smoothing"] + (smoothing_end - hyp["label_smoothing"]) * progress
+                )
+            skip = forced_skip if forced_skip is not None else progress < skip_frac
+            if skipped_before and not skip:
+                # The skipped branch's parameters had no gradient so far, so the fused SGD has no
+                # momentum buffer for them yet; give them zero buffers before their first step.
+                for optimizer in optimizers:
+                    for group in optimizer.param_groups:
+                        for p in group["params"]:
+                            if optimizer.state[p].get("momentum_buffer") is None:
+                                optimizer.state[p]["momentum_buffer"] = torch.zeros_like(p)
+            skipped_before = skip
+            forward_loss = state.forward_loss_skip if skip else state.forward_loss
+            loss = forward_loss(inputs, targets, progress < whiten_frac)
             if state.nonfinite is not None:
                 state.nonfinite += (~torch.isfinite(loss.detach())).to(torch.int64)
             for optimizer in optimizers:
@@ -761,6 +904,38 @@ def _fit(state, total_steps, proxy_only=False):
         _lookahead(state, 1.0)
     if hyp["bn_recal_batches"] and not proxy_only:
         _recalibrate_bn(state)
+
+
+def _skip_warmup(hyp):
+    """The (batch, resolution) shapes the progressive-depth phase can run at, each with the
+    whiten_bias_steps the six-step warmup fit uses for it: 6 when only the trained whitening
+    bias occurs before skip_residual_until, 0 when only the frozen one, 3 for both or unsure.
+    """
+    until = hyp["skip_residual_until"]
+    if not until:
+        return {}
+
+    def windows(schedule, final, extend=0.0):
+        # [start, end) of every reachable stage on example progress, then the final value.
+        # A batch is chosen per epoch, so its stage can spill one epoch past its end.
+        start, stages = 0.0, []
+        for value, end in schedule:
+            if end > start:
+                stages.append((value, start, min(1.0, end + extend)))
+                start = end
+        stages.append((final, start, 1.0))
+        return stages
+
+    shapes = {
+        (batch, resolution)
+        for batch, b0, b1 in windows(hyp["batch_schedule"], hyp["batch_size"], 1 / hyp["epochs"])
+        for resolution, r0, r1 in windows(hyp["resolution_schedule"], 32)
+        if max(b0, r0) < min(b1, r1, until)
+    }
+    whiten_frac = hyp["whiten_bias_epochs"] / hyp["epochs"]
+    trained, frozen = whiten_frac > 0, whiten_frac < until + 0.01
+    steps = 3 if trained and frozen else 6 if trained else 0
+    return {shape: steps for shape in shapes}
 
 
 @torch.no_grad()
