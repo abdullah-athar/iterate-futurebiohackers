@@ -4,7 +4,8 @@ Settings: `swarm --agents 4 --generations 2 --eval local --max-budget-usd 1 --se
 after the other on the default `median_string` objective (`mid` tier: four DNA instances of 280–688 bp +
 one 320 aa protein) with the trusted evaluator from #20. One run per model, so differences of a few
 percent are within noise. Dashboard: [models4-haiku-sonnet-opus-1003.html](models4-haiku-sonnet-opus-1003.html)
-("Research progress" card, "vs tokens" tab for objective against tokens).
+("Research progress" card, "vs tokens" tab for objective against tokens). Quality vs efficiency view:
+[models4-comparison-1003.html](models4-comparison-1003.html), made with `scripts/compare_models.py`.
 
 | | Haiku | Sonnet | Opus |
 |---|---|---|---|
@@ -15,8 +16,8 @@ percent are within noise. Dashboard: [models4-haiku-sonnet-opus-1003.html](model
 | Agent tokens (8 sessions) | 3.22 M | **0.61 M** | 0.92 M |
 | Agent cost (Claude Code estimate) | $0.85 | **$0.54** | $1.32 |
 | Objective points gained per 1k tokens | 0.94 | **5.84** | 4.66 |
-| Objective points gained per dollar | 3,555 | **6,548** | 3,250 |
-| Wall clock | 6 min 26 s | **1 min 17 s** | 2 min 35 s |
+| Objective points gained per dollar | 3,553 | **6,599** | 3,259 |
+| Wall clock (run start to end, holdout included) | 6 min 27 s | **1 min 17 s** | 2 min 36 s |
 | Agent sessions stopped at the 180 s limit | 2 of 8 | 0 | 0 |
 
 - Opus is the only model that beats the planted reference (18,525 vs 18,787 on validate), and it keeps the
