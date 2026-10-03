@@ -118,6 +118,11 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
         refs.append(RefLine(s0.baseline, "set-median baseline", "#64748b"))
         if s0.best_known is not None:
             refs.append(RefLine(s0.best_known, "planted optimum", "#16a34a", "2 4"))
+    classical = [(name, ev[r.objective_split].score) for r in runs[:1] for name, ev in r.baselines.items()
+                 if name != "set_median" and r.objective_split in ev and ev[r.objective_split].ok]
+    if classical:
+        name, score = min(classical, key=lambda c: c[1])
+        refs.append(RefLine(score, f"best classical solver ({name})", "#b45309", "4 3"))
     axes = [
         ("evals", "evaluations (duplicates skipped by the novelty gate don't count)", ""),
         ("tokens", "cumulative agent tokens (prompt + completion)", "tokens"),
@@ -151,6 +156,28 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
         + "".join(panels)
         + "</section>"
     )
+
+
+def _baselines_card(runs: list[Run]) -> str:
+    rows = []
+    for run in runs:
+        best = run.best
+        for name, ev in sorted(run.baselines.items(), key=lambda kv: kv[1][run.objective_split].score):
+            v, h = ev.get(run.objective_split), ev.get("holdout")
+            gap = (f"{100 * (v.score - best.objective) / max(v.score, 1):+.1f}%" if best and v and v.ok else "—")
+            rows.append(f"<tr><td class='l'>{escape(run.label)}</td><td class='l'><b>{escape(name)}</b></td>"
+                        f"<td>{fmt_num(v.score) if v and v.ok else 'fail'}</td><td>{gap}</td>"
+                        f"<td>{fmt_num(h.score) if h and h.ok else '—'}</td></tr>")
+        if best:
+            hold = best.evals.get("holdout")
+            rows.append(f"<tr class='best'><td class='l'>{escape(run.label)}</td><td class='l'><b>agents' best (#{best.id})</b></td>"
+                        f"<td>{fmt_num(best.objective)}</td><td>—</td><td>{fmt_num(hold.score) if hold and hold.ok else '—'}</td></tr>")
+    if not rows:
+        return ""
+    return ("<section class='card'><h2>Classical baselines</h2><p class='lead'>Non-agent solvers from "
+            "<code>median_string/solvers</code>, scored once per run under the same CPU budget. "
+            "Δ = how much worse each is than the agents' best.</p><table><tr><th class='l'>run</th><th class='l'>solver</th>"
+            "<th>objective</th><th>Δ vs agents' best</th><th>holdout</th></tr>" + "".join(rows) + "</table></section>")
 
 
 def _scoreboard(summaries: list[Summary], colors: dict[str, str], runs: list[Run]) -> str:
@@ -360,6 +387,7 @@ def render_main(runs: list[Run], title: str) -> str:
         _kpis(summaries),
         _progress_card(runs, colors, summaries),
         _scoreboard(summaries, colors, runs),
+        _baselines_card(runs),
         _instances_card(runs, colors),
         _outcomes_card(summaries, colors),
         _trajectory_card(runs, colors),

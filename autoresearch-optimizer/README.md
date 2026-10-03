@@ -82,12 +82,22 @@ Watch it live with `just autoresearch-viz serve ...`.
 
 | Problem | Objective instances | Notes |
 | --- | --- | --- |
-| `median_string` | 5 instances, 20–43 chars, k = 10–15 | Saturated: the 16-agent swarm-1 reached 511, which no 2-edit move or 300 unbounded restarts improve |
-| `median_string_long` | four 1500 bp DNA (k = 10–20, 10–30% substitutions, 2–8% indels) + one 500 aa protein | MSA-scale; seed 29,656 vs planted 21,612, so plenty of headroom under 1000 ms |
+| `median_string` (default) | four DNA instances of 280–688 bp (k = 20–40) + one 320 aa protein (k = 15), 25–38% substitutions, 5–10% indels | The 1000 ms budget binds: a naive search leaves ~9% on the table vs 10 s. The previous 20–43-char objective was solved (every agent solver landed on 511) and is retired |
+| `median_string_long` | four 1500 bp DNA (k = 10–20, 10–30% substitutions, 2–8% indels) + one 500 aa protein | MSA-scale. long-1 (16 agents, 7 generations): seed 29,584 → 21,513 vs planted 21,612; the noisy instance still has ~1.8% headroom at 30 s |
+
+Every run also has three reference points:
+- the **set-median baseline**, which is the best input string;
+- the **seed** solver;
+- the **planted string** (`best_known`).
+
+`init` also scores the classical non-agent solvers from `median_string/solvers` (`set_median`,
+`frequency_consensus`, `template`) under the same CPU budget and writes them to `baselines.json`.
+They appear as a table in `report.md` and the dashboard, and the dashboard also draws them as a
+reference line.
 
 `median_string.metrics.levenshtein_distance` uses rapidfuzz (C++, ~0.1 ms at 1500×1500), and
 `levenshtein_editops` gives solvers optimal alignments. Pure-Python DP code is ~3000× slower and
-cannot fit the budget at 1500 bp.
+cannot fit the budget at these sizes.
 
 ### Budgets
 
