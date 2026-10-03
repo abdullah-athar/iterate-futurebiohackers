@@ -277,6 +277,8 @@ It shows:
 - a scoreboard per run, including held-out gain;
 - per-instance bars;
 - the outcome mix of all proposals;
+- the idea lineage: every proposal as a node in a parent → child graph by generation, coloured by outcome, verdict or mode,
+  with the path to the final best highlighted (seed hidden by default, so independent lines of attack form separate trees);
 - the trajectory, with each proposal's verdict.
 
 ```sh
