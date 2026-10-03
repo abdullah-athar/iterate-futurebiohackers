@@ -8,7 +8,7 @@ runs at 31x31 and 15x15, where each channel costs 4-16x more than in the later
 groups and cuDNN reaches only 23-34% of A100 peak; the capacity sits in the last
 group, which runs at 3x3 at 78-89% of peak.
 
-Training: 9 epochs at batch 1024, Nesterov SGD (lr 11.5, weight decay 0.017 per 1024
+Training: 9.5 epochs at batch 1024, Nesterov SGD (lr 11.5, weight decay 0.017 per 1024
 examples, momentum 0.85, BatchNorm-bias lr 32x), label smoothing 0.25, logit scale
 1.25/9, BatchNorm momentum 0.5, lookahead weight average. The first half of the steps
 trains on 28x28 bilinear downsamples of the images (0.77x the FLOPs), the second half
@@ -33,6 +33,23 @@ Implementation details that change the time but not the model:
   resize is two matmuls instead of `F.interpolate` (65 ms on fp16 channels-last).
 
 ## Development results
+
+Confirmation runs for the submitted 9.5-epoch defaults (3 October): 40 trials per seed set, the
+75% target enforced, cold `build`, Modal NVIDIA A100-SXM4-80GB at the 400 W power limit.
+
+| Seeds | Recipe | Mean accuracy | Min / max trial | Mean preparation + training | Cold build | Qualified |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| 0-39 | **9.5 epochs (submitted defaults)** | **75.28% (sd 0.24)** | 74.71% / 75.85% | **4.96 s** (sd 0.01) | 196 s | yes |
+| 40-79 | **9.5 epochs (submitted defaults)** | **75.32% (sd 0.29)** | 74.79% / 76.02% | **4.94 s** (sd 0.01) | 259 s | yes |
+| 0-39 | 9.0 epochs (previous defaults) | 75.12% (sd 0.26) | | 4.72 s (sd 0.01) | 193 s | yes |
+
+The 9.5-epoch defaults trade 0.24 s for about 0.2 points of margin over the 75% target. At 9
+epochs the 40-seed mean sat within a few standard errors of the target (the previous estimate
+below is a 10% chance of a 40-seed draw falling short); the two 40-seed sets above both clear an
+internal floor of 75.15%. Under an emulated four-CPU container quota (the official judging
+limit) the cold build of the 9-epoch graphs, which this recipe shares, took 255 s.
+
+Earlier results for the 9-epoch recipe:
 
 Each row pair ran back to back in one Modal A100-SXM4-80GB container on the same 40
 random seeds (drawn like the organizer seed file), 75% target enforced. Seed sets
