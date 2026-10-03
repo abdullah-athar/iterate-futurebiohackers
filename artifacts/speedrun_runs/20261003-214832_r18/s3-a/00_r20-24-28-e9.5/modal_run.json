@@ -1,0 +1,46 @@
+{
+  "returncode": 1,
+  "wall_seconds": 158.9,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T204927Z-4240e27a",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[20, 0.15], [24, 0.35], [28, 0.55]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "r20-24-28-e9.5",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[20, 0.15], [24, 0.35], [28, 0.55]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[20, 0.15], [24, 0.35], [28, 0.55]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          20,
+          0.15
+        ],
+        [
+          24,
+          0.35
+        ],
+        [
+          28,
+          0.55
+        ]
+      ],
+      "epochs": 9.5
+    },
+    "hypothesis": "three-stage 20/24/28 (4.05 s, -0.20 pp at 9 ep) with half an epoch back (NB: four resolutions = 8 graphs, cold build under 4 CPUs likely > 400 s)",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 9.5, \"resolution_schedule\": [[20, 0.15], [24, 0.35], [28, 0.55]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

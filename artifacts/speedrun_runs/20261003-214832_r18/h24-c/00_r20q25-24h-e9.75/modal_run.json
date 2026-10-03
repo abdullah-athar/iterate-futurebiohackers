@@ -1,0 +1,42 @@
+{
+  "returncode": 1,
+  "wall_seconds": 81.1,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T204910Z-8eea6b3f",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 9.75, \"resolution_schedule\": [[20, 0.25], [24, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "r20q25-24h-e9.75",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 9.75, \"resolution_schedule\": [[20, 0.25], [24, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 9.75, \"resolution_schedule\": [[20, 0.25], [24, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          20,
+          0.25
+        ],
+        [
+          24,
+          0.5
+        ]
+      ],
+      "epochs": 9.75
+    },
+    "hypothesis": "20 px first quarter, 24 px to the half, then 32, with 0.75 epoch back (three resolutions, 339 s class cold build)",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 9.75, \"resolution_schedule\": [[20, 0.25], [24, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
