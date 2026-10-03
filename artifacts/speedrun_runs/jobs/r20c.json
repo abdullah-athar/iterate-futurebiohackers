@@ -1,0 +1,30 @@
+{
+  "round": "r20",
+  "n": 8,
+  "seed": 0,
+  "control": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25},
+  "jobs": [
+    {
+      "name": "head-a",
+      "control_index": 1,
+      "variants": [
+        {"label": "A-pool-maxmean-cat", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25, "global_pool": "maxmean_cat"},
+         "hypothesis": "head: global max and mean pooling concatenated (1536 -> 100 linear); backbone unchanged"},
+        {"label": "A-pool-maxmean-sum", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25, "global_pool": "maxmean_sum"},
+         "hypothesis": "head: global max plus mean pooling summed (768 -> 100 linear)"},
+        {"label": "A-learned-scale", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25, "learned_scale": true},
+         "hypothesis": "head: a single trainable logit scale initialised at 1.25/9 (reset in prepare, no weight decay)"}
+      ]
+    },
+    {
+      "name": "head-b",
+      "control_index": 1,
+      "variants": [
+        {"label": "A-head-bias", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25, "head_bias": true},
+         "hypothesis": "head: linear layer with a bias"},
+        {"label": "A-head-bias-learned-scale", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25, "head_bias": true, "learned_scale": true},
+         "hypothesis": "head: bias and learned scale together"}
+      ]
+    }
+  ]
+}
