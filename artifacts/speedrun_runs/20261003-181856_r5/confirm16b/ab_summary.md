@@ -1,0 +1,10 @@
+# r5/confirm16b
+
+2026-10-03 18:28, NVIDIA A100-SXM4-80GB @ 400.00 W (task ta-01M41CDN5V9QRQR6YR6K3BVZCR, CLOUD_PROVIDER_AWS/us-west), one container, sequential, 16 trial(s) per run, seeds from 0, warm compile cache, k = 1.0, container wall 535.7 s. GPU guard attempts: ['NVIDIA A100 80GB PCIe @ 300.00 W [task ta-01M41CDAF0S6PHFWDP03N261FR CLOUD_PROVIDER_AZURE/uk]', 'NVIDIA A100 80GB PCIe @ 300.00 W [task ta-01M41CDFVSF15TD9TSPANH5M9R CLOUD_PROVIDER_AZURE/eu-south]', 'NVIDIA A100-SXM4-80GB @ 400.00 W [task ta-01M41CDN5V9QRQR6YR6K3BVZCR CLOUD_PROVIDER_AWS/us-west]'].
+
+| variant | params | n | mean acc % | std | paired dacc pp +- SE | mean prep+train s | dtime s | dtime_adj s | build s | nonfinite | GPU @ power | verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| S7-res24s0.25-e9.0 | `{"bias_scaler": 32.0, "bn_momentum": 0.7, "epochs": 9.0, "jitter": 0.3, "label_smoothing": 0.25, "lr": 10.8, "resolution_switch": 0.25, "scaling_factor": 0.1388888888888889, "train_resolution": 24}` | 16/16 | 75.39 | 0.18 | +0.48 +- 0.08 | 5.86 | -0.22 | -0.71 | 27.41 (warm) | 0 | NVIDIA A100-SXM4-80GB @ 400.00 W | QUALIFIED (>= 75%) |
+| control | `{}` | 16/16 | 74.91 | 0.25 | control | 6.08 | control | control | 17.21 (warm) | 0 | NVIDIA A100-SXM4-80GB @ 400.00 W | BELOW 75% |
+| S7-res24s0.25-e8.75 | `{"bias_scaler": 32.0, "bn_momentum": 0.7, "epochs": 8.75, "jitter": 0.3, "label_smoothing": 0.25, "lr": 10.8, "resolution_switch": 0.25, "scaling_factor": 0.1388888888888889, "train_resolution": 24}` | 16/16 | 75.34 | 0.25 | +0.43 +- 0.07 | 5.70 | -0.38 | -0.81 | 25.84 (warm) | 0 | NVIDIA A100-SXM4-80GB @ 400.00 W | QUALIFIED (>= 75%) |
+| S7-res24s0.25-e9.25 | `{"bias_scaler": 32.0, "bn_momentum": 0.7, "epochs": 9.25, "jitter": 0.3, "label_smoothing": 0.25, "lr": 10.8, "resolution_switch": 0.25, "scaling_factor": 0.1388888888888889, "train_resolution": 24}` | 16/16 | 75.49 | 0.24 | +0.58 +- 0.09 | 6.02 | -0.06 | -0.64 | 25.33 (warm) | 0 | NVIDIA A100-SXM4-80GB @ 400.00 W | QUALIFIED (>= 75%) |
