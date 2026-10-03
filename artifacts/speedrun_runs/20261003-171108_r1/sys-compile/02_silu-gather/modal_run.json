@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 107.0,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T163739Z-39f7e6d8",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"activation\": \"silu\", \"count_nonfinite\": true, \"crop_gather\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "silu-gather",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"activation\": \"silu\", \"count_nonfinite\": true, \"crop_gather\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"activation\": \"silu\", \"count_nonfinite\": true, \"crop_gather\": true}",
+    "delta": {
+      "activation": "silu",
+      "crop_gather": true
+    },
+    "hypothesis": "cheap-swaps bundle: SiLU plus the sync-free vectorised crop",
+    "config": "futurebiohackers {\"activation\": \"silu\", \"crop_gather\": true}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

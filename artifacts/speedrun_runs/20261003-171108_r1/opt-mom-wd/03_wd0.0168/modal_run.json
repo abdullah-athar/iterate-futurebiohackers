@@ -1,0 +1,31 @@
+{
+  "returncode": 0,
+  "wall_seconds": 93.6,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T162230Z-878d732e",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"weight_decay\": 0.0168}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "wd0.0168",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"weight_decay\": 0.0168}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"weight_decay\": 0.0168}",
+    "delta": {
+      "weight_decay": 0.0168
+    },
+    "hypothesis": "wd x1.4: stronger regularisation; with lookahead EMA may improve generalisation",
+    "config": "futurebiohackers {\"weight_decay\": 0.0168}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

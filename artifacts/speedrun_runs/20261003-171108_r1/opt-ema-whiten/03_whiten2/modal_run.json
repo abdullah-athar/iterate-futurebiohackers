@@ -1,0 +1,31 @@
+{
+  "returncode": 0,
+  "wall_seconds": 84.0,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T163152Z-f66500d9",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"whiten_bias_epochs\": 2}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "whiten2",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"whiten_bias_epochs\": 2}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"whiten_bias_epochs\": 2}",
+    "delta": {
+      "whiten_bias_epochs": 2
+    },
+    "hypothesis": "freeze the whitening bias earlier: the bias-grad graph runs fewer steps",
+    "config": "futurebiohackers {\"whiten_bias_epochs\": 2}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

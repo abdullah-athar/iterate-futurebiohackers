@@ -1,0 +1,31 @@
+{
+  "returncode": 0,
+  "wall_seconds": 96.1,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T162915Z-6ef9df62",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"bias_scaler\": 32.0, \"count_nonfinite\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "bias32",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"bias_scaler\": 32.0, \"count_nonfinite\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"bias_scaler\": 32.0, \"count_nonfinite\": true}",
+    "delta": {
+      "bias_scaler": 32.0
+    },
+    "hypothesis": "BN biases learn too fast at 64x",
+    "config": "futurebiohackers {\"bias_scaler\": 32.0}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

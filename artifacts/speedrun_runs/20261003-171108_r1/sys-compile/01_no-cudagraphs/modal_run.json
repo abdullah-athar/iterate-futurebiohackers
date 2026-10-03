@@ -1,0 +1,31 @@
+{
+  "returncode": 0,
+  "wall_seconds": 116.3,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T163542Z-6da7946b",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"compile\": \"max-autotune-no-cudagraphs\", \"count_nonfinite\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "no-cudagraphs",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"compile\": \"max-autotune-no-cudagraphs\", \"count_nonfinite\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"compile\": \"max-autotune-no-cudagraphs\", \"count_nonfinite\": true}",
+    "delta": {
+      "compile": "max-autotune-no-cudagraphs"
+    },
+    "hypothesis": "cheaper build; measures what CUDA graphs are worth per step",
+    "config": "futurebiohackers {\"compile\": \"max-autotune-no-cudagraphs\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

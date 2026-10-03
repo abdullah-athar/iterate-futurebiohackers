@@ -1,0 +1,31 @@
+{
+  "returncode": 0,
+  "wall_seconds": 85.7,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T161814Z-2bb45c71",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"translate\": 1}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "translate1",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"translate\": 1}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"translate\": 1}",
+    "delta": {
+      "translate": 1
+    },
+    "hypothesis": "less translation = less regularisation, closer fit in few epochs; also 9 instead of 25 crop masks",
+    "config": "futurebiohackers {\"translate\": 1}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

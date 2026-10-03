@@ -1,0 +1,31 @@
+{
+  "returncode": 0,
+  "wall_seconds": 192.8,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T163535Z-45d98a5d",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"batch_size\": 768, \"count_nonfinite\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "bs768",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"batch_size\": 768, \"count_nonfinite\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"batch_size\": 768, \"count_nonfinite\": true}",
+    "delta": {
+      "batch_size": 768
+    },
+    "hypothesis": "smaller batch = more steps per epoch; the sum loss keeps the airbench lr/wd scaling; maybe better accuracy per epoch",
+    "config": "futurebiohackers {\"batch_size\": 768}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

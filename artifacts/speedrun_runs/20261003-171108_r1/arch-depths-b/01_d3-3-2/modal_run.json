@@ -1,0 +1,35 @@
+{
+  "returncode": 1,
+  "wall_seconds": 130.7,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T161920Z-a1d3a164",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"depths\": [3, 3, 2]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "d3-3-2",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"depths\": [3, 3, 2]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"depths\": [3, 3, 2]}",
+    "delta": {
+      "depths": [
+        3,
+        3,
+        2
+      ]
+    },
+    "hypothesis": "drop the residual pair in group 3 (cheapest group): small saving, tests depth sensitivity",
+    "config": "futurebiohackers {\"depths\": [3, 3, 2]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

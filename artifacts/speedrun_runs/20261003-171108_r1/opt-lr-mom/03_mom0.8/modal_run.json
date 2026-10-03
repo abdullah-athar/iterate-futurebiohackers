@@ -1,0 +1,31 @@
+{
+  "returncode": 0,
+  "wall_seconds": 84.3,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T162104Z-7e6fcb9d",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"momentum\": 0.8}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "mom0.8",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"momentum\": 0.8}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"momentum\": 0.8}",
+    "delta": {
+      "momentum": 0.8
+    },
+    "hypothesis": "lower momentum (lr is decoupled, so this changes the effective step too)",
+    "config": "futurebiohackers {\"momentum\": 0.8}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

@@ -1,0 +1,371 @@
+{
+  "round": "r1",
+  "job": "arch-depths-a",
+  "environment": {
+    "task_id": "ta-01M418V8GVEND2Z5NY2MHX2Q4R",
+    "hostname": "modal",
+    "region": "us-east",
+    "cloud": "CLOUD_PROVIDER_AWS",
+    "cpu_count": 20,
+    "gpu_name": "NVIDIA A100-SXM4-80GB",
+    "gpu_memory": "81920 MiB",
+    "gpu_power_limit": "400.00 W",
+    "driver": "580.95.05",
+    "mig": "Disabled"
+  },
+  "gpu_attempts": [
+    "NVIDIA A100 80GB PCIe @ 300.00 W [task ta-01M418QHJTJXMRK51BEQEBG0ZR CLOUD_PROVIDER_AZURE/eu-west]",
+    "NVIDIA A100 80GB PCIe @ 300.00 W [task ta-01M418RHA1YVFN0556PHJQAXVR CLOUD_PROVIDER_UNSPECIFIED/us-east]",
+    "NVIDIA A100-SXM4-80GB @ 400.00 W [task ta-01M418V8GVEND2Z5NY2MHX2Q4R CLOUD_PROVIDER_AWS/us-east]"
+  ],
+  "container_seconds": 322.1,
+  "rows": [
+    {
+      "label": "control",
+      "params": "{\"count_nonfinite\": true}",
+      "delta": {},
+      "hypothesis": "control",
+      "config": "futurebiohackers {}",
+      "returncode": 0,
+      "folder": "artifacts/speedrun_runs/20261003-171108_r1/arch-depths-a/00_control",
+      "gpu": "NVIDIA A100-SXM4-80GB",
+      "power_limit": "400.00 W",
+      "task_id": "ta-01M418V8GVEND2Z5NY2MHX2Q4R",
+      "region": "us-east",
+      "cloud": "CLOUD_PROVIDER_AWS",
+      "container_wall": 88.2,
+      "deadline_hit": false,
+      "nonfinite": 0,
+      "build_mode": "warm",
+      "complete": true,
+      "qualified": true,
+      "run_error": null,
+      "n": 8,
+      "trials_ok": 8,
+      "mean_acc": 0.7512625,
+      "acc_std": 0.002197360429502389,
+      "mean_time": 7.394640856125001,
+      "time_std": 0.02376658501666146,
+      "mean_eval": 0.1109601583750024,
+      "build_time": 17.033517267,
+      "mean_prepare": 0.11037279250000154,
+      "mean_train": 7.2842680636249995,
+      "by_trial": {
+        "0": [
+          0.749,
+          7.402871037000004
+        ],
+        "1": [
+          0.7478,
+          7.358088590999991
+        ],
+        "2": [
+          0.7493,
+          7.364568039000005
+        ],
+        "3": [
+          0.7522,
+          7.3837683269999985
+        ],
+        "4": [
+          0.7536,
+          7.403714087999987
+        ],
+        "5": [
+          0.7527,
+          7.407706119000011
+        ],
+        "6": [
+          0.7528,
+          7.4091507440000015
+        ],
+        "7": [
+          0.7527,
+          7.42725990400001
+        ]
+      },
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "accs": [
+        0.749,
+        0.7478,
+        0.7493,
+        0.7522,
+        0.7536,
+        0.7527,
+        0.7528,
+        0.7527
+      ],
+      "times": [
+        7.402871037000004,
+        7.358088590999991,
+        7.364568039000005,
+        7.3837683269999985,
+        7.403714087999987,
+        7.407706119000011,
+        7.4091507440000015,
+        7.42725990400001
+      ],
+      "evals": [
+        0.1207616100000024,
+        0.1027054660000033,
+        0.10681123900000955,
+        0.11075623600000029,
+        0.11144756800000266,
+        0.10964414900000463,
+        0.11371034399999758,
+        0.11184465499999874
+      ],
+      "verdict": "QUALIFIED (>= 75%)"
+    },
+    {
+      "label": "d2-3-3",
+      "params": "{\"count_nonfinite\": true, \"depths\": [2, 3, 3]}",
+      "delta": {
+        "depths": [
+          2,
+          3,
+          3
+        ]
+      },
+      "hypothesis": "drop the residual pair in group 1 (largest spatial map): saves ~1/3 of group 1 time",
+      "config": "futurebiohackers {\"depths\": [2, 3, 3]}",
+      "returncode": 1,
+      "folder": "artifacts/speedrun_runs/20261003-171108_r1/arch-depths-a/01_d2-3-3",
+      "gpu": "NVIDIA A100-SXM4-80GB",
+      "power_limit": "400.00 W",
+      "task_id": "ta-01M418V8GVEND2Z5NY2MHX2Q4R",
+      "region": "us-east",
+      "cloud": "CLOUD_PROVIDER_AWS",
+      "container_wall": 103.5,
+      "deadline_hit": false,
+      "nonfinite": 0,
+      "build_mode": "warm",
+      "complete": true,
+      "qualified": false,
+      "run_error": null,
+      "n": 8,
+      "trials_ok": 8,
+      "mean_acc": 0.749575,
+      "acc_std": 0.002407577324080883,
+      "mean_time": 6.804807264749993,
+      "time_std": 0.01972197312939184,
+      "mean_eval": 0.10710995100000176,
+      "build_time": 38.156796234,
+      "mean_prepare": 0.1040757732499955,
+      "mean_train": 6.700731491499997,
+      "by_trial": {
+        "0": [
+          0.7498,
+          6.836094392000007
+        ],
+        "1": [
+          0.7475,
+          6.781565670999981
+        ],
+        "2": [
+          0.746,
+          6.7835982539999975
+        ],
+        "3": [
+          0.7513,
+          6.791548830000011
+        ],
+        "4": [
+          0.7483,
+          6.7977455499999735
+        ],
+        "5": [
+          0.7513,
+          6.807450177999982
+        ],
+        "6": [
+          0.7535,
+          6.815452597000018
+        ],
+        "7": [
+          0.7489,
+          6.825002645999973
+        ]
+      },
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "accs": [
+        0.7498,
+        0.7475,
+        0.746,
+        0.7513,
+        0.7483,
+        0.7513,
+        0.7535,
+        0.7489
+      ],
+      "times": [
+        6.836094392000007,
+        6.781565670999981,
+        6.7835982539999975,
+        6.791548830000011,
+        6.7977455499999735,
+        6.807450177999982,
+        6.815452597000018,
+        6.825002645999973
+      ],
+      "evals": [
+        0.1146498350000229,
+        0.10549669399998152,
+        0.10016968700000461,
+        0.10485669600001302,
+        0.1109532639999884,
+        0.10522029499998098,
+        0.11151239800000212,
+        0.10402073900002051
+      ],
+      "verdict": "BELOW 75%",
+      "paired": {
+        "pairs": 8,
+        "dacc": -0.0016875000000000223,
+        "dacc_se": 0.0007863653958016543,
+        "dtime": -0.5898335913750081,
+        "dtime_se": 0.004875779268457773
+      },
+      "dtime_adj": -0.21062010822893568
+    },
+    {
+      "label": "d3-2-3",
+      "params": "{\"count_nonfinite\": true, \"depths\": [3, 2, 3]}",
+      "delta": {
+        "depths": [
+          3,
+          2,
+          3
+        ]
+      },
+      "hypothesis": "drop the residual pair in group 2 (40% of time)",
+      "config": "futurebiohackers {\"depths\": [3, 2, 3]}",
+      "returncode": 0,
+      "folder": "artifacts/speedrun_runs/20261003-171108_r1/arch-depths-a/02_d3-2-3",
+      "gpu": "NVIDIA A100-SXM4-80GB",
+      "power_limit": "400.00 W",
+      "task_id": "ta-01M418V8GVEND2Z5NY2MHX2Q4R",
+      "region": "us-east",
+      "cloud": "CLOUD_PROVIDER_AWS",
+      "container_wall": 102.9,
+      "deadline_hit": false,
+      "nonfinite": 0,
+      "build_mode": "warm",
+      "complete": true,
+      "qualified": true,
+      "run_error": null,
+      "n": 8,
+      "trials_ok": 8,
+      "mean_acc": 0.750125,
+      "acc_std": 0.0022397385051448754,
+      "mean_time": 6.527809742500004,
+      "time_std": 0.01797013623529335,
+      "mean_eval": 0.1031079932500063,
+      "build_time": 40.079749623,
+      "mean_prepare": 0.09999531375001425,
+      "mean_train": 6.42781442874999,
+      "by_trial": {
+        "0": [
+          0.7537,
+          6.567872037000029
+        ],
+        "1": [
+          0.7513,
+          6.510990431999971
+        ],
+        "2": [
+          0.7494,
+          6.515282649000028
+        ],
+        "3": [
+          0.751,
+          6.518431776999989
+        ],
+        "4": [
+          0.7491,
+          6.520521798999994
+        ],
+        "5": [
+          0.7518,
+          6.535360332999971
+        ],
+        "6": [
+          0.7469,
+          6.529866305000041
+        ],
+        "7": [
+          0.7478,
+          6.5241526080000085
+        ]
+      },
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "accs": [
+        0.7537,
+        0.7513,
+        0.7494,
+        0.751,
+        0.7491,
+        0.7518,
+        0.7469,
+        0.7478
+      ],
+      "times": [
+        6.567872037000029,
+        6.510990431999971,
+        6.515282649000028,
+        6.518431776999989,
+        6.520521798999994,
+        6.535360332999971,
+        6.529866305000041,
+        6.5241526080000085
+      ],
+      "evals": [
+        0.11271661200004246,
+        0.09808318499995039,
+        0.10050540800000363,
+        0.10189385199998924,
+        0.10366694399999687,
+        0.09738806000001432,
+        0.10604816500000425,
+        0.10456172000004926
+      ],
+      "verdict": "QUALIFIED (>= 75%)",
+      "paired": {
+        "pairs": 8,
+        "dacc": -0.0011375000000000135,
+        "dacc_se": 0.0013713832302772718,
+        "dtime": -0.8668311136249969,
+        "dtime_se": 0.007885231998667318
+      },
+      "dtime_adj": -0.611213136096904
+    }
+  ],
+  "profile": null
+}

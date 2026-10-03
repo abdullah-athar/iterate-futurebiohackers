@@ -1,0 +1,31 @@
+{
+  "returncode": 0,
+  "wall_seconds": 86.1,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T162107Z-d6e0db79",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"jitter\": 0.3}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "jitter0.3",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"jitter\": 0.3}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"jitter\": 0.3}",
+    "delta": {
+      "jitter": 0.3
+    },
+    "hypothesis": "strong photometric jitter; may hurt at 8.5 epochs (under-training)",
+    "config": "futurebiohackers {\"jitter\": 0.3}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

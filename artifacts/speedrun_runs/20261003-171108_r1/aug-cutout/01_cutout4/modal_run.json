@@ -1,0 +1,31 @@
+{
+  "returncode": 0,
+  "wall_seconds": 74.1,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T161917Z-74ab85c0",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"cutout\": 4}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "cutout4",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"cutout\": 4}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"cutout\": 4}",
+    "delta": {
+      "cutout": 4
+    },
+    "hypothesis": "small cutout as extra regularisation (airbench96 uses cutout at long schedules)",
+    "config": "futurebiohackers {\"cutout\": 4}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

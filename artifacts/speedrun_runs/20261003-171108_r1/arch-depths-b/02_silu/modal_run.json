@@ -1,0 +1,31 @@
+{
+  "returncode": 1,
+  "wall_seconds": 148.1,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T162138Z-b98fddc9",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"activation\": \"silu\", \"count_nonfinite\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "silu",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"activation\": \"silu\", \"count_nonfinite\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"activation\": \"silu\", \"count_nonfinite\": true}",
+    "delta": {
+      "activation": "silu"
+    },
+    "hypothesis": "SiLU is cheaper than erf-GELU and often equal in accuracy at short schedules",
+    "config": "futurebiohackers {\"activation\": \"silu\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

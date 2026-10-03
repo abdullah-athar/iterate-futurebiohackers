@@ -1,0 +1,31 @@
+{
+  "returncode": 0,
+  "wall_seconds": 94.7,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T163052Z-ebd557b9",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"bias_scaler\": 128.0, \"count_nonfinite\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "bias128",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"bias_scaler\": 128.0, \"count_nonfinite\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"bias_scaler\": 128.0, \"count_nonfinite\": true}",
+    "delta": {
+      "bias_scaler": 128.0
+    },
+    "hypothesis": "BN biases can learn faster still (airbench uses 64x on CIFAR-10)",
+    "config": "futurebiohackers {\"bias_scaler\": 128.0}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

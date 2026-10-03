@@ -1,0 +1,35 @@
+{
+  "returncode": 1,
+  "wall_seconds": 103.5,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T161836Z-c9fe62ea",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"depths\": [2, 3, 3]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "d2-3-3",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"depths\": [2, 3, 3]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"depths\": [2, 3, 3]}",
+    "delta": {
+      "depths": [
+        2,
+        3,
+        3
+      ]
+    },
+    "hypothesis": "drop the residual pair in group 1 (largest spatial map): saves ~1/3 of group 1 time",
+    "config": "futurebiohackers {\"depths\": [2, 3, 3]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

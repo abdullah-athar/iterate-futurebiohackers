@@ -1,0 +1,31 @@
+{
+  "returncode": 0,
+  "wall_seconds": 104.2,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T162900Z-31624c37",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"scaling_factor\": 0.08888888888888889}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "scale0.0889",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"scaling_factor\": 0.08888888888888889}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"scaling_factor\": 0.08888888888888889}",
+    "delta": {
+      "scaling_factor": 0.08888888888888889
+    },
+    "hypothesis": "logit scale x0.8: softer logits with label smoothing 0.3",
+    "config": "futurebiohackers {\"scaling_factor\": 0.08888888888888889}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

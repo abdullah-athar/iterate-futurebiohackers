@@ -1,0 +1,35 @@
+{
+  "returncode": 0,
+  "wall_seconds": 117.8,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T161814Z-1a1da881",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"widths\": [96, 384, 576]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "w96-384-576",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"widths\": [96, 384, 576]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"widths\": [96, 384, 576]}",
+    "delta": {
+      "widths": [
+        96,
+        384,
+        576
+      ]
+    },
+    "hypothesis": "group 1 is 36% of forward time at 31x31; narrowing it saves the most time per channel",
+    "config": "futurebiohackers {\"widths\": [96, 384, 576]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

@@ -1,0 +1,31 @@
+{
+  "returncode": 0,
+  "wall_seconds": 85.8,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T162900Z-3f2b8010",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"ema_every\": 3}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "ema3",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"ema_every\": 3}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"ema_every\": 3}",
+    "delta": {
+      "ema_every": 3
+    },
+    "hypothesis": "more frequent lookahead averaging",
+    "config": "futurebiohackers {\"ema_every\": 3}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

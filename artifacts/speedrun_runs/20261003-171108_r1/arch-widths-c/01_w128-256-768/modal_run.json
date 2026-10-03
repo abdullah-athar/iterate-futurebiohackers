@@ -1,0 +1,35 @@
+{
+  "returncode": 0,
+  "wall_seconds": 189.3,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T161920Z-5cad3dcc",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"widths\": [128, 256, 768]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "w128-256-768",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"widths\": [128, 256, 768]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"widths\": [128, 256, 768]}",
+    "delta": {
+      "widths": [
+        128,
+        256,
+        768
+      ]
+    },
+    "hypothesis": "aggressive group 2 cut compensated by group 3",
+    "config": "futurebiohackers {\"widths\": [128, 256, 768]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
