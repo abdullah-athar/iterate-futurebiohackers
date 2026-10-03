@@ -409,8 +409,13 @@ def build(context: BuildContext):
             if isinstance(m, nn.BatchNorm2d):
                 m.float()
     compiled = cuda and hyp["compile"]
+    # Static shapes: one graph per training resolution, all compiled in the warmup
+    # below. Automatic dynamic shapes would recompile mid-trial at a new size.
+    torch._dynamo.config.cache_size_limit = max(torch._dynamo.config.cache_size_limit, 32)
     train_net = (
-        torch.compile(net, mode=hyp["compile"]) if compiled and not hyp["compile_step"] else net
+        torch.compile(net, mode=hyp["compile"], dynamic=False)
+        if compiled and not hyp["compile_step"]
+        else net
     )
 
     def loss_fn(outputs, labels):
@@ -424,7 +429,7 @@ def build(context: BuildContext):
         return loss_fn(train_net(inputs, whiten_bias_grad), labels)
 
     if compiled and hyp["compile_step"]:
-        forward_loss = torch.compile(forward_loss, mode=hyp["compile"])
+        forward_loss = torch.compile(forward_loss, mode=hyp["compile"], dynamic=False)
     float_state = [t for t in net.state_dict().values() if t.is_floating_point()]
     state = SimpleNamespace(
         hyp=hyp,
