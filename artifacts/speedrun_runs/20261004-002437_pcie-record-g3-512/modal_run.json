@@ -1,0 +1,28 @@
+{
+  "returncode": 0,
+  "wall_seconds": 260.8,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T232019Z-4f7df7da",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --seed 0 --params '{\"count_nonfinite\": true}'",
+  "spec": {
+    "label": "pcie-record-g3-512",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--seed",
+      "0",
+      "--params",
+      "{\"count_nonfinite\": true}"
+    ],
+    "params": "{\"count_nonfinite\": true}",
+    "delta": {
+      "count_nonfinite": true
+    },
+    "config": "futurebiohackers --n 8 --seed 0"
+  },
+  "nonfinite": 0,
+  "build_mode": "cold"
+}
