@@ -59,6 +59,7 @@ DEFAULTS = {
     "activation": "gelu",  # or "silu"
     "bn_dtype": "float",  # or "half"
     "color_jitter": [0.0, 0.0],  # per-image brightness and contrast ranges
+    "inductor_tuning": [],  # e.g. ["coordinate_descent_tuning", "aggressive_fusion"]
     "bn_recal_batches": 0,  # re-estimate BN statistics on center crops after training
     "stem": "patch2",  # "patch2": 2x2 whitening at 31x31; "patch4s2": 4x4 stride-2 at 15x15
     "inner_kernels": [3, 3, 3],  # kernel size of conv2/conv3 in each group (1 or 3)
@@ -403,6 +404,10 @@ def build(context: BuildContext):
     import torch._inductor.config as inductor_config
 
     inductor_config.max_autotune_gemm_backends = hyp["autotune_backends"]
+    for flag in hyp["inductor_tuning"]:
+        if flag not in ("coordinate_descent_tuning", "aggressive_fusion"):
+            raise ValueError(f"Unsupported inductor_tuning flag: {flag}")
+        setattr(inductor_config, flag, True)
 
     net = Net(hyp, context.num_classes).to(device, dtype, memory_format=torch.channels_last)
     if hyp["bn_dtype"] == "float":
