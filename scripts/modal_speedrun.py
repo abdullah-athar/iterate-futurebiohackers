@@ -139,7 +139,7 @@ def _graph_count(params) -> int:
         params = json.loads(params or "{}")
     schedule = params.get("resolution_schedule")
     if schedule is None:
-        schedule = [[28, 0.5]]
+        schedule = [[24, 0.25], [28, 0.5]]  # the recipe's default since candidate B (PR #22)
     resolutions = len({r for r, _ in schedule} | {32})
     batches = 1 + len({b for b, _ in (params.get("batch_schedule") or [])})
     graphs = 2 * resolutions * batches
