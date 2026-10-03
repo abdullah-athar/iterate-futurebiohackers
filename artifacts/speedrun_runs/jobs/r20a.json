@@ -1,0 +1,18 @@
+{
+  "round": "r20",
+  "n": 8,
+  "seed": 0,
+  "control": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25},
+  "jobs": [
+    {
+      "name": "recal",
+      "control_index": 1,
+      "variants": [
+        {"label": "A-bnrecal2", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25, "bn_recal_batches": 2},
+         "hypothesis": "BatchNorm recalibration after training: no-grad train-mode pass over 2048 center-cropped training images for the final lookahead weights (timed, inside train)"},
+        {"label": "A-bnrecal5", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25, "bn_recal_batches": 5},
+         "hypothesis": "BatchNorm recalibration over 5120 training images"}
+      ]
+    }
+  ]
+}
