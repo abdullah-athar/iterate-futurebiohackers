@@ -288,7 +288,35 @@ def _fresh_suite(specs, seed_offset: int, label: str) -> list[ProblemInstance]:
     ]
 
 
-BenchmarkTier = Literal["small", "medium", "hard", "confirm", "holdout"]
+LONG_SPECS = [
+    # MSA-scale instances: 1500 bp DNA and a 500 aa protein; the Hamming case is omitted because
+    # column majority solves it exactly.
+    ("dna_1500bp_k10_low_noise", "ACGT", 1500, 10, 0.10, 0.02, "levenshtein"),
+    ("dna_1500bp_k15", "ACGT", 1500, 15, 0.20, 0.04, "levenshtein"),
+    ("dna_1500bp_k10_noisy", "ACGT", 1500, 10, 0.30, 0.08, "levenshtein"),
+    ("dna_1500bp_k20", "ACGT", 1500, 20, 0.15, 0.05, "levenshtein"),
+    ("protein_500aa_k12", "ACDEFGHIKLMNPQRSTVWY", 500, 12, 0.25, 0.04, "levenshtein"),
+]
+
+
+def get_long_suite() -> list[ProblemInstance]:
+    """Search-time objective for the long variant (fixed seeds)."""
+    return _fresh_suite(LONG_SPECS, 600, "Long instance")
+
+
+def get_long_confirm_suite() -> list[ProblemInstance]:
+    """Fresh long instances for confirmation re-tests (AUTORESEARCH_CONFIRM_SEED when set)."""
+    seed = int(os.environ.get("AUTORESEARCH_CONFIRM_SEED", 5000)) + 100
+    return _fresh_suite([("confirm_" + s[0], *s[1:]) for s in LONG_SPECS], seed, "Long confirmation instance")
+
+
+def get_long_holdout_suite() -> list[ProblemInstance]:
+    """Fresh long instances for final reporting (AUTORESEARCH_HOLDOUT_SEED when set)."""
+    seed = int(os.environ.get("AUTORESEARCH_HOLDOUT_SEED", 9000)) + 100
+    return _fresh_suite([("holdout_" + s[0], *s[1:]) for s in LONG_SPECS], seed, "Long held-out instance")
+
+
+BenchmarkTier = Literal["small", "medium", "hard", "confirm", "holdout", "long", "long_confirm", "long_holdout"]
 
 
 def get_benchmark_suite(tier: BenchmarkTier = "small") -> list[ProblemInstance]:
@@ -303,5 +331,11 @@ def get_benchmark_suite(tier: BenchmarkTier = "small") -> list[ProblemInstance]:
         return get_confirm_suite()
     elif tier == "holdout":
         return get_holdout_suite()
+    elif tier == "long":
+        return get_long_suite()
+    elif tier == "long_confirm":
+        return get_long_confirm_suite()
+    elif tier == "long_holdout":
+        return get_long_holdout_suite()
     else:
-        raise ValueError(f"Unknown benchmark tier '{tier}'. Choose from 'small', 'medium', 'hard', 'confirm', 'holdout'.")
+        raise ValueError(f"Unknown benchmark tier '{tier}'. Choose from 'small', 'medium', 'hard', 'confirm', 'holdout', 'long', 'long_confirm', 'long_holdout'.")

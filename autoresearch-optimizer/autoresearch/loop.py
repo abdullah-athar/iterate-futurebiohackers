@@ -65,7 +65,8 @@ class LoopConfig:
     novelty_threshold: float = 0.95
     max_novelty_attempts: int = 3
     exploit: float = 0.7
-    patience: int = 4          # proposals without global improvement before 'plateau'
+    patience: int = 4          # proposals without global improvement before 'plateau' (single agent)
+    patience_generations: int = 1  # swarm: whole generations without a new best before 'plateau'
     ucb_c: float = 0.8
     time_budget_ms: int = 1000  # CPU budget per instance for one solve() call
 
@@ -118,10 +119,27 @@ class ResearchRun:
                 n += 1
         return n
 
+    def generations_since_improvement(self, entries: list[Entry]) -> int:
+        gens = sorted({e.generation for e in entries if e.generation})
+        improved = {e.generation for e in entries if e.generation and e.improved_global}
+        n = 0
+        for g in reversed(gens):
+            if g in improved:
+                break
+            n += 1
+        return n
+
+    def plateau(self, entries: list[Entry]) -> bool:
+        """Swarm runs count whole generations (16 flat proposals in one generation is one data point);
+        single-agent runs count proposals."""
+        if any(e.generation for e in entries):
+            return self.generations_since_improvement(entries) >= self.config.patience_generations
+        return self.steps_since_improvement(entries) >= self.config.patience
+
     def mode_scores(self, entries: list[Entry], archive: Archive) -> dict[str, float]:
         """UCB1 score per eligible prompt mode (inf = untried). After a plateau `tune` is not eligible."""
         eligible = [m for m in MODES if m != "merge" or archive.complementary()]
-        if self.steps_since_improvement(entries) >= self.config.patience:
+        if self.plateau(entries):
             eligible = [m for m in eligible if m != "tune"] or eligible
         stats = {m: [0, 0.0] for m in MODES}
         for e in entries:
@@ -137,8 +155,7 @@ class ResearchRun:
         scores = self.mode_scores(entries, archive)
         untried = [m for m, v in scores.items() if v == math.inf]
         if untried:
-            plateau = self.steps_since_improvement(entries) >= self.config.patience
-            return untried[0] if not plateau else rng.choice(untried)
+            return untried[0] if not self.plateau(entries) else rng.choice(untried)
         return max(scores, key=scores.get)
 
     def pick_parents(self, mode: str, archive: Archive, rng: random.Random) -> list[Entry]:
