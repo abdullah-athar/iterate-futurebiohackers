@@ -1,0 +1,110 @@
+"""Tests for the autoresearch loop: novelty gate, proposal parsing, archive, mock run."""
+
+import random
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+
+repo_root = Path(__file__).resolve().parent.parent
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
+from autoresearch.archive import Archive
+from autoresearch.guard import check_imports
+from autoresearch.ledger import (
+    STATUS_KEPT,
+    STATUS_REJECTED_DUPLICATE,
+    STATUS_REJECTED_GUARD,
+    STATUS_REJECTED_SCREEN,
+    RunStore,
+)
+from autoresearch.llm import MockLLM
+from autoresearch.loop import LoopConfig, ResearchRun
+from autoresearch.novelty import check_novelty, normalize
+from autoresearch.problem import get_problem
+from autoresearch.prompts import MODES, parse_proposal
+from autoresearch.report import render
+from autoresearch.seeds import mock_proposals as mp
+
+
+def test_novelty_gate():
+    print("Testing novelty gate...")
+    seed = get_problem("median_string").seed_source()
+    dup = check_novelty(mp.SEED_DUPLICATE, [(0, seed)])
+    assert dup.is_duplicate, dup
+    assert dup.nearest_id == 0
+    fresh = check_novelty(mp.CONSENSUS_LOCAL_SEARCH, [(0, seed)])
+    assert not fresh.is_duplicate, fresh
+    # alpha-renaming of locals must not change the normalised form
+    a = normalize("def solve(instance):\n    xs = instance.strings\n    return min(xs)\n")
+    b = normalize("def solve(instance):\n    ys = instance.strings\n    return min(ys)\n")
+    assert a == b
+    print("  Novelty gate test passed!")
+
+
+def test_import_guard():
+    print("Testing import guard...")
+    allowed = ("median_string.metrics",)
+    assert check_imports("import random\nfrom median_string.metrics import sum_distance\n", allowed) == []
+    bad = check_imports("import os, subprocess\nfrom median_string.benchmarks import x\nexec('1')\n", allowed)
+    assert len(bad) == 4, bad
+    assert check_imports("def solve(instance:\n", allowed) == []  # syntax errors are the evaluator's job
+    print("  Import guard test passed!")
+
+
+def test_parse_proposal():
+    print("Testing proposal parsing...")
+    text = "HYPOTHESIS: try consensus start\n```python\ndef solve(instance):\n    return instance.strings[0]\n```\n"
+    hyp, src = parse_proposal(text)
+    assert hyp == "try consensus start"
+    assert src.startswith("def solve")
+    try:
+        parse_proposal("no code here")
+        raise AssertionError("expected ValueError for missing code block")
+    except ValueError:
+        pass
+    print("  Proposal parsing test passed!")
+
+
+def test_mock_run():
+    print("Testing mock research run (evaluates real candidates, ~1 min)...")
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-test-"))
+    try:
+        store = RunStore(tmp / "run")
+        run = ResearchRun.create(store, LoopConfig(problem="median_string"))
+        entries = run.run(MockLLM(), steps=4, seed=0, log=lambda *a, **k: None)
+        statuses = [e.status for e in entries]
+        assert STATUS_REJECTED_DUPLICATE in statuses, statuses  # cosmetic seed rewrite caught
+        assert STATUS_REJECTED_SCREEN in statuses, statuses  # syntax error caught
+        assert STATUS_KEPT in statuses, statuses  # consensus start improves
+        assert all(e.prompt_tokens > 0 for e in entries)
+        assert all(e.verdict for e in entries), [e.verdict for e in entries]
+        seed_entry = run.entries()[0]
+        assert seed_entry.confirmed is True and "confirm" in seed_entry.evals
+        best_entry = max((e for e in entries if e.improved_global), key=lambda e: e.id)
+        assert best_entry.confirmed is True and best_entry.verdict == "supported"
+        archive = Archive.build(run.entries(), run.problem.objective_split)
+        assert archive.global_best is not None and archive.global_best.objective < 543
+        assert len(archive.front) >= 1
+        assert any(m in MODES for m in (e.mode for e in entries))
+        report = render(run, holdout=False)
+        assert "Pareto front" in report and "tokens" in report
+        # agent-mode submit path shares the same ledger
+        entry = run.submit(mp.INDEL_MOVES, "indel moves", "fix_losers", [archive.global_best.id], proposer="test")
+        assert entry.status in (STATUS_KEPT, "evaluated", STATUS_REJECTED_DUPLICATE), entry.status
+        assert (store.root / "ledger.jsonl").exists()
+        guarded = run.submit("import os\ndef solve(instance):\n    return instance.strings[0]\n", "cheat", "tune", [0])
+        assert guarded.status == STATUS_REJECTED_GUARD and "confirm" not in guarded.evals
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Mock run test passed!")
+
+
+if __name__ == "__main__":
+    random.seed(0)
+    test_novelty_gate()
+    test_import_guard()
+    test_parse_proposal()
+    test_mock_run()
+    print("\nAll autoresearch tests passed!")

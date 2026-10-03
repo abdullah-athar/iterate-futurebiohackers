@@ -65,3 +65,15 @@ autoresearch-smoke:
 autoresearch-eval *args:
     uv run python scripts/evaluate_median_string.py "$@"
 
+
+# Autoresearch loop (agent mode): just autoresearch -- --run artifacts/runs/demo init
+[working-directory: justfile_directory() / "autoresearch-optimizer"]
+[positional-arguments]
+autoresearch *args:
+    uv run python -m autoresearch "$@"
+
+# Run the autoresearch loop tests (novelty gate, parsing, mock research run)
+[working-directory: justfile_directory() / "autoresearch-optimizer"]
+autoresearch-test:
+    uv run python scripts/test_median_string.py
+    uv run python scripts/test_autoresearch.py

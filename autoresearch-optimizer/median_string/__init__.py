@@ -11,7 +11,7 @@ from .metrics import (
     sum_distance,
 )
 from .base_solver import BaseSolver, FunctionalSolver, normalize_solver
-from .benchmarks import BenchmarkTier, get_benchmark_suite
+from .benchmarks import BenchmarkTier, get_benchmark_suite, get_confirm_suite, get_holdout_suite
 from .evaluator import Evaluator, EvaluationSummary, InstanceResult
 from .solvers import get_solver, list_solvers, register_solver
 
@@ -25,6 +25,8 @@ __all__ = [
     "InstanceResult",
     "BenchmarkTier",
     "get_benchmark_suite",
+    "get_confirm_suite",
+    "get_holdout_suite",
     "get_solver",
     "list_solvers",
     "register_solver",

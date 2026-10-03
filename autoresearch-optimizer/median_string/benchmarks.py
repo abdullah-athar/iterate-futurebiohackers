@@ -232,7 +232,54 @@ def get_hard_suite() -> list[ProblemInstance]:
     ]
 
 
-BenchmarkTier = Literal["small", "medium", "hard"]
+def get_confirm_suite(seed_offset: int = 5000) -> list[ProblemInstance]:
+    """Fresh medium-difficulty instances used by the autoresearch loop to re-test a claimed
+    new best before accepting it (guards against selecting on evaluation noise/overfitting)."""
+    specs = [
+        ("confirm_dna_25bp_k12", "ACGT", 25, 12, 0.20, 0.04, "levenshtein"),
+        ("confirm_dna_40bp_k15", "ACGT", 40, 15, 0.25, 0.05, "levenshtein"),
+        ("confirm_dna_noisy_30bp_k10", "ACGT", 30, 10, 0.35, 0.08, "levenshtein"),
+        ("confirm_dna_hamming_30bp_k12", "ACGT", 30, 12, 0.25, 0.0, "hamming"),
+        ("confirm_protein_20aa_k10", "ACDEFGHIKLMNPQRSTVWY", 20, 10, 0.30, 0.03, "levenshtein"),
+    ]
+    return _fresh_suite(specs, seed_offset, "Confirmation instance")
+
+
+def get_holdout_suite(seed_offset: int = 9000) -> list[ProblemInstance]:
+    """Fresh instances with the medium/hard generator settings but unseen seeds.
+
+    Used by the autoresearch loop for final reporting so that search-time feedback
+    (small/medium tiers) is separated from the final evaluation.
+    """
+    specs = [
+        ("holdout_dna_25bp_k12", "ACGT", 25, 12, 0.20, 0.04, "levenshtein"),
+        ("holdout_dna_40bp_k15", "ACGT", 40, 15, 0.25, 0.05, "levenshtein"),
+        ("holdout_dna_noisy_30bp_k10", "ACGT", 30, 10, 0.35, 0.08, "levenshtein"),
+        ("holdout_dna_hamming_30bp_k12", "ACGT", 30, 12, 0.25, 0.0, "hamming"),
+        ("holdout_protein_20aa_k10", "ACDEFGHIKLMNPQRSTVWY", 20, 10, 0.30, 0.03, "levenshtein"),
+        ("holdout_dna_60bp_k20", "ACGT", 60, 20, 0.28, 0.06, "levenshtein"),
+    ]
+    return _fresh_suite(specs, seed_offset, "Held-out instance")
+
+
+def _fresh_suite(specs, seed_offset: int, label: str) -> list[ProblemInstance]:
+    return [
+        generate_planted_instance(
+            name=name,
+            alphabet=alphabet,
+            target_length=length,
+            num_strings=k,
+            mutation_rate=mut,
+            indel_rate=indel,
+            seed=seed_offset + i,
+            metric=metric,
+            description=f"{label} (len={length}, k={k}, mut={mut}, indel={indel})",
+        )
+        for i, (name, alphabet, length, k, mut, indel, metric) in enumerate(specs, 1)
+    ]
+
+
+BenchmarkTier = Literal["small", "medium", "hard", "confirm", "holdout"]
 
 
 def get_benchmark_suite(tier: BenchmarkTier = "small") -> list[ProblemInstance]:
@@ -243,5 +290,9 @@ def get_benchmark_suite(tier: BenchmarkTier = "small") -> list[ProblemInstance]:
         return get_medium_suite()
     elif tier == "hard":
         return get_hard_suite()
+    elif tier == "confirm":
+        return get_confirm_suite()
+    elif tier == "holdout":
+        return get_holdout_suite()
     else:
-        raise ValueError(f"Unknown benchmark tier '{tier}'. Choose from 'small', 'medium', 'hard'.")
+        raise ValueError(f"Unknown benchmark tier '{tier}'. Choose from 'small', 'medium', 'hard', 'confirm', 'holdout'.")
