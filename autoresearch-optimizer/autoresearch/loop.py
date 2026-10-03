@@ -73,6 +73,14 @@ class LoopConfig:
     # ablation controls: restrict the bandit to these prompt modes (None = all). `--modes tune --exploit 1.0`
     # is the plain incumbent-only loop (no per-instance archive, merge or mode selection) to compare against.
     modes: list[str] | None = None
+    # exploration-exploitation layer (swarm only, see autoresearch/exploration_exploitation.py)
+    descriptors: bool = False
+    desc_threshold: float = 0.3    # new_family: min descriptor distance to the elite archive to be evaluated
+    drift_threshold: float = 0.3   # tune: descriptor drift from the parent that re-routes a child to new_family
+    elite: int = 10                # elite archive = top N scored candidates by objective
+    landscape: int = 25            # archive members shown to agents as descriptor + summary
+    gap_fraction: float = 1 / 3    # share of new_family agents with a gap prompt
+    describe_model: str = "sonnet"
 
     def to_dict(self) -> dict:
         return self.__dict__.copy()

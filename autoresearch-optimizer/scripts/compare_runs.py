@@ -12,6 +12,7 @@ import argparse
 import json
 import sys
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from itertools import combinations
 from pathlib import Path
 
@@ -53,14 +54,14 @@ def main() -> None:
         entries = store.entries()
         seed = entries[0]
         evaluated = [e for e in entries if e.evals and e.id != 0]
-        descs = []
-        for e in evaluated:
-            src = store.read_candidate(e)
+        def one(e):
             try:
-                d = describe(src, vocab, problem, model=args.model, cache_path=cache)
+                return describe(store.read_candidate(e), vocab, problem, model=args.model, cache_path=cache)
             except RuntimeError:
-                continue
-            descs.append(d)
+                return None
+        with ThreadPoolExecutor(12) as pool:
+            descs = [d for d in pool.map(one, evaluated) if d is not None]
+        for d in descs:
             vocab.add(d)
         vocab.save(vocab_path)
         scored = [e for e in entries if e.scored and e.objective != float("inf") and e.confirmed is not False]

@@ -171,65 +171,63 @@ def test_swarm():
 
 
 def test_exploration_exploitation():
-    print("Testing the exploration-exploitation loop with a fake proposer and describer (local evaluation)...")
+    print("Testing the exploration-exploitation layer in the swarm (fake proposer and describer, local evaluation)...")
     from autoresearch import exploration_exploitation as ee
     from autoresearch import swarm
     from autoresearch.descriptors import Descriptor
 
     fixtures = repo_root / "scripts" / "descriptor_fixtures"
     seed = get_problem("median_string").seed_source()
-    tweak = seed.replace("range(50)", "range(60)")
-    sources = {  # source -> (core, tier-3 terms) the fake describer returns
-        seed: ("hill climbing", ["substitution moves", "set median initialisation", "first-improvement selection"]),
-        tweak: ("hill climbing", ["substitution moves", "set median initialisation", "first-improvement selection"]),
-        (fixtures / "editop_voting.py").read_text(): ("consensus voting", ["edit-operation voting"]),
-        (fixtures / "center_star_consensus.py").read_text(): ("center-star alignment", ["column-wise majority vote"]),
-        (fixtures / "hill_climb.py").read_text(): ("hill climbing", ["substitution moves", "set median initialisation",
-                                                                    "first-improvement selection"]),
-        (fixtures / "positional_vote.py").read_text(): ("greedy construction", ["column-wise majority vote"]),
-    }
-    by_worker = list(sources)[1:]  # w0 exploit tweak (keeps descriptor), w1 exploit drift, w2-w4 explore
+    hill = ("hill climbing", ["substitution moves", "set median initialisation", "first-improvement selection"])
+    by_worker = [  # bandit gives 2 agents each to tune, fix_losers, new_family -> workers in that order
+        (seed.replace("range(50)", "range(60)"), hill),                                            # tune: keeps descriptor
+        ((fixtures / "editop_voting.py").read_text(), ("consensus voting", ["edit-operation voting"])),  # tune: drifts
+        ((fixtures / "positional_vote.py").read_text(), None),                                     # fix_losers
+        (mp.FAST_INDEL_SEARCH, None),                                                              # fix_losers
+        ((fixtures / "hill_climb.py").read_text(), hill),                                          # new_family: same as seed
+        ((fixtures / "center_star_consensus.py").read_text(), ("center-star alignment", ["column-wise majority vote"])),
+    ]
+    labels = {seed: hill} | {src: lab for src, lab in by_worker if lab}
+    seen_assignments = []
 
     def fake_describe(source, vocab, problem, **kw):
-        core, mids = sources[source]
+        core, mids = labels.get(source, ("greedy construction", ["column-wise majority vote"]))
         return Descriptor([(core, 6)] + [(t, 3) for t in mids], summary=core)
 
     def propose_many(run, gen, assignments):
-        return [{"assignment": a, "source": by_worker[a.worker], "hypothesis": f"w{a.worker}",
+        seen_assignments.extend(assignments)
+        return [{"assignment": a, "source": by_worker[a.worker][0], "hypothesis": f"w{a.worker}",
                  "usage": {"model": "fake", "seconds": 1.0, "outcome": "ok", "cost_usd": 0.01}} for a in assignments]
 
     real_describe, ee.describe = ee.describe, fake_describe
     tmp = Path(tempfile.mkdtemp(prefix="autoresearch-ee-"))
     try:
-        run = ResearchRun.create(RunStore(tmp / "run"), LoopConfig(problem="median_string"))
+        run = ResearchRun.create(RunStore(tmp / "run"), LoopConfig(problem="median_string", descriptors=True))
         lines = []
         emit = swarm.Events(run, 0.0, log=lines.append)
-        cfg = ee.ExplorationExploitationConfig(k=2, l=1)
-        ee.run_exploration_exploitation(run, cfg, 1, 1e9, propose_many, swarm.local_evaluator("median_string", 1000),
-                                        emit, max_generations=1)
+        swarm.run_swarm(run, 6, 1, 1e9, propose_many, swarm.local_evaluator("median_string", 1000), emit,
+                        max_generations=1)
+        modes = [a.mode for a in seen_assignments]
+        assert modes == ["tune", "tune", "fix_losers", "fix_losers", "new_family", "new_family"], modes
+        assert all("Descriptor contract" in a.notes for a in seen_assignments if a.mode == "tune")
+        assert all("Research landscape" in a.notes for a in seen_assignments)
         gen1 = [e for e in run.entries() if e.generation == 1]
-        assert [e.mode for e in gen1] == ["exploit", "exploit", "explore", "explore", "explore"], [e.mode for e in gen1]
-        branch = [e.usage["branch"] for e in gen1]
-        assert branch == ["K", "K->L", "L", "L", "L"], branch
-        assert gen1[0].evals, "K child that kept its descriptor must be evaluated"
-        evaluated_pool = [e for e in gen1[1:] if e.evals]
-        assert len(evaluated_pool) == 1, [e.note for e in gen1]
-        assert evaluated_pool[0].usage["min_dist"] >= cfg.novelty_threshold, evaluated_pool[0].usage
-        dup = gen1[3]  # hill-climb descriptor identical to the seed's
+        branch = [e.usage.get("branch") for e in gen1]
+        assert branch == ["K", "K->L", None, None, "L", "L"], branch
+        assert gen1[0].evals, "tune child that kept its descriptor must be evaluated"
+        assert gen1[1].evals and gen1[5].evals, [e.note for e in gen1]
+        dup = gen1[4]  # hill-climb descriptor identical to the seed's
         assert dup.status == STATUS_REJECTED_DUPLICATE and "not selected by max-min" in dup.note, dup.note
-        assert dup.usage["min_dist"] < cfg.novelty_threshold
+        assert dup.usage["min_dist"] < run.config.desc_threshold
+        assert all(e.usage["min_dist"] >= run.config.desc_threshold for e in (gen1[1], gen1[5]))
         events = [json.loads(l) for l in (run.store.root / "events.jsonl").read_text().splitlines()]
-        sel = next(e for e in events if e["type"] == "explore_exploit_select")
-        assert (sel["k_kept"], sel["drifted"], sel["pool"], sel["selected"]) == (1, 1, 4, 1), sel
+        g = next(e for e in events if e["type"] == "descriptor_gate")
+        assert (g["tune_kept"], g["drifted"], g["pool"], g["slots"], g["selected"]) == (1, 1, 3, 3, 2), g
         assert next(e for e in events if e["type"] == "gen_end")["vocab"] > 0
-        # schedule: no new global best in gen 1 -> one slot moves to explore
-        improved = any(e.improved_global for e in gen1)
-        assert ee.split_for(run.entries(), cfg) == ((2, 1) if improved else (1, 2))
     finally:
         ee.describe = real_describe
         shutil.rmtree(tmp, ignore_errors=True)
     print("  Exploration-exploitation test passed!")
-
 
 def test_lineage_parents():
     import autoresearch.exploration_exploitation as ee
@@ -247,6 +245,25 @@ def test_lineage_parents():
     print("  Lineage-parents test passed!")
 
 
+def test_gap_directions():
+    import autoresearch.exploration_exploitation as ee
+    from autoresearch.descriptors import Descriptor
+    from autoresearch.ledger import Entry
+
+    sa = Descriptor([("simulated annealing", 6), ("block moves", 3)])
+    ga = Descriptor([("genetic algorithm", 6), ("center-star alignment", 3)])
+    e1, e2 = (Entry(id=i, parent_ids=[], mode="x", hypothesis="", status="kept") for i in (1, 2))
+    rng = random.Random(0)
+    # a lone strong solver has no untried pairing of its own parts
+    assert ee.gap_directions([(e1, sa)], [sa], 5, rng) == []
+    gaps = ee.gap_directions([(e1, sa), (e2, ga)], [sa, ga], 5, rng)
+    assert len(gaps) == 2 and any("simulated annealing" in g and "center-star alignment" in g for g in gaps), gaps
+    # a pairing that already exists anywhere in the described pool is not a gap
+    tried = Descriptor([("simulated annealing", 6), ("center-star alignment", 3)])
+    gaps = ee.gap_directions([(e1, sa), (e2, ga)], [sa, ga, tried], 5, rng)
+    assert len(gaps) == 1 and "genetic algorithm" in gaps[0] and "block moves" in gaps[0], gaps
+    print("  Gap-directions test passed!")
+
 if __name__ == "__main__":
     random.seed(0)
     test_novelty_gate()
@@ -256,4 +273,5 @@ if __name__ == "__main__":
     test_swarm()
     test_exploration_exploitation()
     test_lineage_parents()
+    test_gap_directions()
     print("\nAll autoresearch tests passed!")

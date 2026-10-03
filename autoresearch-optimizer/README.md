@@ -78,24 +78,26 @@ flowchart TD
 
 Watch it live with `just autoresearch-viz serve ...`.
 
-### Exploration-exploitation loop (`--exploration-exploitation K L`)
+### Exploration-exploitation layer (on by default; `--no-descriptors` turns it off)
 
-An alternative to the mode bandit, built on **descriptors** ([autoresearch/descriptors.py](autoresearch/descriptors.py)):
+A layer on top of the mode bandit, built on **descriptors** ([autoresearch/descriptors.py](autoresearch/descriptors.py)):
 one cached LLM call tags each program with 1–10 terms from a shared, growing vocabulary. Exactly one
 term is tier 6 (what the algorithm is); the others are tier 3 (structure) or tier 1 (detail).
 Descriptor distance is a tier-weighted best-match cosine over centred MiniLM term embeddings, where
-identical descriptors are at distance 0.
+identical descriptors are at distance 0. The bandit still decides how many agents each mode gets.
 
-- **Exploit (K agents)** refine the top 3 elites under a descriptor contract: same algorithm type and
-  components, different hyperparameters and implementation detail. Only exact copies are rejected.
-  A child whose descriptor drifts more than 0.3 from its parent's moves to the explore pool.
-- **Explore (3L agents)**: about two thirds get a gap prompt (an under-used paradigm combined with a
-  structural term never seen with it), the rest are unprompted. All candidates are described, and up
-  to L are picked by greedy max-min distance to the elite archive (top 10 by objective) and to each
-  other. Candidates below the 0.3 floor are never picked.
-- **Schedule:** starts at K:L. Each generation without a new best moves one slot to explore, and each
-  improving generation moves it back.
-- **Prompt context:** agents see descriptor + one-line summary for the top 25 archive members.
+- **`tune` = exploit (K):** refines the best elite of each of the top 3 distinct lineages under a
+  descriptor contract (same algorithm and components, different hyperparameters and implementation
+  detail). Only exact copies are rejected. A child whose descriptor drifts more than 0.3 from its
+  parent's has changed strategy, so it is judged like a `new_family` candidate instead.
+- **`new_family` = explore (L):** every candidate is described and evaluated only if its max-min
+  descriptor distance to the elite archive (top 10 by objective) and to this round's picks is at least
+  0.3. No extra agents are run. At most a third get a gap prompt: a paradigm and a structural term that
+  both appear in strong solvers (global best, per-instance winners) but never together. The rest choose
+  freely.
+- **`fix_losers` and `merge`** keep their own focus.
+- **Prompt context:** no agent gets the problem's hand-written research directions; every agent sees
+  descriptor + one-line summary for the top 25 archive members.
 
 `scripts/validate_descriptors.py` checks the descriptors themselves (self-distance test on the
 solvers in `scripts/descriptor_fixtures/`, plus embedding sanity). The run directory also gets
@@ -148,7 +150,7 @@ just autoresearch-swarm --run artifacts/runs/swarm-1            # 32 agents/gene
 just autoresearch-swarm --run artifacts/runs/long-1 --problem median_string_long   # MSA-scale 1500 bp instances
 just autoresearch-swarm --run artifacts/runs/swarm-1 --agents 8 --budget-min 10 --model opus
 just autoresearch-swarm --run artifacts/runs/simple-1 --modes tune --exploit 1.0   # control: plain incumbent-only loop (no archive/merge/bandit)
-just autoresearch-swarm --run artifacts/runs/ee-1 --exploration-exploitation 3 3   # descriptor-based exploit/explore loop instead of the bandit
+just autoresearch-swarm --run artifacts/runs/plain-1 --no-descriptors   # control: bandit without the exploration-exploitation layer
 just autoresearch-viz serve artifacts/runs/swarm-1 --open      # live dashboard (run in a second terminal)
 just autoresearch-viz render artifacts/runs/swarm-1 artifacts/runs/simple-1 -o artifacts/viz/ablation.html   # offline comparison for the demo
 

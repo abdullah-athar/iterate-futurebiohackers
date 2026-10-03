@@ -103,8 +103,15 @@ Program:
 ```"""
 
 
+_SPELLING = [("neighbor", "neighbour"), ("ization", "isation"), ("imize", "imise"), ("imizing", "imising")]
+
+
 def _norm(term: str) -> str:
-    return " ".join(term.lower().split())
+    """Lowercase, collapse whitespace, British spelling (so 'neighborhood' and 'neighbourhood' are one term)."""
+    term = " ".join(term.lower().split())
+    for us, uk in _SPELLING:
+        term = term.replace(us, uk)
+    return term
 
 
 @dataclass

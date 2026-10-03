@@ -35,7 +35,7 @@ class Assignment:
     mode: str
     parent_ids: list[int]
     direction: str = ""
-    notes: str = ""  # extra STATUS.md section (exploration-exploitation loop: descriptor contract, research landscape)
+    notes: str = ""  # extra STATUS.md section (exploration-exploitation layer: descriptor contract, research landscape)
 
 
 def allocate(run: ResearchRun, n: int, rng: random.Random) -> list[Assignment]:
@@ -94,7 +94,8 @@ PROMPT = "Read AGENT.md and STATUS.md in the current directory and follow them. 
 def write_workspace(run: ResearchRun, a: Assignment, gen: int, n: int, mix: str, turn_s: int, ws: Path,
                     eval_backend: str) -> None:
     ctx = run.context(mode=a.mode, parent_ids=a.parent_ids)
-    (ws / "STATUS.md").write_text(build_user_prompt(run.problem.describe(), ctx) + (f"\n\n{a.notes}" if a.notes else ""))
+    (ws / "STATUS.md").write_text(build_user_prompt(run.problem.describe(), ctx, run.config.descriptors)
+                                  + (f"\n\n{a.notes}" if a.notes else ""))
     (ws / "AGENT.md").write_text(AGENT_MD.format(worker=a.worker, gen=gen, mode=a.mode, n=n, mix=mix,
                                                  turn_s=turn_s, half=turn_s // 2,
                                                  direction=a.direction or "your choice"))
@@ -236,9 +237,9 @@ def format_event(r: dict) -> str:
     if k == "gen_end":
         return (f"gen {r['gen']} end: best #{r['best_id']}={r['best']:g}; {r['evaluated']} evaluated, {r['kept']} kept; "
                 f"{r['seconds']:.0f}s; cost so far ${r['cost_usd']:.2f}")
-    if k == "explore_exploit_select":
-        return (f"gen {r['gen']} exploit:explore {r['k']}:{r['l']} — K {r['k_kept']} kept, {r['drifted']} drifted to L; "
-                f"L pool {r['pool']} -> {r['selected']} selected (min dist {r['min_dists']}), {r['unfilled']} slot(s) unfilled")
+    if k == "descriptor_gate":
+        return (f"gen {r['gen']} descriptors: tune {r['tune_kept']} kept, {r['drifted']} drifted to new_family; "
+                f"new_family pool {r['pool']} -> {r['selected']}/{r['slots']} selected (min dist {r['min_dists']})")
     if k == "holdout":
         return f"holdout: seed {r['seed']:g} -> best #{r['best_id']} {r['best']:g} (baseline {r['baseline']:g})"
     if k == "run_end":
@@ -253,25 +254,40 @@ def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propo
     entries = run.entries()
     gen = max((e.generation or 0 for e in entries), default=0) + 1
     eval_s, generations, proposals = 60.0, 0, 0
-    emit("run_start", agents=agents, budget_s=int(budget_s), turn_s=turn_s, eval=eval_name)
-    while time.time() - t0 + turn_s + eval_s + 30 <= budget_s and (max_generations is None or generations < max_generations):
+    layer = None
+    if run.config.descriptors:
+        from .exploration_exploitation import ExplorationExploitation
+        layer = ExplorationExploitation(run)
+    describe_s = 60.0 if layer else 0.0
+    emit("run_start", agents=agents, budget_s=int(budget_s), turn_s=turn_s,
+         eval=eval_name + (", descriptors" if layer else ""))
+    while (time.time() - t0 + turn_s + describe_s + eval_s + 30 <= budget_s
+           and (max_generations is None or generations < max_generations)):
         tg = time.time()
         assignments = allocate(run, agents, rng)
+        if layer:
+            assignments = layer.prepare(assignments, rng)
         best = run.archive().global_best
         emit("gen_start", gen=gen, mix=", ".join(f"{m} {c}" for m, c in Counter(a.mode for a in assignments).items()),
-             best_id=best.id, best=best.objective, assignments=[asdict(a) for a in assignments])
+             best_id=best.id, best=best.objective, assignments=[{**asdict(a), "notes": ""} for a in assignments])
         results = propose_many(run, gen, assignments)
         results.sort(key=lambda r: r["assignment"].worker)
         next_id = run.store.next_id()
         arrivals: list[tuple[int, str]] = []
         for r in (r for r in results if r["source"]):
-            r["pre"] = run.precheck(r["source"], extra_prior=arrivals)
+            # with descriptors, tune children only lose to exact copies (refinement is the point)
+            exact = layer is not None and r["assignment"].mode == "tune"
+            r["pre"] = run.precheck(r["source"], extra_prior=arrivals, threshold=1.0 if exact else None)
             arrivals.append((next_id + len(arrivals), r["source"]))
+        if layer:
+            td = time.time()
+            layer.gate(results, gen, emit)
+            describe_s = max(30.0, time.time() - td)
         emit("eval_start", gen=gen, n=len(passed(results)), dup=sum(1 for r in results if r.get("pre") and r["pre"][1].is_duplicate),
              guard=sum(1 for r in results if r.get("pre") and r["pre"][0]), empty=sum(1 for r in results if not r["source"]))
         eval_s, n = evaluate_and_record(run, gen, results, evaluate_many, emit)
         proposals += n
-        emit_gen_end(run, gen, tg, emit)
+        emit_gen_end(run, gen, tg, emit, **({"vocab": layer.describer.end_generation()} if layer else {}))
         gen += 1
         generations += 1
     write_holdout(run, emit)

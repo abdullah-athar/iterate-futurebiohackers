@@ -114,7 +114,8 @@ def cmd_swarm(args) -> None:
     store = RunStore(args.run)
     if not store.exists:
         run = ResearchRun.create(store, LoopConfig(problem=args.problem, time_budget_ms=args.budget_ms,
-                                                   modes=args.modes, exploit=args.exploit))
+                                                   modes=args.modes, exploit=args.exploit,
+                                                   descriptors=not args.no_descriptors, describe_model=args.model))
         print(f"Initialised run at {store.root}\n" + ResearchRun.describe_entry(run.entries()[0]))
     run = ResearchRun(store)
     emit = swarm.Events(run, time.time())
@@ -122,16 +123,8 @@ def cmd_swarm(args) -> None:
     budget_ms = run.config.time_budget_ms
     evaluate = (swarm.modal_evaluator(run.problem_name, budget_ms) if args.eval == "modal"
                 else swarm.local_evaluator(run.problem_name, budget_ms))
-    if args.exploration_exploitation:
-        from .exploration_exploitation import ExplorationExploitationConfig, run_exploration_exploitation
-        k, l = args.exploration_exploitation
-        cfg = ExplorationExploitationConfig(k=k, l=l, elite=args.elite, novelty_threshold=args.desc_threshold,
-                                            drift_threshold=args.drift_threshold, describe_model=args.describe_model)
-        run_exploration_exploitation(run, cfg, args.turn_s, args.budget_min * 60, propose, evaluate, emit,
-                                     seed=args.seed, max_generations=args.generations, eval_name=args.eval)
-    else:
-        swarm.run_swarm(run, args.agents, args.turn_s, args.budget_min * 60, propose, evaluate, emit,
-                        seed=args.seed, max_generations=args.generations, eval_name=args.eval)
+    swarm.run_swarm(run, args.agents, args.turn_s, args.budget_min * 60, propose, evaluate, emit,
+                    seed=args.seed, max_generations=args.generations, eval_name=args.eval)
     from .report import render
     text = render(run)
     (store.root / "report.md").write_text(text)
@@ -218,13 +211,9 @@ def main(argv=None) -> None:
     _ablation_args(s)
     s.add_argument("--budget-ms", type=int, default=1000, help="CPU ms per instance for a new run")
     s.add_argument("--seed", type=int, default=0)
-    s.add_argument("--exploration-exploitation", type=int, nargs=2, metavar=("K", "L"),
-                   help="exploration-exploitation descriptor loop instead of the mode bandit (K exploit + 3L explore agents/generation; "
-                        "--agents is ignored), e.g. --exploration-exploitation 3 3")
-    s.add_argument("--elite", type=int, default=10, help="exploration-exploitation: elite archive size (top N by objective)")
-    s.add_argument("--desc-threshold", type=float, default=0.3, help="exploration-exploitation: max-min descriptor distance floor")
-    s.add_argument("--drift-threshold", type=float, default=0.3, help="exploration-exploitation: K child drift that re-routes it to L")
-    s.add_argument("--describe-model", default="sonnet", help="exploration-exploitation: model for the describer calls")
+    s.add_argument("--no-descriptors", action="store_true",
+                   help="new run without the exploration-exploitation layer (descriptor contract for tune, "
+                        "max-min novelty selection for new_family, research landscape)")
     s.set_defaults(fn=cmd_swarm)
 
     s = sub.add_parser("report", help="render report.md (optionally with held-out evaluation)")
