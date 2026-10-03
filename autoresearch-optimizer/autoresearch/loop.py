@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import random
 import time
@@ -34,7 +35,7 @@ from .prompts import (
     format_diagnostics,
     format_digest,
 )
-from .sandbox import get_evaluate
+from .sandbox import evaluator_hash, get_evaluate
 
 
 def evaluate_candidate(problem_name: str, source: str, budget_ms: int | None, evaluate=None) -> dict[str, dict]:
@@ -69,6 +70,9 @@ class LoopConfig:
     patience_generations: int = 1  # swarm: whole generations without a new best before 'plateau'
     ucb_c: float = 0.8
     time_budget_ms: int = 1000  # CPU budget per instance for one solve() call
+    # ablation controls: restrict the bandit to these prompt modes (None = all). `--modes tune --exploit 1.0`
+    # is the plain incumbent-only loop (no per-instance archive, merge or mode selection) to compare against.
+    modes: list[str] | None = None
 
     def to_dict(self) -> dict:
         return self.__dict__.copy()
@@ -87,7 +91,7 @@ class ResearchRun:
     def create(cls, store: RunStore, config: LoopConfig, seed_source: str | None = None, evaluate=None) -> ResearchRun:
         if store.exists:
             raise FileExistsError(f"run already exists at {store.root}")
-        store.create(config.to_dict())
+        store.create({**config.to_dict(), "evaluator_hash": evaluator_hash()})
         run = cls(store)
         source = seed_source or run.problem.seed_source()
         entry = Entry(id=0, parent_ids=[], mode="seed", hypothesis="Seed solver (starting point)", status=STATUS_SEED,
@@ -99,7 +103,29 @@ class ResearchRun:
             entry.improved_global = True
             entry.confirmed = run._confirmed(entry, None)
         store.append(entry)
+        run.write_baselines(evaluate)
         return run
+
+    def write_baselines(self, evaluate=None) -> dict:
+        """Score the problem's classical (non-agent) solvers on the objective and holdout splits
+        under the run's budget -> baselines.json (reference rows for the report and dashboard)."""
+        names = getattr(self.problem, "baseline_solvers", ())
+        evaluate = evaluate or get_evaluate()
+        out = {}
+        for name in names:
+            src = self.problem.baseline_source(name)
+            out[name] = {split: evaluate(self.problem_name, self.problem, src, split, self.config.time_budget_ms).to_dict()
+                         for split in (self.problem.objective_split, "holdout")}
+        if out:
+            (self.store.root / "baselines.json").write_text(json.dumps(out, indent=1))
+        return out
+
+    def baselines(self) -> dict[str, dict[str, EvalResult]]:
+        path = self.store.root / "baselines.json"
+        if not path.exists():
+            return {}
+        return {name: {split: EvalResult.from_dict(d) for split, d in rec.items()}
+                for name, rec in json.loads(path.read_text()).items()}
 
     def entries(self) -> list[Entry]:
         return self.store.entries()
@@ -138,7 +164,8 @@ class ResearchRun:
 
     def mode_scores(self, entries: list[Entry], archive: Archive) -> dict[str, float]:
         """UCB1 score per eligible prompt mode (inf = untried). After a plateau `tune` is not eligible."""
-        eligible = [m for m in MODES if m != "merge" or archive.complementary()]
+        allowed = [m for m in MODES if not self.config.modes or m in self.config.modes] or list(MODES)
+        eligible = [m for m in allowed if m != "merge" or archive.complementary()] or [allowed[0]]
         if self.plateau(entries):
             eligible = [m for m in eligible if m != "tune"] or eligible
         stats = {m: [0, 0.0] for m in MODES}

@@ -82,12 +82,22 @@ Watch it live with `just autoresearch-viz serve ...`.
 
 | Problem | Objective instances | Notes |
 | --- | --- | --- |
-| `median_string` | 5 instances, 20–43 chars, k = 10–15 | Saturated: the 16-agent swarm-1 reached 511, which no 2-edit move or 300 unbounded restarts improve |
-| `median_string_long` | four 1500 bp DNA (k = 10–20, 10–30% substitutions, 2–8% indels) + one 500 aa protein | MSA-scale; seed 29,656 vs planted 21,612, so plenty of headroom under 1000 ms |
+| `median_string` (default) | four DNA instances of 280–688 bp (k = 20–40) + one 320 aa protein (k = 15), 25–38% substitutions, 5–10% indels | The 1000 ms budget binds: a naive search leaves ~9% on the table vs 10 s. The previous 20–43-char objective was solved (every agent solver landed on 511) and is retired |
+| `median_string_long` | four 1500 bp DNA (k = 10–20, 10–30% substitutions, 2–8% indels) + one 500 aa protein | MSA-scale. long-1 (16 agents, 7 generations): seed 29,584 → 21,513 vs planted 21,612; the noisy instance still has ~1.8% headroom at 30 s |
+
+Every run also has three reference points:
+- the **set-median baseline**, which is the best input string;
+- the **seed** solver;
+- the **planted string** (`best_known`).
+
+`init` also scores the classical non-agent solvers from `median_string/solvers` (`set_median`,
+`frequency_consensus`, `template`) under the same CPU budget and writes them to `baselines.json`.
+They appear as a table in `report.md` and the dashboard, and the dashboard also draws them as a
+reference line.
 
 `median_string.metrics.levenshtein_distance` uses rapidfuzz (C++, ~0.1 ms at 1500×1500), and
 `levenshtein_editops` gives solvers optimal alignments. Pure-Python DP code is ~3000× slower and
-cannot fit the budget at 1500 bp.
+cannot fit the budget at these sizes.
 
 ### Budgets
 
@@ -114,7 +124,9 @@ just autoresearch-swarm-smoke                                   # 2 agents, 1 ge
 just autoresearch-swarm --run artifacts/runs/swarm-1            # 32 agents/generation, 20 min
 just autoresearch-swarm --run artifacts/runs/long-1 --problem median_string_long   # MSA-scale 1500 bp instances
 just autoresearch-swarm --run artifacts/runs/swarm-1 --agents 8 --budget-min 10 --model opus
+just autoresearch-swarm --run artifacts/runs/simple-1 --modes tune --exploit 1.0   # control: plain incumbent-only loop (no archive/merge/bandit)
 just autoresearch-viz serve artifacts/runs/swarm-1 --open      # live dashboard (run in a second terminal)
+just autoresearch-viz render artifacts/runs/swarm-1 artifacts/runs/simple-1 -o artifacts/viz/ablation.html   # offline comparison for the demo
 
 # single-agent mode (tell the agent: "read autoresearch/program.md and start a research run")
 just autoresearch --run artifacts/runs/demo init
@@ -178,10 +190,18 @@ loop handles it.
 7. **Agents can game their own evaluation.**
    - *The problem:* an agent that grades itself, or can read the test generator, can fake progress.
    - *What we do:*
-     - agents only return source code;
-     - the harness re-scores it in a separate process or a separate Modal container;
-     - an import guard blocks `os`, `subprocess`, the benchmark generator, `exec` and `open`;
-     - only the orchestrator writes the ledger.
+     - agents only return source code; the harness evaluates it in a separate process or Modal container;
+     - inside that evaluation, the candidate's code runs in its own process
+       (`autoresearch/candidate_runner.py`) that receives only a copy of the strings, alphabet, metric,
+       length constraint and CPU budget: no planted answer, no reference score, no generator seed, no
+       `AUTORESEARCH_*` secrets. It returns one string per instance. Validation, distances and baselines
+       are computed by the parent from its own copy of the inputs, so reading the answer, mutating the
+       inputs or monkeypatching `median_string.metrics` cannot change a score
+       (`scripts/test_autoresearch.py::test_evaluator_boundary` checks each of these);
+     - an import guard blocks `os`, `subprocess`, the benchmark generator, `exec` and `open`: a readable
+       check, not a security sandbox;
+     - only the orchestrator writes the ledger, and `config.json` records an `evaluator_hash` so runs made
+       with different evaluator versions are not compared by accident.
 8. **Serial loops are slow.**
    - *The problem:* one agent at a time gives roughly one hypothesis a minute.
    - *What we do:* N agents work in parallel each generation, and every evaluation runs in its own
@@ -231,6 +251,8 @@ It shows:
 - a scoreboard per run, including held-out gain;
 - per-instance bars;
 - the outcome mix of all proposals;
+- the idea lineage: every proposal as a node in a parent → child graph by generation, coloured by outcome, verdict or mode,
+  with the path to the final best highlighted (seed hidden by default, so independent lines of attack form separate trees);
 - the trajectory, with each proposal's verdict.
 
 ```sh

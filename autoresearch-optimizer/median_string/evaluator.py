@@ -18,6 +18,15 @@ from .solvers import get_solver, list_solvers
 
 
 @dataclass
+class SolveOutcome:
+    """What one solve() call returned on one instance, before any validation or scoring."""
+
+    candidate: Any = ""
+    error: str = ""  # crash / timeout message; empty when solve() returned normally
+    elapsed_seconds: float = 0.0
+
+
+@dataclass
 class InstanceResult:
     """Evaluation result on a single ProblemInstance."""
 
@@ -148,20 +157,43 @@ class Evaluator:
             instances = benchmark
             tier_name = "custom"
 
+        outcomes = [self.run_solver(solver_obj, inst) for inst in instances]
+        return self.score(instances, outcomes, solver_name=solver_name, tier=tier_name, verbose=verbose)
+
+    @staticmethod
+    def run_solver(solver_obj: BaseSolver, inst: ProblemInstance) -> SolveOutcome:
+        """Call the solver on the instance's public view, never on the original."""
+        t0 = time.perf_counter()
+        try:
+            candidate = solver_obj.solve(inst.public_view())
+            error_msg = ""
+        except Exception as e:
+            candidate, error_msg = "", f"Crash: {type(e).__name__}: {e}"
+        return SolveOutcome(candidate=candidate, error=error_msg, elapsed_seconds=time.perf_counter() - t0)
+
+    def score(
+        self,
+        instances: list[ProblemInstance],
+        outcomes: Sequence[SolveOutcome],
+        solver_name: str = "candidate",
+        tier: str = "custom",
+        verbose: bool = False,
+    ) -> EvaluationSummary:
+        """Score solver outputs against the evaluator's own copy of each instance.
+
+        This is the trust boundary: validity, distances and the set-median baseline are computed
+        from `instances` as held here, never from anything the solver returned or touched.
+        """
+        if len(instances) != len(outcomes):
+            raise ValueError(f"{len(outcomes)} outcomes for {len(instances)} instances")
+
         results: list[InstanceResult] = []
         total_time = 0.0
 
-        for inst in instances:
-            t0 = time.perf_counter()
-            error_msg = ""
-            candidate = ""
-
-            try:
-                candidate = solver_obj.solve(inst)
-            except Exception as e:
-                error_msg = f"Crash: {type(e).__name__}: {e}"
-
-            elapsed = time.perf_counter() - t0
+        for inst, outcome in zip(instances, outcomes):
+            error_msg = outcome.error
+            candidate = outcome.candidate
+            elapsed = outcome.elapsed_seconds
             total_time += elapsed
 
             # Validate solution
@@ -218,7 +250,7 @@ class Evaluator:
 
         summary = EvaluationSummary(
             solver_name=solver_name,
-            tier=tier_name,
+            tier=tier,
             total_score=total_score,
             total_baseline_score=total_baseline,
             net_improvement=net_improvement,
@@ -286,7 +318,7 @@ def main() -> None:
         "--tier",
         type=str,
         default="small",
-        choices=["small", "medium", "hard", "confirm", "holdout"],
+        choices=["small", "medium", "hard", "mid", "confirm", "holdout", "long"],
         help="Difficulty tier for the benchmark suite (default: small).",
     )
     parser.add_argument(

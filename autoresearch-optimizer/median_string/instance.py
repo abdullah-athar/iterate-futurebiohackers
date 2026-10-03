@@ -38,6 +38,22 @@ class ProblemInstance:
             raise ValueError(f"Instance '{self.name}' must contain at least one string.")
         self.alphabet_set = set(self.alphabet)
 
+    def public_view(self) -> ProblemInstance:
+        """The instance as a candidate solver is allowed to see it.
+
+        A fresh copy of the inputs and constraints only: no planted answer, reference score,
+        description, generator seed or metadata. The evaluator keeps the original and scores
+        against that, so mutating the view cannot change the score or the baseline.
+        """
+        return ProblemInstance(
+            name=self.name,
+            strings=list(self.strings),
+            alphabet=self.alphabet,
+            target_length=self.target_length,
+            metric=self.metric,
+            time_budget_ms=self.time_budget_ms,
+        )
+
     @property
     def num_strings(self) -> int:
         return len(self.strings)

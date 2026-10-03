@@ -2,9 +2,10 @@
 
 Adapted from Keller Jordan's airbench (https://github.com/KellerJordan/cifar10-airbench),
 Copyright (c) 2024 Keller Jordan, released under the MIT License. Changes: 100-class
-head, 96/256/768 blocks with global max pooling, label smoothing 0.25, an 8.75-epoch
-schedule whose first quarter trains on 24x24 crops, per-image brightness/contrast
-jitter, the harness build/prepare/train split, and no test-time augmentation.
+head with widths 128/256/768 and a two-conv first group, label smoothing 0.3, an
+8.25-epoch schedule, half-precision BatchNorm, a compiled forward+loss step, the
+harness build/prepare/train split, and no test-time augmentation. The optional
+Muon optimizer follows hiverge/cifar10-speedrun (MIT); see LICENSE.hiverge.
 
 Untimed build() compiles the network and warms up every kernel on synthetic data.
 Timed prepare() resets all learned state, moves the images to the GPU, normalizes
@@ -12,7 +13,6 @@ them, and initializes the patch-whitening layer from training images.
 """
 
 import math
-import sys
 from types import SimpleNamespace
 
 import torch
@@ -23,7 +23,7 @@ from benchmark.api import BuildContext, TrainingData
 
 # Override any value with --params, e.g. '{"epochs": 9, "widths": [128, 384, 768]}'.
 DEFAULTS = {
-    "epochs": 8.25,
+    "epochs": 9.0,
     "batch_size": 1024,
     "lr": 11.5,  # per 1024 examples, decoupled from momentum (airbench convention)
     "momentum": 0.85,
@@ -35,30 +35,50 @@ DEFAULTS = {
     "whiten_bias_epochs": 3,
     "translate": 2,
     "cutout": 0,
-    "widths": [128, 256, 768],
+    "widths": [64, 256, 768],
     "depth": 3,  # convs per group; the third adds a residual connection
-    "depths": [2, 3, 3],  # per-group convs; None uses depth for every group
-    "train_resolution": 24,  # reduced resolution for the first training stage
-    "resolution_switch": 0.25,  # fraction of steps before returning to 32 pixels
-    "crop_mode": "indexed",  # "indexed" preserves channels-last with one gather
-    "fused_sgd": True,
-    "compile_loss": True,
+    "depths": [3, 3, 3],  # per-group conv count; overrides depth
+    "train_resolution": 32,  # reduced resolution for the first training stage
+    "resolution_switch": 0.5,  # fraction of steps before returning to 32 pixels
+    # Multi-stage schedule, e.g. [[24, 0.33], [28, 0.67]]: resolution until that
+    # fraction of steps, then 32. Overrides train_resolution/resolution_switch.
+    "resolution_schedule": [[28, 0.5]],
+    # Batch-size schedule, e.g. [[512, 0.5]]: batch size until that fraction of the
+    # training examples, then batch_size. Chosen per epoch. Weight decay per step
+    # scales with the batch so the per-example decay is unchanged.
+    "batch_schedule": [],
+    "crop_mode": "indexed",  # one gather per epoch; "masked" is airbench's 25 masked copies
+    "fused_sgd": True,  # one fused CUDA kernel for the SGD step
+    "compile_loss": False,
     "hard_fraction": 1.0,  # <1 enables a freshly trained small proxy
     "proxy_widths": [32, 64, 128],
     "proxy_every": 4,  # proxy backward/update period; scores every batch
     "proxy_mode": "offline",  # airbench-style prepass, or online selection
-    "gelu_approximate": "none",  # "tanh" uses a cheaper approximation; "silu" swaps in SiLU
-    "global_pool": "max",  # "max": plain full-map max pool, avoids adaptive atomics
+    "gelu_approximate": "none",  # "tanh" uses a cheaper approximation
     "autotune_backends": "ATEN,TRITON",  # ATen/cuDNN and Inductor Triton candidates
     "pool_first": [False, False, False],  # move selected group pools before conv1
-    "scaling_factor": 1.25 / 9,  # logit scale (airbench uses 1/9)
+    "scaling_factor": 1.25 / 9,
     "bn_momentum": 0.5,
     "ema_every": 5,  # lookahead EMA period in steps; 0 disables it
     "compile": "max-autotune",  # torch.compile mode; "" runs eagerly
-    # Accuracy-recovery and resizing switches.
-    "jitter": 0.3,  # per-image brightness/contrast jitter strength (own RNG, seeded per trial)
-    "low_res_compile": "default",  # torch.compile mode of the separate static low-res graph
-    "count_nonfinite": False,  # count non-finite step losses on the GPU; train() prints the total
+    "compile_step": True,  # compile forward and loss as one graph
+    "activation": "gelu",  # or "silu"
+    "bn_dtype": "half",  # BatchNorm in the network dtype; "float" keeps fp32 BN
+    "color_jitter": [0.2, 0.2],  # per-image brightness and contrast ranges
+    "inductor_tuning": [],  # e.g. ["coordinate_descent_tuning", "aggressive_fusion"]
+    "bn_recal_batches": 0,  # re-estimate BN statistics on center crops after training
+    "stem": "patch2",  # "patch2": 2x2 whitening at 31x31; "patch4s2": 4x4 stride-2 at 15x15
+    "inner_kernels": [3, 3, 3],  # kernel size of conv2/conv3 in each group (1 or 3)
+    # "max" is max(dim).values; adaptive_max_pool2d's backward uses slow atomics and
+    # "amax" trains to NaN under torch.compile in torch 2.4.
+    "global_pool": "max",
+    # "muon" follows hiverge/cifar10-speedrun: Muon on conv filters, SGD on biases and head.
+    "optimizer": "sgd",
+    "muon_lr": 0.205,
+    "muon_momentum": 0.655,
+    "muon_wd": 1.04e-6,  # per example
+    "bias_lr": 0.0573,
+    "head_lr": 0.5415,
 }
 
 
@@ -67,73 +87,66 @@ DEFAULTS = {
 #############################################
 
 
+def make_activation(hyp):
+    if hyp["activation"] == "silu":
+        return F.silu
+    approximate = hyp["gelu_approximate"]
+    return lambda x: F.gelu(x, approximate=approximate)
+
+
 class BatchNorm(nn.BatchNorm2d):
     def __init__(self, num_features, momentum):
         super().__init__(num_features, eps=1e-12, momentum=1 - momentum)
         self.weight.requires_grad = False
 
-    def activate(self, x, approximate, residual=None):
+    def activate(self, x, act, residual=None):
         x = self(x)
         if residual is not None:
             x = x + residual
-        return _activate(x, approximate)
+        return act(x)
 
 
 class Conv(nn.Conv2d):
-    def __init__(self, channels_in, channels_out):
-        super().__init__(channels_in, channels_out, kernel_size=3, padding="same", bias=False)
+    def __init__(self, channels_in, channels_out, kernel_size=3):
+        super().__init__(
+            channels_in, channels_out, kernel_size=kernel_size, padding="same", bias=False
+        )
 
     def reset_parameters(self):
         super().reset_parameters()
+        # Same result as nn.init.dirac_(w[:cin]) without its per-channel Python loop
+        # (one kernel launch per channel, about 60 ms per reset across the network).
         w = self.weight.data
-        nn.init.dirac_(w[: w.size(1)])
+        cin, (kh, kw) = w.size(1), w.shape[2:]
+        n = min(w.size(0), cin)
+        w[:cin].zero_()
+        idx = torch.arange(n, device=w.device)
+        w[idx, idx, kh // 2, kw // 2] = 1
 
 
 class ConvGroup(nn.Module):
-    def __init__(self, channels_in, channels_out, depth, bn_momentum, gelu_approximate, pool_first):
+    def __init__(
+        self, channels_in, channels_out, depth, bn_momentum, act, pool_first, kernel=3, pool=True
+    ):
         super().__init__()
         self.conv1 = Conv(channels_in, channels_out)
-        self.pool = nn.MaxPool2d(2)
+        self.pool = nn.MaxPool2d(2) if pool else nn.Identity()
         self.pool_first = pool_first
         self.norm1 = BatchNorm(channels_out, bn_momentum)
-        self.conv2 = Conv(channels_out, channels_out)
+        self.conv2 = Conv(channels_out, channels_out, kernel)
         self.norm2 = BatchNorm(channels_out, bn_momentum)
-        self.conv3 = Conv(channels_out, channels_out) if depth == 3 else None
+        self.conv3 = Conv(channels_out, channels_out, kernel) if depth == 3 else None
         self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
-        self.approximate = gelu_approximate
+        self.act = act
 
     def forward(self, x):
         x = self.conv1(self.pool(x)) if self.pool_first else self.pool(self.conv1(x))
-        x = self.norm1.activate(x, self.approximate)
+        x = self.norm1.activate(x, self.act)
         if self.conv3 is None:
-            return self.norm2.activate(self.conv2(x), self.approximate)
+            return self.norm2.activate(self.conv2(x), self.act)
         x0 = x
-        x = self.norm2.activate(self.conv2(x), self.approximate)
-        return self.norm3.activate(self.conv3(x), self.approximate, x0)
-
-
-def _activate(x, approximate):
-    return F.silu(x) if approximate == "silu" else F.gelu(x, approximate=approximate)
-
-
-class Activation(nn.Module):
-    def __init__(self, approximate):
-        super().__init__()
-        self.approximate = approximate
-
-    def forward(self, x):
-        return _activate(x, self.approximate)
-
-
-class GlobalMaxPool(nn.Module):
-    def __init__(self, implementation):
-        super().__init__()
-        self.implementation = implementation
-
-    def forward(self, x):
-        if self.implementation == "max":
-            return F.max_pool2d(x, x.shape[-2:])
-        return F.adaptive_max_pool2d(x, 1)
+        x = self.norm2.activate(self.conv2(x), self.act)
+        return self.norm3.activate(self.conv3(x), self.act, x0)
 
 
 class Net(nn.Module):
@@ -142,29 +155,39 @@ class Net(nn.Module):
         w1, w2, w3 = hyp["widths"]
         depths = hyp["depths"] or [hyp["depth"]] * 3
         bn_momentum = hyp["bn_momentum"]
-        self.whiten = nn.Conv2d(3, 24, kernel_size=2, padding=0, bias=True)
+        self.act = make_activation(hyp)
+        # The stride-2 stem whitens 4x4 patches straight to 15x15, so the first
+        # group skips its pool and never runs a conv at 31x31.
+        patch, self.whiten_stride = (4, 2) if hyp["stem"] == "patch4s2" else (2, 1)
+        stem_width = 2 * 3 * patch * patch
+        self.whiten = nn.Conv2d(3, stem_width, kernel_size=patch, padding=0, bias=True)
         self.whiten.weight.requires_grad = False
         self.layers = nn.Sequential(
-            Activation(hyp["gelu_approximate"]),
-            ConvGroup(
-                24, w1, depths[0], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][0]
-            ),
-            ConvGroup(
-                w1, w2, depths[1], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][1]
-            ),
-            ConvGroup(
-                w2, w3, depths[2], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][2]
-            ),
-            GlobalMaxPool(hyp["global_pool"]),
+            *(
+                ConvGroup(c_in, c_out, depth, bn_momentum, self.act, pool_first, kernel, pool)
+                for c_in, c_out, depth, pool_first, kernel, pool in zip(
+                    (stem_width, w1, w2),
+                    (w1, w2, w3),
+                    depths,
+                    hyp["pool_first"],
+                    hyp["inner_kernels"],
+                    (self.whiten_stride == 1, True, True),
+                    strict=True,
+                )
+            )
         )
         self.head = nn.Linear(w3, num_classes, bias=False)
         self.scaling_factor = hyp["scaling_factor"]
+        self.muon_head = hyp["optimizer"] == "muon"
+        self.global_pool = hyp["global_pool"]
 
     def reset(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d | nn.BatchNorm2d | nn.Linear):
                 m.reset_parameters()
         self.whiten.bias.data.zero_()
+        if self.muon_head:
+            self.head.weight.data /= self.head.weight.data.std()
 
     @torch.no_grad()
     def init_whiten(self, images, eps=5e-4):
@@ -180,8 +203,17 @@ class Net(nn.Module):
 
     def forward(self, x, whiten_bias_grad: bool = True):
         b = self.whiten.bias
-        x = F.conv2d(x, self.whiten.weight, b if whiten_bias_grad else b.detach())
-        x = self.layers(x).flatten(1)
+        b = b if whiten_bias_grad else b.detach()
+        x = self.act(F.conv2d(x, self.whiten.weight, b, stride=self.whiten_stride))
+        x = self.layers(x)
+        if self.global_pool == "adaptive":
+            x = F.adaptive_max_pool2d(x, 1).flatten(1)
+        elif self.global_pool == "amax":
+            x = x.flatten(2).amax(2)
+        else:
+            x = x.flatten(2).max(2).values
+        if self.muon_head:
+            return self.head(x) / x.size(-1)
         return self.head(x) * self.scaling_factor
 
 
@@ -201,8 +233,82 @@ class Classifier(nn.Module):
 
 
 #############################################
+#                   Muon                    #
+#############################################
+
+
+def newton_schulz(G):
+    """Approximately orthogonalize a stack of matrices [B, D, K] with D <= K."""
+    a, b, c = (3.4576, -4.7391, 2.0843)
+    X = G.bfloat16() if G.is_cuda else G.float()
+    X = X / (X.norm(dim=(1, 2), keepdim=True) + 1e-5)
+    for _ in range(3):
+        A = X @ X.mT
+        B = b * A + c * (A @ A)
+        X = a * X + B @ X
+    return X
+
+
+class Muon(torch.optim.Optimizer):
+    """Nesterov momentum and orthogonalized updates for conv filters (off by default).
+
+    Adapted from hiverge/cifar10-speedrun (MIT, see LICENSE.hiverge): Newton-Schulz
+    coefficients, periodic norm reset and decoupled weight decay.
+
+    Filters with the same shape are stacked so each shape needs one batched
+    Newton-Schulz call. Filter norms are reset to sqrt(out_channels) every few
+    steps, with the interval growing over training as in hiverge/cifar10-speedrun.
+    """
+
+    def __init__(self, params, lr, momentum, weight_decay, total_steps, zeropower):
+        super().__init__(params, dict(lr=lr, momentum=momentum, weight_decay=weight_decay))
+        buckets = {}
+        for p in self.param_groups[0]["params"]:
+            buckets.setdefault(tuple(p.shape), []).append(p)
+        self.buckets = list(buckets.values())
+        self.buffers = [[torch.zeros_like(p) for p in ps] for ps in self.buckets]
+        self.total_steps = total_steps
+        self.zeropower = zeropower
+        self.steps = 0
+        self.last_norm = 0
+
+    @torch.no_grad()
+    def step(self):
+        group = self.param_groups[0]
+        lr, momentum = group["lr"], group["momentum"]
+        self.steps += 1
+        renorm = self.steps - self.last_norm >= 2 + int(15 * self.steps / self.total_steps)
+        if renorm:
+            self.last_norm = self.steps
+        for params, buffers in zip(self.buckets, self.buffers):
+            grads = [p.grad for p in params]
+            torch._foreach_mul_(buffers, momentum)
+            torch._foreach_add_(buffers, grads)
+            updates = torch._foreach_add(grads, buffers, alpha=momentum)
+            G = torch.stack(updates).flatten(2)
+            transposed = G.size(1) > G.size(2)
+            U = self.zeropower(G.mT if transposed else G)
+            U = (U.mT if transposed else U).reshape(len(params), *params[0].shape)
+            if renorm:
+                norms = torch._foreach_norm(params)
+                torch._foreach_mul_(
+                    params, [len(p) ** 0.5 / (n + 1e-7) for p, n in zip(params, norms)]
+                )
+            torch._foreach_add_(params, list(U.to(params[0].dtype).unbind(0)), alpha=-lr)
+            if group["weight_decay"]:
+                torch._foreach_mul_(params, 1 - lr * group["weight_decay"])
+
+
+#############################################
 #               Augmentation                #
 #############################################
+
+
+def color_jitter(images, brightness, contrast):
+    n = len(images)
+    shift = (torch.rand(n, 1, 1, 1, device=images.device, dtype=images.dtype) * 2 - 1) * brightness
+    scale = (torch.rand(n, 1, 1, 1, device=images.device, dtype=images.dtype) * 2 - 1) * contrast
+    return (images + shift) * (scale + 1)
 
 
 def batch_flip_lr(images):
@@ -246,16 +352,6 @@ def batch_cutout(images, size):
     return images.masked_fill(mask, 0)
 
 
-def batch_jitter(images, strength, generator):
-    """Per-image contrast (x * c) and brightness (+ b) jitter, c in [1-s, 1+s], b in [-s, s]
-    in normalized units; drawn from `generator` so the global RNG stream is untouched."""
-    n = len(images)
-    uniform = torch.rand(2, n, device=images.device, generator=generator) * 2 - 1
-    contrast = (1 + strength * uniform[0]).to(images.dtype).view(-1, 1, 1, 1)
-    brightness = (strength * uniform[1]).to(images.dtype).view(-1, 1, 1, 1)
-    return images * contrast + brightness
-
-
 def indexed_crop(images, crop_size):
     """One gather per epoch, with the same uniform crop distribution as batch_crop."""
     n, _, h, w = images.shape
@@ -293,14 +389,28 @@ def build(context: BuildContext):
         raise ValueError("hard_fraction must be in (0, 1]; proxy_every must be positive")
     if hyp["proxy_mode"] not in ("online", "offline"):
         raise ValueError("proxy_mode must be online or offline")
-    if hyp["gelu_approximate"] not in ("none", "tanh", "silu"):
-        raise ValueError("gelu_approximate must be none, tanh or silu")
+    if hyp["gelu_approximate"] not in ("none", "tanh"):
+        raise ValueError("gelu_approximate must be none or tanh")
     if hyp["autotune_backends"] not in ("ATEN", "TRITON", "ATEN,TRITON"):
         raise ValueError("autotune_backends must be ATEN, TRITON, or ATEN,TRITON")
     if len(hyp["pool_first"]) != 3 or any(type(v) is not bool for v in hyp["pool_first"]):
         raise ValueError("pool_first must contain three booleans")
-    if hyp["jitter"] < 0:
-        raise ValueError("jitter must be non-negative")
+    if hyp["activation"] not in ("gelu", "silu") or hyp["bn_dtype"] not in ("float", "half"):
+        raise ValueError("activation must be gelu or silu; bn_dtype must be float or half")
+    if not hyp["resolution_schedule"] and hyp["train_resolution"] < 32:
+        hyp["resolution_schedule"] = [[hyp["train_resolution"], hyp["resolution_switch"]]]
+    if any(r not in (16, 20, 24, 28) or not 0 <= f <= 1 for r, f in hyp["resolution_schedule"]):
+        raise ValueError("resolution_schedule entries must be [16|20|24|28, fraction]")
+    if len(hyp["inner_kernels"]) != 3 or any(k not in (1, 3) for k in hyp["inner_kernels"]):
+        raise ValueError("inner_kernels must contain three values of 1 or 3")
+    if hyp["stem"] not in ("patch2", "patch4s2"):
+        raise ValueError("stem must be patch2 or patch4s2")
+    if any(b <= 0 or not 0 <= f <= 1 for b, f in hyp["batch_schedule"]):
+        raise ValueError("batch_schedule entries must be [positive batch, fraction]")
+    if hyp["global_pool"] not in ("adaptive", "amax", "max"):
+        raise ValueError("global_pool must be adaptive, amax, or max")
+    if hyp["optimizer"] not in ("sgd", "muon") or len(hyp["color_jitter"]) != 2:
+        raise ValueError("optimizer must be sgd or muon; color_jitter needs two ranges")
     device = context.device
     cuda = device.type == "cuda"
     dtype = torch.float16 if cuda else torch.float32
@@ -313,22 +423,25 @@ def build(context: BuildContext):
     import torch._inductor.config as inductor_config
 
     inductor_config.max_autotune_gemm_backends = hyp["autotune_backends"]
+    for flag in hyp["inductor_tuning"]:
+        if flag not in ("coordinate_descent_tuning", "aggressive_fusion"):
+            raise ValueError(f"Unsupported inductor_tuning flag: {flag}")
+        setattr(inductor_config, flag, True)
 
     net = Net(hyp, context.num_classes).to(device, dtype, memory_format=torch.channels_last)
-    for m in net.modules():
-        if isinstance(m, nn.BatchNorm2d):
-            m.float()
-    if cuda and hyp["compile"] and hyp["train_resolution"] < 32:
-        # Progressive resizing: one static graph per resolution over the same eager net.
-        # dynamic=False keeps dynamo from switching to dynamic shapes on the second size, and
-        # the low-res graph compiles in the cheaper low_res_compile mode (a second
-        # max-autotune graph added about 230 s to the cold build).
-        train_net = torch.compile(net, mode=hyp["compile"], dynamic=False)
-        low_net = torch.compile(net, mode=hyp["low_res_compile"], dynamic=False)
-    elif cuda and hyp["compile"]:
-        train_net = low_net = torch.compile(net, mode=hyp["compile"])
-    else:
-        train_net = low_net = net
+    if hyp["bn_dtype"] == "float":
+        for m in net.modules():
+            if isinstance(m, nn.BatchNorm2d):
+                m.float()
+    compiled = cuda and hyp["compile"]
+    # Static shapes: one graph per training resolution, all compiled in the warmup
+    # below. Automatic dynamic shapes would recompile mid-trial at a new size.
+    torch._dynamo.config.cache_size_limit = max(torch._dynamo.config.cache_size_limit, 32)
+    train_net = (
+        torch.compile(net, mode=hyp["compile"], dynamic=False)
+        if compiled and not hyp["compile_step"]
+        else net
+    )
 
     def loss_fn(outputs, labels):
         return F.cross_entropy(
@@ -336,22 +449,35 @@ def build(context: BuildContext):
         )
 
     loss_fn = torch.compile(loss_fn) if cuda and hyp["compile_loss"] else loss_fn
+
+    def forward_loss(inputs, labels, whiten_bias_grad: bool):
+        return loss_fn(train_net(inputs, whiten_bias_grad), labels)
+
+    if compiled and hyp["compile_step"]:
+        forward_loss = torch.compile(forward_loss, mode=hyp["compile"], dynamic=False)
     float_state = [t for t in net.state_dict().values() if t.is_floating_point()]
+    # Bilinear 32 -> r resize as two matmuls (A x A^T); F.interpolate on 50k fp16
+    # channels-last images takes about 65 ms, the matmuls about 2 ms.
+    resize = {}
+    for resolution, _ in hyp["resolution_schedule"]:
+        eye = torch.eye(32).view(1, 1, 32, 32)
+        matrix = F.interpolate(eye, size=(resolution, 32), mode="bilinear", align_corners=False)
+        resize[resolution] = matrix[0, 0].to(device, dtype)
     state = SimpleNamespace(
         hyp=hyp,
         device=device,
         dtype=dtype,
+        resize=resize,
         net=net,
         train_net=train_net,
-        low_net=low_net,
         loss_fn=loss_fn,
+        forward_loss=forward_loss,
+        zeropower=torch.compile(newton_schulz, dynamic=False) if compiled else newton_schulz,
         classifier=Classifier(net, dtype).to(device),
         float_state=float_state,
         ema=[t.clone() for t in float_state],
         proxy=None,
         crop_kernel=crop_kernel,
-        aug_generator=None,
-        nonfinite=None,
     )
     if hyp["hard_fraction"] < 1:
         proxy_hyp = {**hyp, "widths": hyp["proxy_widths"], "depths": [2, 2, 2]}
@@ -376,13 +502,16 @@ def build(context: BuildContext):
             torch.randint(0, 256, (count, 3, 32, 32), dtype=torch.uint8),
             torch.randint(0, context.num_classes, (count,)),
         )
-        for resolution in sorted({hyp["train_resolution"], 32}):
-            state.warmup_resolution = resolution
-            for _ in range(2):
-                prepare(state, synthetic, seed=0)
-                state.whiten_bias_steps = 3
-                _fit(state, total_steps=6)
-        del state.warmup_resolution
+        batches = sorted({b for b, _ in hyp["batch_schedule"]} | {hyp["batch_size"]})
+        resolutions = sorted({r for r, _ in hyp["resolution_schedule"]} | {32})
+        for batch in batches:
+            for resolution in resolutions:
+                state.warmup_batch, state.warmup_resolution = batch, resolution
+                for _ in range(2):
+                    prepare(state, synthetic, seed=0)
+                    state.whiten_bias_steps = 3
+                    _fit(state, total_steps=6)
+        del state.warmup_batch, state.warmup_resolution
         state.classifier.eval()
         with torch.inference_mode():
             for size in (context.eval_batch_size, 10_000 % context.eval_batch_size, 1):
@@ -413,26 +542,16 @@ def prepare(state, data: TrainingData, seed: int) -> None:
         state.proxy.train()
         state.proxy.whiten.weight.data.copy_(net.whiten.weight)
     torch._foreach_copy_(state.ema, state.float_state)
-    # Extra augmentation randomness comes from its own generator, re-seeded every trial, so
-    # the global stream (init, data order, flips, crops) stays identical to the base recipe.
-    state.aug_generator = (
-        torch.Generator(device=device).manual_seed(seed) if hyp["jitter"] else None
-    )
 
     # Alternating flip: flip a random half once, then mirror everything on odd epochs.
     images = batch_flip_lr(images)
-    if hyp["train_resolution"] < 32:
-        small = F.interpolate(
-            images,
-            size=(hyp["train_resolution"],) * 2,
-            mode="bilinear",
-            align_corners=False,
-        )
+    state.small_images = {}
+    for resolution, _ in hyp["resolution_schedule"]:
+        matrix = state.resize[resolution]
+        small = torch.matmul(torch.matmul(matrix, images), matrix.T)
         if hyp["translate"]:
             small = F.pad(small, (hyp["translate"],) * 4, "reflect")
-        state.small_images = small.to(memory_format=torch.channels_last)
-    else:
-        state.small_images = None
+        state.small_images[resolution] = small.to(memory_format=torch.channels_last)
     if hyp["translate"]:
         images = F.pad(images, (hyp["translate"],) * 4, "reflect")
     state.images = images
@@ -444,15 +563,18 @@ def prepare(state, data: TrainingData, seed: int) -> None:
     lr = hyp["lr"] / kilostep_scale
     wd = hyp["weight_decay"] * batch_size / kilostep_scale
     lr_biases = lr * hyp["bias_scaler"]
-    state.optimizer = _make_optimizer(net, lr, lr_biases, wd * hyp["hard_fraction"], hyp, device)
-    if state.proxy is not None:
-        state.proxy_optimizer = _make_optimizer(state.proxy, lr, lr_biases, wd, hyp, device)
-
     state.batch_size = batch_size
     state.masks = []
     state.steps_per_epoch = len(data.labels) // batch_size
     state.total_steps = math.ceil(hyp["epochs"] * state.steps_per_epoch)
     state.whiten_bias_steps = math.ceil(hyp["whiten_bias_epochs"] * state.steps_per_epoch)
+    if hyp["optimizer"] == "muon":
+        state.optimizers = _make_muon(net, batch_size, state.total_steps, hyp, state)
+    else:
+        sgd_wd = wd * hyp["hard_fraction"]
+        state.optimizers = [_make_optimizer(net, lr, lr_biases, sgd_wd, hyp, device)]
+    if state.proxy is not None:
+        state.proxy_optimizer = _make_optimizer(state.proxy, lr, lr_biases, wd, hyp, device)
 
 
 def _make_optimizer(net, lr, lr_biases, wd, hyp, device):
@@ -469,7 +591,30 @@ def _make_optimizer(net, lr, lr_biases, wd, hyp, device):
     )
     for group in optimizer.param_groups:
         group["initial_lr"] = group["lr"]
+        group["initial_weight_decay"] = group["weight_decay"]
     return optimizer
+
+
+def _make_muon(net, batch_size, total_steps, hyp, state):
+    wd = hyp["muon_wd"] * batch_size
+    bias_lr, head_lr = hyp["bias_lr"], hyp["head_lr"]
+    norm_biases = [p for name, p in net.named_parameters() if "norm" in name and p.requires_grad]
+    filters = [p for p in net.parameters() if p.ndim == 4 and p.requires_grad]
+    sgd = torch.optim.SGD(
+        [
+            dict(params=[net.whiten.bias], lr=bias_lr, weight_decay=wd / bias_lr, whiten=True),
+            dict(params=norm_biases, lr=bias_lr, weight_decay=wd / bias_lr),
+            dict(params=[net.head.weight], lr=head_lr, weight_decay=wd / head_lr),
+        ],
+        momentum=hyp["momentum"],
+        nesterov=True,
+        fused=hyp["fused_sgd"] and state.device.type == "cuda",
+    )
+    muon = Muon(filters, hyp["muon_lr"], hyp["muon_momentum"], wd, total_steps, state.zeropower)
+    for optimizer in (sgd, muon):
+        for group in optimizer.param_groups:
+            group["initial_lr"] = group["lr"]
+    return [sgd, muon]
 
 
 def train(state) -> nn.Module:
@@ -483,46 +628,51 @@ def train(state) -> nn.Module:
         if cuda_rng is not None:
             torch.cuda.set_rng_state(cuda_rng, state.device)
     _fit(state, state.total_steps)
-    if hyp_count_nonfinite(state):
-        # One host read at the very end (the harness synchronizes here anyway). The worker's
-        # stderr is inherited, so the launcher can parse this line from the container log.
-        state.nonfinite_losses = int(state.nonfinite)
-        print(f"NONFINITE_LOSSES {state.nonfinite_losses}", file=sys.stderr, flush=True)
     return state.classifier
 
 
-def hyp_count_nonfinite(state) -> bool:
-    return bool(state.hyp["count_nonfinite"]) and state.nonfinite is not None
-
-
 def _fit(state, total_steps, proxy_only=False):
-    hyp, net, optimizer = state.hyp, state.net, state.optimizer
-    labels, batch_size, steps_per_epoch = state.labels, state.batch_size, state.steps_per_epoch
-    warmup_steps = int(total_steps * hyp["warmup"])
-    ema_decay = (0.95**5 * (torch.arange(total_steps + 1) / total_steps) ** 3).tolist()
-    nonfinite = (
-        torch.zeros((), dtype=torch.int64, device=labels.device)
-        if hyp["count_nonfinite"] and not proxy_only
-        else None
-    )
+    hyp, net, optimizers = state.hyp, state.net, state.optimizers
+    labels, base_batch = state.labels, state.batch_size
+    # Schedules run on progress = examples seen / total examples, so a batch-size
+    # schedule changes the step count but not the learning-rate curve. With a
+    # constant batch this equals step / total_steps exactly.
+    total_examples = total_steps * base_batch
+    warmup_frac = int(total_steps * hyp["warmup"]) / total_steps
+    whiten_frac = state.whiten_bias_steps / total_steps
+    ema_scale = 0.95**5
     step = 0
+    seen = 0
     net.train()
-    for epoch in range(math.ceil(total_steps / steps_per_epoch)):
+    epoch = 0
+    while seen < total_examples:
+        progress = seen / total_examples
+        batch_size = getattr(state, "warmup_batch", None) or next(
+            (b for b, end in hyp["batch_schedule"] if progress < end), base_batch
+        )
+        batch_size = min(batch_size, len(labels))
+        if batch_size != base_batch or hyp["batch_schedule"]:
+            for optimizer in optimizers:
+                for group in optimizer.param_groups:
+                    if "initial_weight_decay" in group:
+                        group["weight_decay"] = (
+                            group["initial_weight_decay"] * batch_size / base_batch
+                        )
+        steps_per_epoch = len(labels) // batch_size
         images = None
         current_resolution = None
         order = torch.randperm(len(labels), device=labels.device)
         for i in range(steps_per_epoch):
-            if step >= total_steps:
+            if seen >= total_examples:
                 break
+            progress = seen / total_examples
             resolution = getattr(state, "warmup_resolution", None)
             if resolution is None:
-                resolution = (
-                    hyp["train_resolution"]
-                    if step < int(total_steps * hyp["resolution_switch"])
-                    else 32
+                resolution = next(
+                    (r for r, end in hyp["resolution_schedule"] if progress < end), 32
                 )
             if resolution != current_resolution:
-                source = state.small_images if resolution < 32 else state.images
+                source = state.small_images[resolution] if resolution < 32 else state.images
                 if state.crop_kernel is not None:
                     images = state.crop_kernel(source, resolution, flip=epoch % 2 == 1)
                 else:
@@ -532,10 +682,9 @@ def _fit(state, total_steps, proxy_only=False):
                     images = images.flip(-1)
                 if hyp["cutout"]:
                     images = batch_cutout(images, hyp["cutout"])
-                if hyp["jitter"]:
-                    images = batch_jitter(images, hyp["jitter"], state.aug_generator)
+                if any(hyp["color_jitter"]):
+                    images = color_jitter(images, *hyp["color_jitter"])
                 current_resolution = resolution
-                train_net = state.train_net if resolution == 32 else state.low_net
             idx = order[i * batch_size : (i + 1) * batch_size]
             inputs, targets = images[idx], labels[idx]
             offline_main = (
@@ -562,7 +711,7 @@ def _fit(state, total_steps, proxy_only=False):
                 if update_proxy:
                     state.proxy_optimizer.zero_grad(set_to_none=True)
                     proxy_losses[chosen].sum().backward()
-                    proxy_frac = step / max(1, total_steps)
+                    proxy_frac = progress
                     proxy_scale = min(1.0, 0.2 + 8 * proxy_frac) * (1 - proxy_frac)
                     for group in state.proxy_optimizer.param_groups:
                         group["lr"] = group["initial_lr"] * proxy_scale
@@ -571,29 +720,57 @@ def _fit(state, total_steps, proxy_only=False):
                 if proxy_only:
                     state.masks.append(chosen)
                     step += 1
+                    seen += batch_size
                     continue
-            outputs = train_net(inputs, step < state.whiten_bias_steps)
-            loss = state.loss_fn(outputs, targets)
-            if nonfinite is not None:
-                nonfinite += (~torch.isfinite(loss.detach())).to(nonfinite.dtype)
-            optimizer.zero_grad(set_to_none=True)
+            loss = state.forward_loss(inputs, targets, progress < whiten_frac)
+            for optimizer in optimizers:
+                optimizer.zero_grad(set_to_none=True)
             loss.backward()
-            if step < warmup_steps:
-                frac = step / warmup_steps
+            if progress < warmup_frac:
+                frac = progress / warmup_frac
                 scale = 0.2 * (1 - frac) + frac
             else:
-                frac = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+                frac = (progress - warmup_frac) / max(1e-9, 1 - warmup_frac)
                 scale = (1 - frac) + hyp["final_lr"] * frac
-            for group in optimizer.param_groups:
-                group["lr"] = group["initial_lr"] * scale
-            optimizer.step()
+            whiten_scale = max(0.0, 1 - progress / max(1e-9, whiten_frac))
+            for optimizer in optimizers:
+                for group in optimizer.param_groups:
+                    group["lr"] = group["initial_lr"] * (
+                        whiten_scale if "whiten" in group else scale
+                    )
+                optimizer.step()
             step += 1
+            seen += batch_size
             if hyp["ema_every"] and step % hyp["ema_every"] == 0:
-                _lookahead(state, ema_decay[step])
+                _lookahead(state, ema_scale * min(1.0, seen / total_examples) ** 3)
+        epoch += 1
     if hyp["ema_every"] and not proxy_only:
         _lookahead(state, 1.0)
-    if not proxy_only:
-        state.nonfinite = nonfinite
+    if hyp["bn_recal_batches"] and not proxy_only:
+        _recalibrate_bn(state)
+
+
+@torch.no_grad()
+def _recalibrate_bn(state):
+    """Re-estimate BatchNorm running statistics on unaugmented training images.
+
+    Training batches are translated and flipped; evaluation sees plain 32x32
+    images. A few forward passes over center crops align the statistics with
+    that. This runs inside train() and uses only training images.
+    """
+    net, t = state.net, state.hyp["translate"]
+    norms = [m for m in net.modules() if isinstance(m, nn.BatchNorm2d)]
+    for m in norms:
+        m.reset_running_stats()
+        m.momentum = None  # cumulative average over the recalibration batches
+    images = state.images[:, :, t : t + 32, t : t + 32] if t else state.images
+    batch = state.batch_size
+    order = torch.randperm(len(images), device=images.device)
+    net.train()
+    for i in range(min(state.hyp["bn_recal_batches"], len(images) // batch)):
+        net(images[order[i * batch : (i + 1) * batch]], False)
+    for m in norms:
+        m.momentum = 1 - state.hyp["bn_momentum"]
 
 
 @torch.no_grad()

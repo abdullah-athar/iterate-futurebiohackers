@@ -1,6 +1,7 @@
-"""Tests for the autoresearch loop: novelty gate, import guard, archive, agent-mode run."""
+"""Tests for the autoresearch loop: novelty gate, import guard, candidate/scorer boundary, archive, agent-mode run."""
 
 import json
+import os
 import random
 import shutil
 import sys
@@ -24,6 +25,7 @@ from autoresearch.loop import LoopConfig, ResearchRun
 from autoresearch.novelty import check_novelty, normalize
 from autoresearch.problem import get_problem
 from autoresearch.report import render
+from autoresearch.sandbox import evaluate_in_subprocess
 
 import autoresearch_fixtures as mp
 
@@ -53,6 +55,58 @@ def test_import_guard():
     print("  Import guard test passed!")
 
 
+HONEST = "def solve(instance):\n    return instance.strings[0]\n"
+PEEK_ANSWER = "def solve(instance):\n    return instance.planted_consensus\n"
+NO_SECRETS = ("def solve(instance):\n"
+              "    assert instance.planted_consensus is None and instance.known_best_score is None\n"
+              "    assert not instance.metadata and instance.description == ''\n"
+              "    return instance.strings[0]\n")
+MUTATE_INPUTS = "def solve(instance):\n    instance.strings[:] = instance.strings[:1]\n    return instance.strings[0]\n"
+TAMPER_SCORER = ("import median_string.metrics as m\n\ndef solve(instance):\n"
+                 "    m.levenshtein_distance = lambda a, b: 0\n    m.hamming_distance = lambda a, b: 0\n"
+                 "    return instance.strings[0]\n")
+NOT_A_STRING = "def solve(instance):\n    return 12345\n"
+READ_SECRET_ENV = ("import os\n\ndef solve(instance):\n"
+                   "    return instance.strings[0] if 'AUTORESEARCH_CONFIRM_SEED' not in os.environ else ''\n")
+
+
+def test_evaluator_boundary():
+    """Candidate code runs in its own process on a copy of the inputs; the parent scores the originals.
+    Each probe below produced a false score on the previous single-process evaluator."""
+    print("Testing the candidate/scorer boundary...")
+    problem = get_problem("median_string")
+
+    def ev(src):
+        return evaluate_in_subprocess("median_string", problem, src, "screen", 1000)
+
+    honest = ev(HONEST)
+    assert honest.ok and honest.score > honest.baseline > 0, honest
+    # 1. the planted answer, its score and the generator metadata are not in what the candidate sees
+    peek = ev(PEEK_ANSWER)
+    assert not peek.ok and all("must be a string" in i.error for i in peek.instances), peek
+    assert ev(NO_SECRETS).score == honest.score
+    # 2. mutating the inputs changes nothing: score and baseline come from the evaluator's own copy
+    mut = ev(MUTATE_INPUTS)
+    assert mut.ok and (mut.score, mut.baseline) == (honest.score, honest.baseline), mut
+    # 3. monkeypatching the distance functions inside the candidate's process cannot reach the scorer
+    tam = ev(TAMPER_SCORER)
+    assert tam.ok and (tam.score, tam.baseline) == (honest.score, honest.baseline), tam
+    # 4. a non-string answer is invalid (penalty), not a crash of the harness
+    bad = ev(NOT_A_STRING)
+    assert not bad.ok and bad.score == bad.baseline + 1000 * len(bad.instances), bad
+    # 5. the hidden-suite seeds are stripped from the candidate's environment
+    os.environ["AUTORESEARCH_CONFIRM_SEED"] = "4242"
+    try:
+        env = ev(READ_SECRET_ENV)
+    finally:
+        del os.environ["AUTORESEARCH_CONFIRM_SEED"]
+    assert env.ok and env.score == honest.score, env
+    # 6. budget enforcement and per-instance CPU accounting still work across the process boundary
+    slow = ev(mp.SLOW_ON_VALIDATE.replace("> 18", ">= 0"))
+    assert not slow.ok and all("over budget" in i.error and i.cpu_ms > 1000 for i in slow.instances), slow
+    print("  Boundary test passed!")
+
+
 def test_agent_run():
     print("Testing agent-mode research run (evaluates real candidates, ~1 min)...")
     tmp = Path(tempfile.mkdtemp(prefix="autoresearch-test-"))
@@ -64,7 +118,7 @@ def test_agent_run():
         proposals = [
             (mp.SEED_DUPLICATE, "cosmetic rewrite of the seed", "tune"),
             (mp.SLOW_ON_VALIDATE, "set median, but slow on the objective split", "tune"),
-            (mp.FAST_DESCENT, "steepest descent with incremental DP over sub/ins/del", "tune"),
+            (mp.FAST_INDEL_SEARCH, "set median + substitution/insertion/deletion search", "tune"),
             (mp.BROKEN, "syntax error", "fix_losers"),
         ]
         entries = [run.submit(src, hyp, mode, [run.archive().global_best.id], proposer="test")
@@ -94,7 +148,7 @@ def test_swarm():
     tmp = Path(tempfile.mkdtemp(prefix="autoresearch-swarm-"))
     try:
         run = ResearchRun.create(RunStore(tmp / "run"), LoopConfig(problem="median_string"))
-        sources = [mp.FAST_DESCENT, mp.SEED_DUPLICATE, ""]
+        sources = [mp.FAST_INDEL_SEARCH, mp.SEED_DUPLICATE, ""]
 
         def propose_many(run, gen, assignments):
             return [{"assignment": a, "source": sources[a.worker % 3], "hypothesis": f"w{a.worker}",
@@ -116,10 +170,49 @@ def test_swarm():
     print("  Swarm test passed!")
 
 
+def test_viz_lineage():
+    print("Testing the dashboard's idea-lineage chart (merges, duplicates, disjoint trees)...")
+    from autoresearch_viz.html import render
+    from autoresearch_viz.load import load_run
+
+    rows = [
+        {"id": 0, "parent_ids": [], "mode": "seed", "status": "seed", "objective": 100, "improved_global": True},
+        {"id": 1, "parent_ids": [0], "mode": "tune", "status": "kept", "objective": 90, "improved_global": True, "verdict": "supported", "generation": 1},
+        {"id": 2, "parent_ids": [0], "mode": "new_family", "status": "evaluated", "objective": 95, "verdict": "falsified", "generation": 1},
+        {"id": 3, "parent_ids": [0], "mode": "tune", "status": "rejected_duplicate", "verdict": "untested", "generation": 1,
+         "novelty": {"nearest_id": 1, "max_similarity": 0.99}},
+        {"id": 4, "parent_ids": [1, 2], "mode": "merge", "status": "kept", "objective": 80, "improved_global": True, "generation": 2,
+         "hypothesis": "combine <both> & \"quote\""},
+        {"id": 5, "parent_ids": [4], "mode": "fix_losers", "status": "rejected_duplicate", "generation": 3},
+        {"id": 6, "parent_ids": [4, 99], "mode": "tune", "status": "failed", "generation": 3},
+        {"id": 7, "parent_ids": [0], "mode": "new_family", "status": "evaluated", "objective": 97},
+        {"id": 8, "parent_ids": [7], "mode": "tune", "status": "evaluated", "objective": 96},
+    ]
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-viz-"))
+    try:
+        (tmp / "ledger.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        html = render([load_run(tmp)])
+        card = html[html.index("<h2>Idea lineage</h2>"):html.index("<h2>Research trajectory</h2>")]
+        ideas = card[card.index('data-group="linview0" data-key="ideas"'):card.index('data-group="linview0" data-key="evaluated"')]
+        assert ideas.count('class="ln') == 8 and 'data-id="0"' not in ideas, "seed must be hidden by default"
+        assert ideas.count('class="le') == 5, ideas.count('class="le')  # 1→4, 2→4, 4→5, 4→6, 7→8
+        assert "one-off idea" in ideas and "ideas from #1, #2" in ideas and "ideas from #7" in ideas
+        assert "★ #4 best" in ideas and "&lt;both&gt;" in ideas
+        evaluated = card[card.index('data-group="linview0" data-key="evaluated"'):card.index('data-group="linview0" data-key="seed"')]
+        assert evaluated.count('class="ln') == 6 and "duplicates hidden" in evaluated
+        with_seed = card[card.index('data-group="linview0" data-key="seed"'):]
+        assert with_seed.count('class="ln') == 9 and "9 ideas from #0" in with_seed
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Lineage chart test passed!")
+
+
 if __name__ == "__main__":
     random.seed(0)
     test_novelty_gate()
     test_import_guard()
+    test_evaluator_boundary()
     test_agent_run()
     test_swarm()
+    test_viz_lineage()
     print("\nAll autoresearch tests passed!")

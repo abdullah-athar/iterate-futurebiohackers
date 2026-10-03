@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from html import escape
 from itertools import pairwise
@@ -202,5 +203,156 @@ def stacked_hbars(rows: list[tuple[str, list[tuple[str, str, float]]]], *, width
                 out.append(f'<text class="seg" x="{x + w / 2:.1f}" y="{y + bar_h / 2 + 4:.1f}" text-anchor="middle">{v:g}</text>')
             x += w
         out.append(f'<text class="val" x="{x + 6:.1f}" y="{y + bar_h / 2 + 4:.1f}">{total:g} proposals</text>')
+    out.append("</svg>")
+    return "\n".join(out)
+
+
+@dataclass
+class DagNode:
+    id: int
+    layer: int
+    tip: str
+    colors: dict[str, str]  # colour scheme -> colour; the first scheme is drawn initially
+    radius: float = 5.0
+    hollow: bool = False  # drawn as an outline (e.g. never evaluated)
+    ring: str = ""  # outline colour for highlighted nodes
+    label: str = ""
+
+
+@dataclass
+class DagEdge:
+    src: int
+    dst: int
+    color: str = "#94a3b8"
+    emphasis: bool = False
+
+
+def _dag_components(ids: list[int], edges: list[DagEdge]) -> list[list[int]]:
+    root = {i: i for i in ids}
+
+    def find(x: int) -> int:
+        while root[x] != x:
+            root[x] = root[root[x]]
+            x = root[x]
+        return x
+
+    for e in edges:
+        root[find(e.dst)] = find(e.src)
+    comps: dict[int, list[int]] = {}
+    for i in ids:
+        comps.setdefault(find(i), []).append(i)
+    return sorted(comps.values(), key=lambda c: (-len(c), min(c)))
+
+
+def _dag_rows(comp: list[int], layer: dict[int, int], parents: dict[int, list[int]], children: dict[int, list[int]]) -> tuple[dict[int, int], int]:
+    """Order each layer by the barycentre of its neighbours (a few Sugiyama sweeps), then pack into rows."""
+    by_layer: dict[int, list[int]] = {}
+    for i in sorted(comp):
+        by_layer.setdefault(layer[i], []).append(i)
+    layers = sorted(by_layer)
+    pos = {i: float(k) for ids in by_layer.values() for k, i in enumerate(ids)}
+
+    def sweep(order: list[int], nbrs: dict[int, list[int]]) -> None:
+        for lv in order:
+            ids = by_layer[lv]
+            key = {i: (sum(pos[n] for n in nbrs[i]) / len(nbrs[i]) if nbrs[i] else pos[i]) for i in ids}
+            ids.sort(key=lambda i: (key[i], i))
+            pos.update({i: float(k) for k, i in enumerate(ids)})
+
+    for _ in range(4):
+        sweep(layers[1:], parents)
+        sweep(layers[-2::-1], children)
+    height = max(len(v) for v in by_layer.values())
+    row: dict[int, int] = {}
+    for lv in layers:
+        ids = by_layer[lv]
+        want = [round(sum(row[p] for p in parents[i]) / len(parents[i])) if parents[i] else k for k, i in enumerate(ids)]
+        ys: list[int] = []
+        for w in want:
+            ys.append(max(w, ys[-1] + 1 if ys else 0))
+        for k in range(len(ys) - 1, -1, -1):
+            ys[k] = min(ys[k], height - 1 if k == len(ys) - 1 else ys[k + 1] - 1)
+        row.update(zip(ids, ys))
+    return row, height
+
+
+def dag_chart(
+    nodes: list[DagNode],
+    edges: list[DagEdge],
+    *,
+    layer_label: str = "gen",
+    width: int = 1180,
+    row_h: int = 20,
+    group_label: Callable[[list[int], bool], str] | None = None,
+) -> str:
+    """Layered DAG, one column per layer, edges drawn left to right. Weakly connected components are
+    stacked as separate bands (all single-node components share one band).
+    `group_label(ids, is_singles_band)` names a band."""
+    if not nodes:
+        return "<p class='muted'>No proposals yet.</p>"
+    by_id = {n.id: n for n in nodes}
+    edges = [e for e in edges if e.src in by_id and e.dst in by_id and by_id[e.src].layer < by_id[e.dst].layer]
+    parents: dict[int, list[int]] = {i: [] for i in by_id}
+    children: dict[int, list[int]] = {i: [] for i in by_id}
+    for e in edges:
+        parents[e.dst].append(e.src)
+        children[e.src].append(e.dst)
+    layer = {n.id: n.layer for n in nodes}
+    comps = _dag_components(list(by_id), edges)
+    singles = sorted(i for c in comps if len(c) == 1 for i in c)
+    bands = [c for c in comps if len(c) > 1] + ([singles] if singles else [])
+    layers = sorted(set(layer.values()))
+    col = {lv: k for k, lv in enumerate(layers)}
+    ml, mr, mt, band_head, band_gap = 14, 14, 26, 20, 12
+    cw = max((width - ml - mr) / len(layers), 46.0)
+    width = int(ml + mr + cw * len(layers))
+    xy: dict[int, tuple[float, float]] = {}
+    heads: list[tuple[float, float, str]] = []
+    y0 = mt
+    for band in bands:
+        label = group_label(band, band is singles) if group_label else f"{len(band)} nodes"
+        if band is singles:  # isolated nodes need no edges, so pack them into a small grid inside their column
+            per_row = max(int(cw // (row_h * 0.8)), 1)
+            slot: dict[int, int] = {}
+            for i in band:
+                k = slot[layer[i]] = slot.get(layer[i], -1) + 1
+                gx = (k % per_row - (per_row - 1) / 2) * row_h * 0.8
+                xy[i] = (ml + cw * (col[layer[i]] + 0.5) + gx, y0 + band_head + (k // per_row + 0.5) * row_h)
+            h = max((k // per_row + 1 for k in slot.values()), default=1)
+        else:
+            row, h = _dag_rows(band, layer, parents, children)
+            for i in band:
+                xy[i] = (ml + cw * (col[layer[i]] + 0.5), y0 + band_head + (row[i] + 0.5) * row_h)
+        heads.append((y0, y0 + band_head + h * row_h, label))
+        y0 += band_head + h * row_h + band_gap
+    height = int(y0)
+    out = [f'<svg class="lin" viewBox="0 0 {width} {height}" width="{width}" height="{height}" data-w="{width}" data-h="{height}" role="img">']
+    for lv in layers:
+        x = ml + cw * (col[lv] + 0.5)
+        out.append(f'<line class="grid" x1="{x:.1f}" x2="{x:.1f}" y1="{mt - 6}" y2="{height - band_gap}"/>')
+        out.append(f'<text class="tick" x="{x:.1f}" y="{mt - 10}" text-anchor="middle">{escape(layer_label)} {lv}</text>')
+    for top, _bottom, label in heads:
+        if top > mt:
+            out.append(f'<line class="axis" x1="{ml}" x2="{width - mr}" y1="{top - band_gap / 2:.1f}" y2="{top - band_gap / 2:.1f}"/>')
+        out.append(f'<text class="label" x="{ml}" y="{top + 13:.1f}">{escape(label)}</text>')
+    for e in sorted(edges, key=lambda e: e.emphasis):
+        (x1, y1), (x2, y2) = xy[e.src], xy[e.dst]
+        dx = min(cw * 0.7, (x2 - x1) / 2)
+        cls = "le em" if e.emphasis else "le"
+        out.append(
+            f'<path class="{cls}" data-s="{e.src}" data-t="{e.dst}" stroke="{e.color}" '
+            f'd="M{x1:.1f},{y1:.1f} C{x1 + dx:.1f},{y1:.1f} {x2 - dx:.1f},{y2:.1f} {x2:.1f},{y2:.1f}"/>'
+        )
+    for n in sorted(nodes, key=lambda n: bool(n.ring)):
+        x, y = xy[n.id]
+        color = next(iter(n.colors.values()), "#64748b")
+        data = " ".join(f'data-c{k}="{v}"' for k, v in n.colors.items())
+        paint = f'fill="#fff" stroke="{color}" data-hollow="1"' if n.hollow else f'fill="{color}" stroke="{n.ring or "#fff"}"'
+        out.append(
+            f'<circle class="ln{" ring" if n.ring else ""}" data-id="{n.id}" cx="{x:.1f}" cy="{y:.1f}" r="{n.radius:.1f}" {paint} {data} '
+            f'data-tip="{escape(n.tip, quote=True)}"/>'
+        )
+        if n.label:
+            out.append(f'<text class="nl" x="{x + n.radius + 2:.1f}" y="{y - n.radius:.1f}">{escape(n.label)}</text>')
     out.append("</svg>")
     return "\n".join(out)
