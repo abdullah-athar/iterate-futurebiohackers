@@ -28,7 +28,8 @@ def _run(args) -> ResearchRun:
 
 def cmd_init(args) -> None:
     store = RunStore(args.run)
-    cfg = LoopConfig(problem=args.problem, novelty_threshold=args.novelty_threshold, patience=args.patience)
+    cfg = LoopConfig(problem=args.problem, novelty_threshold=args.novelty_threshold, patience=args.patience,
+                     modes=args.modes, exploit=args.exploit)
     seed_src = Path(args.seed).read_text() if args.seed else None
     try:
         run = ResearchRun.create(store, cfg, seed_source=seed_src)
@@ -112,7 +113,8 @@ def cmd_swarm(args) -> None:
             deploy()
     store = RunStore(args.run)
     if not store.exists:
-        run = ResearchRun.create(store, LoopConfig(problem=args.problem, time_budget_ms=args.budget_ms))
+        run = ResearchRun.create(store, LoopConfig(problem=args.problem, time_budget_ms=args.budget_ms,
+                                                   modes=args.modes, exploit=args.exploit))
         print(f"Initialised run at {store.root}\n" + ResearchRun.describe_entry(run.entries()[0]))
     run = ResearchRun(store)
     emit = swarm.Events(run, time.time())
@@ -149,6 +151,15 @@ def cmd_best(args) -> None:
         print(src)
 
 
+def _ablation_args(s) -> None:
+    """Controls for the simple-loop vs full-framework comparison (apply to a new run only)."""
+    s.add_argument("--modes", nargs="+", choices=list(MODES),
+                   help="restrict prompt modes, e.g. `--modes tune` for a plain incumbent-only loop (default: all)")
+    s.add_argument("--exploit", type=float, default=LoopConfig.exploit,
+                   help=f"probability the parent is the global best rather than a front member (default {LoopConfig.exploit}; "
+                        "1.0 = no per-instance archive)")
+
+
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(prog="autoresearch", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--run", default=DEFAULT_RUN, help=f"run directory (default {DEFAULT_RUN})")
@@ -162,6 +173,7 @@ def main(argv=None) -> None:
     s.add_argument("--seed", help="path to a custom seed solver file")
     s.add_argument("--novelty-threshold", type=float, default=0.95)
     s.add_argument("--patience", type=int, default=4)
+    _ablation_args(s)
     s.set_defaults(fn=cmd_init)
 
     s = sub.add_parser("status", help="show archive, diagnostics, suggested mode (agent mode)")
@@ -195,6 +207,7 @@ def main(argv=None) -> None:
     s.add_argument("--no-deploy", action="store_true", help="skip `modal deploy` of the eval app")
     s.add_argument("--max-budget-usd", type=float, help="per-session spend cap passed to claude")
     s.add_argument("--problem", default="median_string", help="problem for a new run")
+    _ablation_args(s)
     s.add_argument("--budget-ms", type=int, default=1000, help="CPU ms per instance for a new run")
     s.add_argument("--seed", type=int, default=0)
     s.set_defaults(fn=cmd_swarm)

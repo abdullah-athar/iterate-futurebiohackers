@@ -85,22 +85,31 @@ def _legend(items: list[tuple[str, str]]) -> str:
     )
 
 
-def _kpis(summaries: list[Summary]) -> str:
+def _kpis(summaries: list[Summary], runs: list[Run]) -> str:
     scored = [s for s in summaries if math.isfinite(s.gain_vs_baseline_pct)]
     if not scored:
         return ""
     best = max(scored, key=lambda s: s.gain_vs_baseline_pct)
     dupes = sum(s.counts.get(STATUS_REJECTED_DUPLICATE, 0) for s in summaries)
     tiles = [
-        (fmt_num(best.gain_vs_baseline_pct, "pct"), "best improvement vs baseline", f"{best.label} · {best.objective_split} split"),
-        (fmt_num(best.tokens, "tokens"), "agent tokens used", f"{best.evaluated} evaluations in {fmt_num(best.seconds, 'seconds')}"
-         + (f" · ${best.cost_usd:.2f}" if best.cost_usd else "")),
+        (fmt_num(best.gain_vs_baseline_pct, "pct"), "best improvement vs set-median baseline", f"{best.label} · {best.objective_split} split"),
     ]
+    # the headline that matters: how far the agents got past the strongest classical solver, same CPU budget
+    run = next((r for r in runs if r.label == best.label), None)
+    classical = [(name, ev[run.objective_split].score) for name, ev in (run.baselines if run else {}).items()
+                 if run.objective_split in ev and ev[run.objective_split].ok]
+    if classical and math.isfinite(best.best_objective):
+        name, score = min(classical, key=lambda c: c[1])
+        pct = 100.0 * (score - best.best_objective) / max(score, 1.0)
+        tiles.append((fmt_num(pct, "pct"), f"vs strongest classical solver ({name})",
+                      f"{fmt_num(score)} → agents' best {fmt_num(best.best_objective)} · same CPU budget"))
+    tiles.append((fmt_num(best.tokens, "tokens"), "agent tokens used", f"{best.evaluated} evaluations in {fmt_num(best.seconds, 'seconds')}"
+                  + (f" · ${best.cost_usd:.2f}" if best.cost_usd else "")))
     if best.tokens_per_pct:
         tiles.append((fmt_num(best.tokens_per_pct, "tokens"), "tokens per 1% gained", f"{best.label} · research efficiency"))
     if best.holdout_pct is not None:
         tiles.append((fmt_num(best.holdout_pct, "pct"), "held-out improvement (unseen instances)", best.label))
-    tiles.append((str(dupes), "duplicate proposals skipped", "evaluations + tokens saved by the novelty gate"))
+    tiles.append((str(dupes), "duplicate proposals skipped", "evaluations saved by the novelty gate; their proposal tokens were still spent"))
     return (
         '<div class="kpis">'
         + "".join(
@@ -117,7 +126,7 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
     if s0:
         refs.append(RefLine(s0.baseline, "set-median baseline", "#64748b"))
         if s0.best_known is not None:
-            refs.append(RefLine(s0.best_known, "planted optimum", "#16a34a", "2 4"))
+            refs.append(RefLine(s0.best_known, "planted reference (not proven optimal)", "#16a34a", "2 4"))
     classical = [(name, ev[r.objective_split].score) for r in runs[:1] for name, ev in r.baselines.items()
                  if name != "set_median" and r.objective_split in ev and ev[r.objective_split].ok]
     if classical:
@@ -240,7 +249,7 @@ def _instances_card(runs: list[Run], colors: dict[str, str]) -> str:
             {r.name: r.best_by_run[run.label][0] for r in rows if run.label in r.best_by_run},
             {
                 r.name: f"{run.label}: {fmt_num(r.best_by_run[run.label][0])} (entry #{r.best_by_run[run.label][1]}), baseline {fmt_num(r.baseline)}"
-                + (f", optimum {fmt_num(r.best_known)}" if r.best_known is not None else "")
+                + (f", planted reference {fmt_num(r.best_known)}" if r.best_known is not None else "")
                 for r in rows
                 if run.label in r.best_by_run
             },
@@ -249,11 +258,11 @@ def _instances_card(runs: list[Run], colors: dict[str, str]) -> str:
     ]
     markers = {
         r.name: [(r.baseline, "set-median baseline", "#64748b")]
-        + ([(r.best_known, "planted optimum", "#16a34a")] if r.best_known is not None else [])
+        + ([(r.best_known, "planted reference", "#16a34a")] if r.best_known is not None else [])
         for r in rows
     }
     legend = _legend(
-        [(r.label, colors[r.label]) for r in runs] + [("baseline (dashed grey)", "#64748b"), ("planted optimum (dashed green)", "#16a34a")]
+        [(r.label, colors[r.label]) for r in runs] + [("baseline (dashed grey)", "#64748b"), ("planted reference (dashed green; a feasible answer, not a proven optimum)", "#16a34a")]
     )
     return (
         "<section class='card'><h2>Per-instance results</h2><p class='lead'>Best score each flavour reached on every benchmark instance. Shorter bars are better; the Pareto archive keeps solvers that win on any single instance, not just the total.</p>"
@@ -384,7 +393,7 @@ def render_main(runs: list[Run], title: str) -> str:
         f"<h1>{escape(title)}</h1><p class='sub'>problem: <b>{escape(problem)}</b> · {len(runs)} run{'s' if len(runs) != 1 else ''} · "
         f"updated {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}</p>",
         _live_card(runs),
-        _kpis(summaries),
+        _kpis(summaries, runs),
         _progress_card(runs, colors, summaries),
         _scoreboard(summaries, colors, runs),
         _baselines_card(runs),
