@@ -1,0 +1,41 @@
+{
+  "returncode": 0,
+  "wall_seconds": 73.5,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T184631Z-a4686bfd",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"bias_scaler\": 16.0, \"compile_loss\": true, \"count_nonfinite\": true, \"epochs\": 9.0, \"fused_sgd\": true, \"lr\": 12.0, \"widths\": [64, 256, 768]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "S-fused-compiled-e9.0",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"bias_scaler\": 16.0, \"compile_loss\": true, \"count_nonfinite\": true, \"epochs\": 9.0, \"fused_sgd\": true, \"lr\": 12.0, \"widths\": [64, 256, 768]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"bias_scaler\": 16.0, \"compile_loss\": true, \"count_nonfinite\": true, \"epochs\": 9.0, \"fused_sgd\": true, \"lr\": 12.0, \"widths\": [64, 256, 768]}",
+    "delta": {
+      "widths": [
+        64,
+        256,
+        768
+      ],
+      "bias_scaler": 16.0,
+      "lr": 12.0,
+      "compile_loss": true,
+      "fused_sgd": true,
+      "epochs": 9.0
+    },
+    "hypothesis": "stack plus PR #5's compiled loss and fused SGD at 9.0 epochs (speed only)",
+    "env": {},
+    "config": "futurebiohackers {\"bias_scaler\": 16.0, \"compile_loss\": true, \"epochs\": 9.0, \"fused_sgd\": true, \"lr\": 12.0, \"widths\": [64, 256, 768]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

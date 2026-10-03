@@ -1,0 +1,38 @@
+{
+  "returncode": 0,
+  "wall_seconds": 83.9,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T184242Z-ebc9b18b",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"bias_scaler\": 16.0, \"count_nonfinite\": true, \"lr\": 12.0, \"widths\": [64, 256, 768]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "S-e8.75",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"bias_scaler\": 16.0, \"count_nonfinite\": true, \"lr\": 12.0, \"widths\": [64, 256, 768]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"bias_scaler\": 16.0, \"count_nonfinite\": true, \"lr\": 12.0, \"widths\": [64, 256, 768]}",
+    "delta": {
+      "widths": [
+        64,
+        256,
+        768
+      ],
+      "bias_scaler": 16.0,
+      "lr": 12.0
+    },
+    "hypothesis": "w64 base + bias 16 (+0.14) + lr 12 (+0.16): additivity at 8.75 epochs",
+    "env": {},
+    "config": "futurebiohackers {\"bias_scaler\": 16.0, \"lr\": 12.0, \"widths\": [64, 256, 768]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

@@ -1,0 +1,39 @@
+{
+  "returncode": 0,
+  "wall_seconds": 73.9,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T184515Z-8dfea0a6",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"bias_scaler\": 16.0, \"count_nonfinite\": true, \"epochs\": 9.0, \"lr\": 12.0, \"widths\": [64, 256, 768]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "S-e9.0",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"bias_scaler\": 16.0, \"count_nonfinite\": true, \"epochs\": 9.0, \"lr\": 12.0, \"widths\": [64, 256, 768]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"bias_scaler\": 16.0, \"count_nonfinite\": true, \"epochs\": 9.0, \"lr\": 12.0, \"widths\": [64, 256, 768]}",
+    "delta": {
+      "widths": [
+        64,
+        256,
+        768
+      ],
+      "bias_scaler": 16.0,
+      "lr": 12.0,
+      "epochs": 9.0
+    },
+    "hypothesis": "same stack with a quarter epoch more (~5.0 s)",
+    "env": {},
+    "config": "futurebiohackers {\"bias_scaler\": 16.0, \"epochs\": 9.0, \"lr\": 12.0, \"widths\": [64, 256, 768]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

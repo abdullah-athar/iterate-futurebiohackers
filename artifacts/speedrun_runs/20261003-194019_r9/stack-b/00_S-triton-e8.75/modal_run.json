@@ -1,0 +1,39 @@
+{
+  "returncode": 1,
+  "wall_seconds": 82.9,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T184242Z-d646ad9e",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"bias_scaler\": 16.0, \"count_nonfinite\": true, \"crop_mode\": \"triton\", \"lr\": 12.0, \"widths\": [64, 256, 768]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "S-triton-e8.75",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"bias_scaler\": 16.0, \"count_nonfinite\": true, \"crop_mode\": \"triton\", \"lr\": 12.0, \"widths\": [64, 256, 768]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"bias_scaler\": 16.0, \"count_nonfinite\": true, \"crop_mode\": \"triton\", \"lr\": 12.0, \"widths\": [64, 256, 768]}",
+    "delta": {
+      "widths": [
+        64,
+        256,
+        768
+      ],
+      "bias_scaler": 16.0,
+      "lr": 12.0,
+      "crop_mode": "triton"
+    },
+    "hypothesis": "stack plus the Triton crop (speed only)",
+    "env": {},
+    "config": "futurebiohackers {\"bias_scaler\": 16.0, \"crop_mode\": \"triton\", \"lr\": 12.0, \"widths\": [64, 256, 768]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

@@ -1,0 +1,35 @@
+{
+  "round": "r11",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "d2-a",
+      "control_index": 1,
+      "variants": [
+        {"label": "d222", "params": {"depths": [2, 2, 2]}, "hypothesis": "top priority: two convs per group (no residual pair) on the promoted recipe, as is"},
+        {"label": "d222-w128-320-896", "params": {"depths": [2, 2, 2], "widths": [128, 320, 896]}, "hypothesis": "depth 2 everywhere with wider channels to recover capacity"},
+        {"label": "d222-w96-320-1024", "params": {"depths": [2, 2, 2], "widths": [96, 320, 1024]}, "hypothesis": "depth 2 everywhere, capacity moved to groups 2 and 3"}
+      ]
+    },
+    {
+      "name": "d2-b",
+      "control_index": 1,
+      "variants": [
+        {"label": "d223", "params": {"depths": [2, 2, 3]}, "hypothesis": "mixed depths: residual pair only in group 3"},
+        {"label": "d232", "params": {"depths": [2, 3, 2]}, "hypothesis": "mixed depths: residual pair only in group 2"},
+        {"label": "d322", "params": {"depths": [3, 2, 2]}, "hypothesis": "mixed depths: residual pair only in group 1"}
+      ]
+    },
+    {
+      "name": "d2-k",
+      "control_index": 1,
+      "variants": [
+        {"label": "d222-e9.5", "params": {"depths": [2, 2, 2], "epochs": 9.5}, "hypothesis": "k on the depth-2 network: +0.75 epoch"},
+        {"label": "d222-e10.0", "params": {"depths": [2, 2, 2], "epochs": 10.0}, "hypothesis": "k on the depth-2 network: +1.25 epochs"},
+        {"label": "d222-e10.5", "params": {"depths": [2, 2, 2], "epochs": 10.5}, "hypothesis": "k on the depth-2 network: +1.75 epochs"}
+      ]
+    }
+  ]
+}

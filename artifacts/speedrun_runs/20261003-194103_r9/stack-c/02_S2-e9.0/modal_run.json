@@ -1,0 +1,40 @@
+{
+  "returncode": 0,
+  "wall_seconds": 72.7,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T184451Z-ca5aa11b",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"bias_scaler\": 16.0, \"count_nonfinite\": true, \"epochs\": 9.0, \"lr\": 12.0, \"weight_decay\": 0.0168, \"widths\": [64, 256, 768]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "S2-e9.0",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"bias_scaler\": 16.0, \"count_nonfinite\": true, \"epochs\": 9.0, \"lr\": 12.0, \"weight_decay\": 0.0168, \"widths\": [64, 256, 768]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"bias_scaler\": 16.0, \"count_nonfinite\": true, \"epochs\": 9.0, \"lr\": 12.0, \"weight_decay\": 0.0168, \"widths\": [64, 256, 768]}",
+    "delta": {
+      "widths": [
+        64,
+        256,
+        768
+      ],
+      "bias_scaler": 16.0,
+      "lr": 12.0,
+      "weight_decay": 0.0168,
+      "epochs": 9.0
+    },
+    "hypothesis": "three-gainer stack at 9.0 epochs (~5.0 s)",
+    "env": {},
+    "config": "futurebiohackers {\"bias_scaler\": 16.0, \"epochs\": 9.0, \"lr\": 12.0, \"weight_decay\": 0.0168, \"widths\": [64, 256, 768]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
