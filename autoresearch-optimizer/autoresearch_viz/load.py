@@ -1,7 +1,7 @@
 """Schema-tolerant loading of autoresearch run directories.
 
 A run directory contains `ledger.jsonl` (one JSON object per proposal) and optionally
-`config.json`. Every field is read with a default so that the dashboard keeps working when
+`config.json`, `events.jsonl` (swarm progress) and `holdout.json` (final held-out scores). Every field is read with a default so that the dashboard keeps working when
 the loop adds or renames fields.
 """
 
@@ -19,15 +19,18 @@ STATUS_EVALUATED = "evaluated"
 STATUS_REJECTED_DUPLICATE = "rejected_duplicate"
 STATUS_REJECTED_SCREEN = "rejected_screen"
 STATUS_FAILED = "failed"
+STATUS_REJECTED_GUARD = "rejected_guard"
 
-STATUS_ORDER = [STATUS_KEPT, STATUS_EVALUATED, STATUS_REJECTED_SCREEN, STATUS_REJECTED_DUPLICATE, STATUS_FAILED]
+STATUS_ORDER = [STATUS_KEPT, STATUS_EVALUATED, STATUS_REJECTED_SCREEN, STATUS_REJECTED_DUPLICATE,
+                STATUS_REJECTED_GUARD, STATUS_FAILED]
 STATUS_LABELS = {
     STATUS_SEED: "seed",
     STATUS_KEPT: "kept (improved)",
     STATUS_EVALUATED: "evaluated, no gain",
     STATUS_REJECTED_SCREEN: "rejected at screen",
     STATUS_REJECTED_DUPLICATE: "duplicate (not evaluated)",
-    STATUS_FAILED: "crashed / timed out",
+    STATUS_FAILED: "crashed / over budget",
+    STATUS_REJECTED_GUARD: "disallowed import (not evaluated)",
 }
 
 
@@ -127,6 +130,14 @@ class Entry:
     novelty: dict[str, Any] = field(default_factory=dict)
     note: str = ""
     source_path: str = ""
+    verdict: str = ""
+    confirmed: bool | None = None
+    generation: int | None = None
+    usage: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def cost(self) -> float:
+        return float(self.usage.get("cost_usd") or 0.0)
 
     @property
     def tokens(self) -> int:
@@ -142,7 +153,7 @@ class Entry:
 
     @property
     def was_evaluated(self) -> bool:
-        return self.status != STATUS_REJECTED_DUPLICATE
+        return self.status not in (STATUS_REJECTED_DUPLICATE, STATUS_REJECTED_GUARD)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Entry:
@@ -153,6 +164,9 @@ class Entry:
         pids = d.get("parent_ids", d.get("parents", []))
         if isinstance(pids, int):
             pids = [pids]
+        novelty = dict(d.get("novelty") or {})
+        novelty.setdefault("duplicate_of", novelty.get("nearest_id"))
+        novelty.setdefault("similarity", novelty.get("max_similarity"))
         return cls(
             id=int(d.get("id", 0)),
             parent_ids=[int(p) for p in (pids or [])],
@@ -168,9 +182,13 @@ class Entry:
             elapsed=_num(d.get("elapsed"), 0.0),
             timestamp=_num(d.get("timestamp")),
             evals=evals,
-            novelty=dict(d.get("novelty") or {}),
+            novelty=novelty,
             note=str(d.get("note", "") or ""),
             source_path=str(d.get("source_path", "") or ""),
+            verdict=str(d.get("verdict", "") or ""),
+            confirmed=d.get("confirmed"),
+            generation=d.get("generation"),
+            usage=dict(d.get("usage") or {}),
         )
 
 
@@ -181,6 +199,7 @@ class Run:
     config: dict[str, Any]
     entries: list[Entry]
     objective_split: str
+    events: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def problem(self) -> str:
@@ -199,7 +218,8 @@ class Run:
 
     @property
     def best(self) -> Entry | None:
-        scored = [e for e in self.entries if e.scored]
+        # same rule as autoresearch.archive: a gain that failed its fresh-instance re-test never counts
+        scored = [e for e in self.entries if e.scored and e.confirmed is not False]
         return min(scored, key=lambda e: (e.objective, e.id)) if scored else None
 
     def describe(self) -> str:
@@ -253,12 +273,28 @@ def load_run(path: str | Path, label: str | None = None) -> Run:
         except (json.JSONDecodeError, TypeError, ValueError):
             continue
     entries.sort(key=lambda e: e.id)
+    events = []
+    if (root / "events.jsonl").exists():
+        for line in (root / "events.jsonl").read_text().splitlines():
+            try:
+                events.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    if (root / "holdout.json").exists():
+        try:
+            by_id = {e.id: e for e in entries}
+            for rec in json.loads((root / "holdout.json").read_text()).values():
+                if rec.get("id") in by_id:
+                    by_id[rec["id"]].evals["holdout"] = Eval.from_dict("holdout", rec)
+        except (json.JSONDecodeError, AttributeError):
+            pass
     return Run(
         label=label or str(config.get("label") or root.name),
         path=root,
         config=config,
         entries=entries,
         objective_split=_infer_objective_split(entries, config),
+        events=events,
     )
 
 

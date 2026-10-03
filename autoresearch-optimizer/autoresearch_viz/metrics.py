@@ -5,14 +5,14 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from .load import STATUS_EVALUATED, STATUS_FAILED, STATUS_KEPT, STATUS_REJECTED_DUPLICATE, STATUS_REJECTED_SCREEN, Entry, Run
+from .load import STATUS_KEPT, STATUS_ORDER, STATUS_REJECTED_DUPLICATE, Entry, Run
 
 
 @dataclass
 class Point:
     entry_id: int
     evals: int  # cumulative evaluations (duplicates skipped by the novelty gate are not counted)
-    tokens: int  # cumulative LLM tokens (duplicates still cost their proposal tokens)
+    tokens: int  # cumulative agent tokens (duplicates still cost their proposal tokens)
     seconds: float  # cumulative wall-clock
     best: float  # best objective so far
     improved: bool  # this entry set a new global best
@@ -35,7 +35,7 @@ def best_so_far(run: Run) -> list[Point]:
             seconds = max(seconds, e.timestamp - t0)
         else:
             seconds += e.elapsed
-        improved = e.scored and e.objective < best
+        improved = e.scored and e.objective < best and e.confirmed is not False
         if improved:
             best = e.objective
         if math.isfinite(best):
@@ -75,6 +75,7 @@ class Summary:
     tokens_per_pct: float | None
     modes: dict[str, ModeStat] = field(default_factory=dict)
     instance_wins_only: int = 0
+    cost_usd: float = 0.0
 
     @property
     def tokens(self) -> int:
@@ -107,13 +108,13 @@ def summarize(run: Run) -> Summary:
     if ref_eval and ref_eval.instances and all(i.best_known is not None for i in ref_eval.instances):
         best_known = sum(i.best_known for i in ref_eval.instances)
 
-    counts = {s: 0 for s in [STATUS_KEPT, STATUS_EVALUATED, STATUS_REJECTED_SCREEN, STATUS_REJECTED_DUPLICATE, STATUS_FAILED]}
+    counts = {s: 0 for s in STATUS_ORDER}
     for e in run.proposals:
         counts[e.status] = counts.get(e.status, 0) + 1
     modes: dict[str, ModeStat] = {}
     inst_only = 0
     for e in run.proposals:
-        if e.status == STATUS_REJECTED_DUPLICATE:
+        if not e.was_evaluated:
             continue
         m = modes.setdefault(e.mode or "?", ModeStat())
         m.tried += 1
@@ -157,6 +158,7 @@ def summarize(run: Run) -> Summary:
         tokens_per_pct=tokens_per_pct,
         modes=modes,
         instance_wins_only=inst_only,
+        cost_usd=sum(e.cost for e in run.entries),
     )
 
 

@@ -26,43 +26,185 @@ Commit both `pyproject.toml` and `uv.lock` when changing dependencies.
 
 ## The autoresearch loop (`autoresearch/`)
 
-The proposer is always a coding agent (Claude Code, Codex, ...); the loop owns evaluation and the ledger.
+The proposer is always a coding agent (Claude Code here; Codex or any agent that can edit files
+works the same way). The loop owns evaluation and the ledger, so an agent can only *propose*.
 
-```sh
-cd autoresearch-optimizer && uv sync --frozen
+### How a run works
 
-# tell the agent: "read autoresearch/program.md and start a research run"
-uv run python -m autoresearch --run artifacts/runs/demo init --problem median_string
-uv run python -m autoresearch --run artifacts/runs/demo status          # evidence + suggested mode + parent file
-uv run python -m autoresearch --run artifacts/runs/demo submit --file cand.py --hypothesis "..." --mode fix_losers --parent 2
-uv run python -m autoresearch --run artifacts/runs/demo report --holdout
-uv run python -m autoresearch --run artifacts/runs/demo best --output median_string/solvers/discovered.py
+`just autoresearch-swarm` starts **N headless Claude Code agents per generation on your laptop**.
+Each writes one solver and one hypothesis. **All solver CPU runs on Modal**: the agents' own
+self-tests and the official evaluation. Only the orchestrator writes `ledger.jsonl`.
+
+```mermaid
+flowchart TD
+    subgraph LAPTOP["Your laptop"]
+        CLI["just autoresearch-swarm --run artifacts/runs/NAME"]
+        ALLOC["Allocate N agents<br/>bandit over modes: tune · fix_losers · new_family · merge<br/>parents from the Pareto archive"]
+        subgraph AGENTS["N headless Claude Code agents, in parallel"]
+            READ["read STATUS.md + AGENT.md<br/>evidence, parent code, ledger, falsified ideas"]
+            WRITE["write candidate.py + hypothesis.txt"]
+            TRY["./try = self-test"]
+        end
+        GATE{"import guard +<br/>novelty gate"}
+        REC["record in ledger.jsonl<br/>verdict · Pareto archive · new best?"]
+        MORE{"time left for another<br/>generation?"}
+        DASH["autoresearch_viz serve<br/>live dashboard"]
+    end
+    subgraph MODAL["Modal CPUs: evaluation only"]
+        TRYEV["one split for ./try"]
+        EVAL["screen → validate → confirm<br/>1000 ms CPU per instance"]
+        HOLD["holdout on hidden seeds"]
+    end
+    CLI --> ALLOC --> READ --> WRITE --> TRY
+    TRY <-->|remote call| TRYEV
+    TRY -->|fix and retry| WRITE
+    WRITE -->|agent done or turn deadline| GATE
+    GATE -->|duplicate or disallowed import:<br/>rejected, not evaluated| REC
+    GATE -->|new idea| EVAL --> REC
+    REC --> MORE
+    MORE -->|yes: next generation sees all results| ALLOC
+    MORE -->|no| HOLD --> OUT["holdout.json + report.md"]
+    REC -.->|events.jsonl| DASH
 ```
 
-Every turn: **novelty gate → import guard → cascade evaluation (screen → validate) → confirmation re-test → archive → ledger**.
-A candidate is a single file defining `solve(instance) -> str`; the loop owns scoring, so the proposer can only *propose*.
-`artifacts/runs/<name>/` holds `ledger.jsonl` (hypothesis, parents, mode, status, verdict, per-instance scores, tokens), `candidates/NNNN.py` and `report.md`.
+What happens to one candidate inside the evaluation step, and the verdict it gets:
 
-### Ideas we tried to move the needle on
+```mermaid
+flowchart LR
+    S["screen<br/>3 small instances"] -->|crash, over budget,<br/>or worse than baseline| RS["rejected_screen<br/>inconclusive"]
+    S --> V["validate<br/>5 medium instances<br/>= the objective"]
+    V -->|crash or over budget| F["failed<br/>inconclusive"]
+    V --> C["confirm<br/>5 fresh instances"]
+    C --> Q{"beats the global<br/>best on validate?"}
+    Q -->|no, but best on<br/>some instance| P["kept · partial"]
+    Q -->|no| X["evaluated · falsified"]
+    Q -->|yes| R{"not worse than the<br/>incumbent on confirm?"}
+    R -->|yes| SUP["kept · supported<br/>NEW BEST"]
+    R -->|no| U["evaluated · unconfirmed<br/>gain treated as noise"]
+```
 
-Each maps to a known hard problem in LLM autoresearch; the point of the hackathon entry is that these are cheap and interpretable.
+Single-agent mode (one agent, e.g. this Claude Code session, driving the CLI by hand) is the same loop with one proposer:
 
-| Hard problem | What the loop does | Where |
+```mermaid
+flowchart LR
+    ST["status<br/>evidence + suggested mode"] --> W["write candidate.py"] --> T["try"]
+    T -->|fix| W
+    T --> SUB["submit<br/>gate → evaluate → record"] --> ST
+```
+
+### Budgets
+
+| Budget | Default | Where to change |
 | --- | --- | --- |
-| Scalar scores are a poor gradient (GEPA) | The proposer sees a **per-instance diagnostics table**: score vs set-median baseline vs planted `best_known` vs best on the front, runtime, metric/noise metadata; it must write a falsifiable hypothesis before code. | `prompts.py`, `status` |
-| Good solvers get thrown away because they lose on aggregate | **Pareto-per-instance archive**: anything best on *some* instance is kept and offered for a `merge` with the leader. | `archive.py` |
-| Paying tokens + compute for re-proposed ideas (Shinka) | **Rejection sampling / novelty gate**: AST-normalise (strip docstrings, α-rename locals), reject ≥0.95 similar candidates *before* evaluation; the proposer is told why. | `novelty.py` |
-| Is the improvement real, or selection on noise? | **Confirmation re-test**: a claimed new global best is re-run on a fresh-seed `confirm` set and only promoted if it is not worse than the incumbent there (verdict `unconfirmed` otherwise). Final numbers come from a `holdout` set the search never saw. | `loop.py::_confirm`, `benchmarks.py` |
-| Do cheap experiments predict expensive ones? | **Cascade** (small `screen` → medium `validate`, early-reject below baseline) and the report prints the **proxy fidelity** (Spearman ρ between screen and validate scores). | `loop.py::_cascade`, `report.py` |
-| Research taste: tune vs. investigate vs. abandon | **UCB bandit over prompt modes** (`tune`, `fix_losers`, `new_family`, `merge`) with a **plateau detector** that bans `tune` after N flat proposals. | `loop.py::choose_mode` |
-| Hypotheses that never get revised | Every submission gets a **verdict** (`supported` / `partial` / `falsified` / `unconfirmed` / `inconclusive` / `untested`); falsified ones are shown back to the proposer as "do not re-propose, build on why they failed". | `ledger.py`, `prompts.py` |
-| Memory decay over long runs | The append-only **ledger** is the memory; `status` replays it, runs are resumable, and any agent can pick up another agent's run. | `ledger.py` |
-| Reward hacking / untrustworthy evidence | Candidates return a string; the harness recomputes the score in a **separate subprocess with timeouts**; a static **import guard** blocks `os`/`subprocess`/benchmark-generator imports before evaluation; the ledger is written only by the loop. | `sandbox.py`, `guard.py` |
-| Research efficiency | Agent **tokens are recorded per proposal**; the report prints objective points per 1k tokens and per evaluated proposal. | `report.py` |
+| CPU per `solve()` call, per instance | **1000 ms**; over 1250 ms the instance is invalid | `swarm --budget-ms` (new run) / `config.json` |
+| One agent session | **180 s** wall clock, then the agent is stopped and its last files are used | `swarm --turn-s` |
+| Whole run | **20 min** wall clock; no new generation starts if one cannot finish | `swarm --budget-min` |
+| Agents per generation | **32** | `swarm --agents` |
+| Evaluation containers | up to 96 in parallel, 1 CPU each | `autoresearch/modal_eval.py` |
 
-Adding another problem = one class implementing `autoresearch/problem.py::Problem` (`describe`, `seed_source`, `evaluate(source, split)`), registered in `PROBLEMS`.
+Solvers see their budget as `instance.time_budget_ms` and should return their best answer
+before it runs out. The evaluator enforces it with a CPU timer (`SIGPROF`) that solver code
+cannot catch with `except Exception`.
 
-Run the tests with `just autoresearch-test` (or `uv run python scripts/test_autoresearch.py`).
+### Commands
+
+```sh
+# one-time: Modal login (uv run modal setup) and the hidden held-out seeds
+uv run modal secret create autoresearch-heldout AUTORESEARCH_CONFIRM_SEED=<int> AUTORESEARCH_HOLDOUT_SEED=<int>
+
+# from the repo root
+just autoresearch-swarm-smoke                                   # 2 agents, 1 generation, ~1-2 min
+just autoresearch-swarm --run artifacts/runs/swarm-1            # 32 agents/generation, 20 min
+just autoresearch-swarm --run artifacts/runs/swarm-1 --agents 8 --budget-min 10 --model opus
+just autoresearch-viz serve artifacts/runs/swarm-1 --open      # live dashboard (run in a second terminal)
+
+# single-agent mode (tell the agent: "read autoresearch/program.md and start a research run")
+just autoresearch --run artifacts/runs/demo init
+just autoresearch --run artifacts/runs/demo status
+just autoresearch --run artifacts/runs/demo try --file cand.py
+just autoresearch --run artifacts/runs/demo submit --file cand.py --hypothesis "..." --mode fix_losers --parent 2
+just autoresearch --run artifacts/runs/demo report --holdout
+```
+
+Set `AUTORESEARCH_EVAL=modal` to send single-agent `submit`/`try` evaluations to Modal too
+(`uv run modal deploy -m autoresearch.modal_eval` first; the swarm deploys it itself).
+
+A run directory `artifacts/runs/<name>/` holds:
+- `ledger.jsonl`: hypothesis, parents, mode, status, verdict, per-instance scores, CPU ms, agent tokens and cost;
+- `candidates/NNNN.py`;
+- `events.jsonl`: swarm progress;
+- `holdout.json`;
+- `agents/`: each agent's Claude Code JSON output;
+- `report.md`.
+
+### What is hard about autoresearch, and what we did about it
+
+Plain-English version. Each item is a known weakness of LLM-driven research loops (FunSearch,
+AlphaEvolve, OpenEvolve, ShinkaEvolve, GEPA, AI-Scientist-style agents), followed by how this
+loop handles it.
+
+1. **A single score hides what went wrong.**
+   - *The problem:* most loops tell the model "your solver scored 518", with no sign of which
+     inputs it fails on or why.
+   - *What we do:* every agent gets a per-instance table: its score against the simple baseline,
+     against the planted answer, and against the best any candidate has reached on that input,
+     plus CPU time and the input's properties (noise level, indels, alphabet). It must state a
+     falsifiable hypothesis ("X because Y, expect lower score on Z") before it writes code.
+2. **Models keep re-proposing the same idea.**
+   - *The problem:* LLMs drift back to the obvious change, and every repeat costs tokens and compute.
+   - *What we do:* a novelty gate compares each new solver with every earlier one, after stripping
+     comments and renaming variables. Near-copies are rejected *before* any evaluation, including
+     copies of what another agent proposed in the same generation. Each agent is also told what
+     the other agents are working on, and that it should skip the most obvious next step.
+3. **"Improvements" that are really luck.**
+   - *The problem:* try hundreds of variants and some will win on the test set by chance.
+   - *What we do:* a claimed new best must also hold up on a second set of fresh instances
+     (*confirm*) before it counts; otherwise it is marked `unconfirmed`. Final numbers come from a
+     *holdout* set the search never sees. On Modal, the seeds that generate those sets live in a
+     secret only the evaluators can read, so an agent cannot regenerate them and hard-code answers.
+4. **Good ideas get thrown away because they lose on average.**
+   - *The problem:* keeping only the single best solver discards one that is excellent on some inputs.
+   - *What we do:* a Pareto archive keeps every solver that is best on at least one instance. The
+     `merge` mode hands an agent two such solvers and asks it to combine them.
+5. **The loop doesn't know when to stop tweaking.**
+   - *The problem:* without guidance, agents make small edits to the leader long after that has
+     stopped paying off.
+   - *What we do:* a bandit tracks which kind of request (`tune`, `fix_losers`, `new_family`,
+     `merge`) has been producing gains and gives those modes more agents. After a run of proposals
+     with no gain, `tune` is switched off so agents have to try something different.
+6. **Unlimited compute makes results meaningless.**
+   - *The problem:* with no time limit, brute force wins and the benchmark saturates. Our first
+     solver already matched the planted answer everywhere.
+   - *What we do:* every `solve()` call gets a hard 1000 ms CPU budget per instance. Agents must
+     find algorithms that are both good and fast, which separates ideas far better.
+7. **Agents can game their own evaluation.**
+   - *The problem:* an agent that grades itself, or can read the test generator, can fake progress.
+   - *What we do:*
+     - agents only return source code;
+     - the harness re-scores it in a separate process or a separate Modal container;
+     - an import guard blocks `os`, `subprocess`, the benchmark generator, `exec` and `open`;
+     - only the orchestrator writes the ledger.
+8. **Serial loops are slow.**
+   - *The problem:* one agent at a time gives roughly one hypothesis a minute.
+   - *What we do:* N agents work in parallel each generation, and every evaluation runs in its own
+     Modal container. Generations stay in sync so each one builds on all previous results.
+9. **Long runs forget and are hard to watch.**
+   - *What we do:* the append-only ledger is the memory. Falsified hypotheses are fed back as
+     "don't repeat this; build on why it failed". `events.jsonl` and the live dashboard show what
+     every agent is doing while the run is in progress.
+
+**Not solved yet:**
+- Agents given the same evidence still tend to converge on similar ideas.
+- Each generation waits for its slowest agent (capped by the turn limit).
+- Modal CPUs are about 1.5x slower and noisier than a laptop, so a solver right at its budget can
+  flip between valid and invalid.
+- Many parallel sessions on a Claude subscription can hit usage limits.
+- The reported dollar cost is Claude Code's own estimate.
+
+Adding another problem means writing one class that implements `autoresearch/problem.py::Problem`
+(`describe`, `seed_source`, `evaluate(source, split, budget_ms)`) and registering it in `PROBLEMS`.
+
+Run the tests with `just autoresearch-test`.
 
 ## Layout
 
@@ -73,7 +215,7 @@ autoresearch-optimizer/
   pyproject.toml    # workspace dependencies
   uv.lock           # reproducible dependency resolution
   autoresearch/     # research loop: propose -> novelty gate -> cascade eval -> archive -> ledger
-  autoresearch_viz/ # dashboard that visualises runs and compares flavours (see below)
+  autoresearch_viz/ # live / static dashboard for runs (see below)
   median_string/    # benchmark, metrics, baseline solvers, evaluator
   scripts/          # runnable experiments and tests
   notebooks/        # exploration
@@ -81,30 +223,22 @@ autoresearch-optimizer/
   artifacts/        # local results, ignored by Git
 ```
 
-## Visualise runs and compare flavours
+## Visualise runs (`autoresearch_viz/`)
 
-`autoresearch_viz` renders one self-contained HTML dashboard (no network access needed, so it
-works in the demo video) from one or more run directories (`artifacts/runs/<name>/ledger.jsonl`).
-Each run is a "flavour" of the research loop: a different proposer, prompt policy, archive or
-novelty setting on the same problem.
+A self-contained HTML dashboard: no network access is needed, so it also works offline in a demo.
+It shows:
+- a live "Now" panel: generation, agents back, elapsed time, cost, latest events;
+- best objective against evaluations, agent tokens and wall clock, with the hypothesis behind
+  every improvement;
+- a scoreboard per run, including held-out gain;
+- per-instance bars;
+- the outcome mix of all proposals;
+- the trajectory, with each proposal's verdict.
 
-```bash
-# compare every run under artifacts/runs
-uv run python -m autoresearch_viz render artifacts/runs -o artifacts/viz/dashboard.html --open
-
-# pick runs and give them display names
-uv run python -m autoresearch_viz render "claude=artifacts/runs/claude_a" "gemini=artifacts/runs/gemini_a"
-
-# synthetic runs (clearly labelled) to iterate on the dashboard before real runs exist
-uv run python -m autoresearch_viz demo --open
+```sh
+just autoresearch-viz serve artifacts/runs/swarm-1 --open          # live: refreshes every 3 s during a run
+just autoresearch-viz render artifacts/runs -o artifacts/viz/all.html   # static snapshot comparing all runs
 ```
-
-The dashboard shows: best objective vs evaluations / LLM tokens / wall-clock (with baseline and
-planted-optimum lines and the hypothesis behind every improvement), a flavour scoreboard (gain on
-the objective split, held-out gain, evaluations, tokens, tokens per 1% gained, duplicates skipped
-by the novelty gate), per-instance bars, the outcome mix of proposals, and the full research
-trajectory of each run as a lab notebook. Loading is schema-tolerant: missing ledger fields fall
-back to sensible defaults.
 
 ## Work together
 

@@ -17,9 +17,12 @@ STATUS_COLORS = {
     "rejected_screen": "#f59e0b",
     "rejected_duplicate": "#fbbf24",
     "failed": "#ef4444",
+    "rejected_guard": "#7c2d12",
     "seed": "#2563eb",
 }
-MODE_COLORS = {"tune": "#0ea5e9", "new_algorithm": "#8b5cf6", "merge": "#ec4899", "seed": "#2563eb", "random": "#78716c"}
+MODE_COLORS = {"tune": "#0ea5e9", "fix_losers": "#f97316", "new_family": "#8b5cf6", "merge": "#ec4899", "seed": "#2563eb"}
+VERDICT_COLORS = {"supported": "#16a34a", "partial": "#65a30d", "falsified": "#94a3b8", "unconfirmed": "#dc2626",
+                  "inconclusive": "#f59e0b", "untested": "#cbd5e1"}
 
 CSS = """
 :root{--bg:#f8fafc;--card:#fff;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--accent:#2563eb}
@@ -52,10 +55,12 @@ select{font:inherit;padding:5px 8px;border-radius:8px;border:1px solid var(--lin
 #tip{position:fixed;pointer-events:none;background:#0f172a;color:#fff;padding:6px 9px;border-radius:6px;font-size:12px;max-width:360px;display:none;z-index:9;white-space:pre-line}
 .note-syn{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:13.5px}
 footer{color:var(--muted);font-size:12px;margin-top:30px}
+.events{margin:0;padding-left:18px;font-size:12.5px;color:#334155}.events li{margin:2px 0}
 @media print{.tabs{display:none}.panel{display:block!important}}
 """
 
 JS = """
+function bind(){
 document.querySelectorAll('.tabs').forEach(t=>{t.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
  t.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
  const grp=t.dataset.group;document.querySelectorAll('.panel[data-group="'+grp+'"]').forEach(p=>p.classList.toggle('on',p.dataset.key===b.dataset.key));})); });
@@ -63,6 +68,8 @@ const tip=document.getElementById('tip');
 document.querySelectorAll('[data-tip]').forEach(el=>{el.addEventListener('mousemove',e=>{tip.textContent=el.dataset.tip;tip.style.display='block';
  tip.style.left=Math.min(e.clientX+14,window.innerWidth-380)+'px';tip.style.top=(e.clientY+14)+'px';});el.addEventListener('mouseleave',()=>tip.style.display='none');});
 const sel=document.getElementById('runsel');if(sel){sel.addEventListener('change',()=>{document.querySelectorAll('.traj').forEach(p=>p.classList.toggle('on',p.dataset.key===sel.value));});}
+}
+bind();
 """
 
 
@@ -86,7 +93,8 @@ def _kpis(summaries: list[Summary]) -> str:
     dupes = sum(s.counts.get(STATUS_REJECTED_DUPLICATE, 0) for s in summaries)
     tiles = [
         (fmt_num(best.gain_vs_baseline_pct, "pct"), "best improvement vs baseline", f"{best.label} · {best.objective_split} split"),
-        (fmt_num(best.tokens, "tokens"), "LLM tokens to get there", f"{best.evaluated} evaluations in {fmt_num(best.seconds, 'seconds')}"),
+        (fmt_num(best.tokens, "tokens"), "agent tokens used", f"{best.evaluated} evaluations in {fmt_num(best.seconds, 'seconds')}"
+         + (f" · ${best.cost_usd:.2f}" if best.cost_usd else "")),
     ]
     if best.tokens_per_pct:
         tiles.append((fmt_num(best.tokens_per_pct, "tokens"), "tokens per 1% gained", f"{best.label} · research efficiency"))
@@ -112,7 +120,7 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
             refs.append(RefLine(s0.best_known, "planted optimum", "#16a34a", "2 4"))
     axes = [
         ("evals", "evaluations (duplicates skipped by the novelty gate don't count)", ""),
-        ("tokens", "cumulative LLM tokens (prompt + completion)", "tokens"),
+        ("tokens", "cumulative agent tokens (prompt + completion)", "tokens"),
         ("seconds", "wall-clock", "seconds"),
     ]
     panels, buttons = [], []
@@ -188,7 +196,7 @@ def _scoreboard(summaries: list[Summary], colors: dict[str, str], runs: list[Run
     )
     return (
         "<section class='card'><h2>Flavour scoreboard</h2><p class='lead'>Lower objective is better. Δ is relative to the set-median baseline on the "
-        f"{escape(summaries[0].objective_split)} split; held-out Δ is on fresh instances the loop never saw. 'tokens / 1%' = total LLM tokens per percentage point gained over the seed.</p>"
+        f"{escape(summaries[0].objective_split)} split; held-out Δ is on fresh instances the loop never saw. 'tokens / 1%' = total agent tokens per percentage point gained over the seed.</p>"
         f"<div style='overflow-x:auto'><table>{head}{''.join(rows)}</table></div>{mode_table}</section>"
     )
 
@@ -270,7 +278,10 @@ def _trajectory_card(runs: list[Run], colors: dict[str, str]) -> str:
             parents = ",".join(f"#{p}" for p in e.parent_ids) or "—"
             trs.append(
                 f"<tr class='{cls}'><td>{e.id}</td><td class='muted'>{parents}</td><td>{_badge(e.mode or '?', MODE_COLORS.get(e.mode, '#64748b'))}</td>"
-                f"<td>{_badge(STATUS_LABELS.get(e.status, e.status), STATUS_COLORS.get(e.status, '#64748b'))}</td>"
+                f"<td>{_badge(STATUS_LABELS.get(e.status, e.status), STATUS_COLORS.get(e.status, '#64748b'))}"
+                + (f"<br>{_badge(e.verdict, VERDICT_COLORS.get(e.verdict, '#64748b'))}" if e.verdict else "")
+                + (f"<br><span class='muted'>gen {e.generation} · {e.usage.get('outcome', '')} · ${e.cost:.2f}</span>" if e.usage else "")
+                + "</td>"
                 f"<td>{fmt_num(e.objective) if e.scored else '—'}</td><td>{delta}</td><td>{fmt_num(e.tokens, 'tokens') if e.tokens else '—'}</td>"
                 f"<td class='h'>{escape(e.hypothesis)}<span class='note'>{escape(detail)}</span></td></tr>"
             )
@@ -278,34 +289,72 @@ def _trajectory_card(runs: list[Run], colors: dict[str, str]) -> str:
                 best = e.objective
         panels.append(
             f'<div class="traj panel {"on" if i == 0 else ""}" data-key="{escape(run.label, quote=True)}"><div style="overflow-x:auto"><table>'
-            "<tr><th>#</th><th>parents</th><th>mode</th><th>outcome</th><th>objective</th><th>Δ best</th><th>tokens</th><th class='l'>hypothesis → what we learned</th></tr>"
-            + "".join(trs)
+            "<tr><th>#</th><th>parents</th><th>mode</th><th>outcome / verdict</th><th>objective</th><th>Δ best</th><th>tokens</th><th class='l'>hypothesis → what we learned</th></tr>"
+            + "".join(reversed(trs[-TRAJECTORY_ROWS:]))
             + "</table></div></div>"
         )
     return (
-        "<section class='card'><h2>Research trajectory</h2><p class='lead'>The ledger as a lab notebook: each proposal's hypothesis, the prompt mode that produced it, and what the evaluation taught us. ↓ marks a per-instance improvement.</p>"
+        "<section class='card'><h2>Research trajectory</h2><p class='lead'>The ledger as a lab notebook, newest first (last "
+        f"{TRAJECTORY_ROWS}): each proposal's hypothesis, the prompt mode that produced it, and what the evaluation taught us. "
+        "↓ marks a per-instance improvement.</p>"
         f'<p><label>Flavour: <select id="runsel">{options}</select></label></p>' + "".join(panels) + "</section>"
     )
 
 
-def render(runs: list[Run], title: str = "Autoresearch — objective optimisation & flavour comparison") -> str:
+TRAJECTORY_ROWS = 80
+
+
+def _live_card(runs: list[Run]) -> str:
+    """Swarm progress from events.jsonl: current generation, agents back, evaluations, cost, recent events."""
+    from autoresearch.swarm import format_event
+
+    cards = []
+    for run in runs:
+        ev = run.events
+        if not ev:
+            continue
+        start = next((e for e in reversed(ev) if e["type"] == "run_start"), ev[0])
+        gen = next((e for e in reversed(ev) if e["type"] == "gen_start"), None)
+        done = ev[-1]["type"] == "run_end"
+        now = ev[-1]["t"] if done else max(ev[-1]["t"], __import__("time").time())
+        elapsed = now - start["t"]
+        budget = start.get("budget_s", 0)
+        back = [e for e in ev if e["type"] == "agent_done" and gen and e["gen"] == gen["gen"] and e["t"] >= gen["t"]]
+        stage = "finished" if done else (
+            "recording" if ev[-1]["type"] == "entry" else "evaluating on Modal" if ev[-1]["type"] == "eval_start"
+            else f"agents working ({len(back)}/{len(gen.get('assignments', [])) if gen else '?'} back)")
+        outcomes = {}
+        for e in back:
+            outcomes[e["outcome"]] = outcomes.get(e["outcome"], 0) + 1
+        cost = sum(e.cost for e in run.entries)
+        best = run.best
+        tiles = [
+            (f"gen {gen['gen'] if gen else '-'}", "generation", stage),
+            (f"{int(elapsed // 60)}:{int(elapsed % 60):02d}", "elapsed", f"budget {budget // 60} min" if budget else ""),
+            (fmt_num(best.objective) if best else "—", "best objective", f"#{best.id}" if best else ""),
+            (str(len(run.proposals)), "proposals", ", ".join(f"{k} {v}" for k, v in outcomes.items()) or "this generation: none back yet"),
+            (f"${cost:.2f}", "agent cost", "Claude Code reported cost"),
+        ]
+        recent = "".join(f"<li><code>{escape(format_event(e))}</code></li>" for e in ev[-14:][::-1])
+        cards.append(
+            f"<h3>{escape(run.label)}{' · LIVE' if not done else ''}</h3><div class='kpis'>"
+            + "".join(f"<div class='kpi'><div class='v'>{escape(v)}</div><div class='k'>{escape(k)}</div><div class='d'>{escape(d)}</div></div>"
+                      for v, k, d in tiles)
+            + f"</div><ul class='events'>{recent}</ul>"
+        )
+    if not cards:
+        return ""
+    return "<section class='card'><h2>Now</h2><p class='lead'>Swarm progress from <code>events.jsonl</code> (newest first).</p>" + "".join(cards) + "</section>"
+
+
+def render_main(runs: list[Run], title: str) -> str:
     colors = {r.label: PALETTE[i % len(PALETTE)] for i, r in enumerate(runs)}
     summaries = [summarize(r) for r in runs]
-    synthetic = any(r.config.get("synthetic") for r in runs)
     problem = ", ".join(sorted({r.problem for r in runs}))
-    parts = [
-        "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
-        f"<title>{escape(title)}</title><style>{CSS}</style></head><body><main>",
-        (
-            f"<h1>{escape(title)}</h1><p class='sub'>problem: <b>{escape(problem)}</b> · {len(runs)} flavour{'s' if len(runs) != 1 else ''} · "
-            f"generated {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}</p>"
-        ),
-    ]
-    if synthetic:
-        parts.append(
-            "<div class='note-syn'><b>Synthetic demo data.</b> Instance names, baselines and planted optima are the real medium-tier benchmark values; proposals, hypotheses and scores are simulated so the dashboard can be designed before real runs exist.</div>"
-        )
-    parts += [
+    return "\n".join([
+        f"<h1>{escape(title)}</h1><p class='sub'>problem: <b>{escape(problem)}</b> · {len(runs)} run{'s' if len(runs) != 1 else ''} · "
+        f"updated {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}</p>",
+        _live_card(runs),
         _kpis(summaries),
         _progress_card(runs, colors, summaries),
         _scoreboard(summaries, colors, runs),
@@ -313,8 +362,26 @@ def render(runs: list[Run], title: str = "Autoresearch — objective optimisatio
         _outcomes_card(summaries, colors),
         _trajectory_card(runs, colors),
         "<footer>Rendered by <code>python -m autoresearch_viz</code> from "
-        + ", ".join(f"<code>{escape(str(r.path))}</code>" for r in runs)
-        + "</footer>",
-        f"</main><div id='tip'></div><script>{JS}</script></body></html>",
+        + ", ".join(f"<code>{escape(str(r.path))}</code>" for r in runs) + "</footer>",
+    ])
+
+
+LIVE_JS = """
+function uiState(){const s={};document.querySelectorAll('.tabs').forEach(t=>{const b=t.querySelector('button.on');if(b)s[t.dataset.group]=b.dataset.key;});
+ const sel=document.getElementById('runsel');if(sel)s.__run=sel.value;return s;}
+function restore(s){Object.entries(s).forEach(([g,k])=>{if(g==='__run')return;const b=document.querySelector('.tabs[data-group="'+g+'"] button[data-key="'+CSS.escape(k)+'"]');if(b)b.click();});
+ const sel=document.getElementById('runsel');if(sel&&s.__run){sel.value=s.__run;sel.dispatchEvent(new Event('change'));}}
+async function refresh(){try{const r=await fetch('fragment',{cache:'no-store'});if(!r.ok)return;const html=await r.text();
+ const s=uiState(),y=window.scrollY;document.querySelector('main').innerHTML=html;bind();restore(s);window.scrollTo(0,y);}catch(e){}}
+setInterval(refresh,3000);
+"""
+
+
+def render(runs: list[Run], title: str = "Autoresearch — objective optimisation & flavour comparison", live: bool = False) -> str:
+    parts = [
+        "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
+        f"<title>{escape(title)}</title><style>{CSS}</style></head><body><main>",
+        render_main(runs, title),
+        f"</main><div id='tip'></div><script>{JS}{LIVE_JS if live else ''}</script></body></html>",
     ]
     return "\n".join(parts)

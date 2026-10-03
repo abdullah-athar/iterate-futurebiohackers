@@ -24,7 +24,9 @@ uv run python -m autoresearch --run artifacts/runs/<name> init --problem median_
    - Do not resubmit an idea the ledger shows was tried; near-duplicates are rejected unevaluated.
 3. Write the complete solver to a scratch file, e.g. `artifacts/runs/<name>/scratch/candidate.py`:
    - must define `def solve(instance) -> str`; stdlib + `median_string.metrics` only; deterministic.
-   - time budget: whole `screen` split < 20 s, whole `validate` split < 90 s.
+   - CPU budget: `instance.time_budget_ms` per solve() call; over 1.25x the instance is invalid.
+   - Self-test before submitting: `uv run python -m autoresearch --run artifacts/runs/<name> try --file <file>`
+     prints per-instance scores and CPU ms (each solve() gets `instance.time_budget_ms`, default 1000 ms).
 4. `uv run python -m autoresearch --run artifacts/runs/<name> submit --file <file> --hypothesis "..." --mode <mode> --parent <ids> --proposer <your-name>`
    - Output: `kept` (new global best or new best on some instance), `evaluated` (valid, no gain),
      `rejected_duplicate`, `rejected_guard` (disallowed import/call), `rejected_screen`
