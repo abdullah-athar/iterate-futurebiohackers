@@ -1,0 +1,37 @@
+{
+  "returncode": 0,
+  "wall_seconds": 223.3,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T201949Z-f4f110a6",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"bias_scaler\": 16.0, \"bn_momentum\": 0.7, \"color_jitter\": [0.3, 0.3], \"count_nonfinite\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "safe-stack-e9.0",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"bias_scaler\": 16.0, \"bn_momentum\": 0.7, \"color_jitter\": [0.3, 0.3], \"count_nonfinite\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"bias_scaler\": 16.0, \"bn_momentum\": 0.7, \"color_jitter\": [0.3, 0.3], \"count_nonfinite\": true}",
+    "delta": {
+      "bn_momentum": 0.7,
+      "bias_scaler": 16.0,
+      "color_jitter": [
+        0.3,
+        0.3
+      ]
+    },
+    "hypothesis": "SAFETY CANDIDATE: the three accuracy knobs main lacks (BN momentum 0.7, bias lr 16x, jitter 0.3) at equal epochs; target mean >= 75.15% on both seed sets",
+    "env": {},
+    "config": "futurebiohackers {\"bias_scaler\": 16.0, \"bn_momentum\": 0.7, \"color_jitter\": [0.3, 0.3]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

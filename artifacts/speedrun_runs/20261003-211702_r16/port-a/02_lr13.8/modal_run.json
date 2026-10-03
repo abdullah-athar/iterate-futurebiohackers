@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 85.5,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T202535Z-5e8ec7a7",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"lr\": 13.8}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "lr13.8",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"lr\": 13.8}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"lr\": 13.8}",
+    "delta": {
+      "lr": 13.8
+    },
+    "hypothesis": "port: lr x1.2 (11.5 -> 13.8); lr 10.8 -> 12 gave +0.16 pp on our network",
+    "env": {},
+    "config": "futurebiohackers {\"lr\": 13.8}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

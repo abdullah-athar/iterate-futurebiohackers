@@ -1,0 +1,34 @@
+{
+  "returncode": 0,
+  "wall_seconds": 232.0,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T202650Z-6805e843",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"batch_size\": 512, \"count_nonfinite\": true, \"epochs\": 8.0, \"lr\": 16.0}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "bs512-lr16-e8",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"batch_size\": 512, \"count_nonfinite\": true, \"epochs\": 8.0, \"lr\": 16.0}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"batch_size\": 512, \"count_nonfinite\": true, \"epochs\": 8.0, \"lr\": 16.0}",
+    "delta": {
+      "batch_size": 512,
+      "lr": 16.0,
+      "epochs": 8.0
+    },
+    "hypothesis": "README lead: batch 512 with lr 16 for 8 epochs matched 9 epochs of batch 1024 and was 4% faster over 10 trials",
+    "env": {},
+    "config": "futurebiohackers {\"batch_size\": 512, \"epochs\": 8.0, \"lr\": 16.0}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

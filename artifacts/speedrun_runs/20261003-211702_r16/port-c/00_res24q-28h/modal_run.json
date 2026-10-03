@@ -1,0 +1,41 @@
+{
+  "returncode": 0,
+  "wall_seconds": 311.4,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T201949Z-e008dcf8",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "res24q-28h",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"resolution_schedule\": [[24, 0.25], [28, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.25
+        ],
+        [
+          28,
+          0.5
+        ]
+      ]
+    },
+    "hypothesis": "port: 24x24 for the first quarter of the examples, then the baseline's 28 px half, then 32; the README's 24 px test ([[24,0.33],[28,0.67]] at 10.5 ep) cost 0.8 pt",
+    "env": {},
+    "config": "futurebiohackers {\"resolution_schedule\": [[24, 0.25], [28, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
