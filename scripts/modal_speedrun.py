@@ -1161,6 +1161,22 @@ def _regenerate_leaderboard() -> None:
         print(f"leaderboard failed: {exc}", flush=True)
 
 
+def _recipe_supports(key: str) -> bool:
+    """Whether the submission's DEFAULTS mention a parameter (the harness rejects unknown keys)."""
+    source = SPEEDRUN / "submissions" / TEAM / "submission.py"
+    try:
+        return f'"{key}"' in source.read_text(encoding="utf-8")
+    except OSError:
+        return False
+
+
+def _nonfinite_switch(requested: bool) -> bool:
+    if requested and not _recipe_supports("count_nonfinite"):
+        print("note: this recipe has no count_nonfinite switch; non-finite losses not counted")
+        return False
+    return requested
+
+
 def _split_launcher_flags(argv: tuple[str, ...]) -> tuple[dict, list[str]]:
     """Pull the launcher's own flags out of the pass-through harness flags."""
     opts = {
@@ -1235,7 +1251,7 @@ def main(*argv: str):
     for i, arg in enumerate(args):
         if arg == "--params" and i + 1 < len(args):
             params = json.loads(args[i + 1])
-    if opts["count_nonfinite"]:
+    if _nonfinite_switch(opts["count_nonfinite"]):
         params = {**params, "count_nonfinite": True}
         if "--params" in args:
             args[args.index("--params") + 1] = json.dumps(params, sort_keys=True)
@@ -1294,7 +1310,7 @@ def _screen_config(
         "control": control,
         "warm": warm,
         "require": require,
-        "count_nonfinite": count_nonfinite,
+        "count_nonfinite": _nonfinite_switch(count_nonfinite),
         "no_target": no_target,
         "build_timeout": build_timeout,
         "k": _load_k(),
