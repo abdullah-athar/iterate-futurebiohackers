@@ -1,0 +1,39 @@
+{
+  "returncode": 1,
+  "wall_seconds": 82.1,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T205944Z-ef4aef23",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 9.5, \"lr\": 10.3, \"resolution_schedule\": [[24, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "lr10.3",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 9.5, \"lr\": 10.3, \"resolution_schedule\": [[24, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 9.5, \"lr\": 10.3, \"resolution_schedule\": [[24, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.5
+        ]
+      ],
+      "epochs": 9.5,
+      "lr": 10.3
+    },
+    "hypothesis": "lr x0.9: the long 24 px phase may prefer a lower lr (higher was -0.2 pp)",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 9.5, \"lr\": 10.3, \"resolution_schedule\": [[24, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

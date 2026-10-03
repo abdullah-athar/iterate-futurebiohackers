@@ -1,0 +1,39 @@
+{
+  "returncode": 1,
+  "wall_seconds": 138.5,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T210126Z-329a6cec",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"cutout\": 4, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "cutout4",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"cutout\": 4, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"cutout\": 4, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.5
+        ]
+      ],
+      "epochs": 9.5,
+      "cutout": 4
+    },
+    "hypothesis": "cutout 4 px (likely negative on a 9.5-epoch schedule; closes the question)",
+    "env": {},
+    "config": "futurebiohackers {\"cutout\": 4, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

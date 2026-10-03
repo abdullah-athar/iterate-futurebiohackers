@@ -1,0 +1,44 @@
+{
+  "returncode": 0,
+  "wall_seconds": 260.2,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T205656Z-6b37b165",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"batch_schedule\": [[512, 0.5]], \"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "bsched512",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"batch_schedule\": [[512, 0.5]], \"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"batch_schedule\": [[512, 0.5]], \"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.5
+        ]
+      ],
+      "epochs": 9.5,
+      "batch_schedule": [
+        [
+          512,
+          0.5
+        ]
+      ]
+    },
+    "hypothesis": "batch 512 during the 24 px half (more, cheaper updates early), 1024 after; lr unchanged (sum loss)",
+    "env": {},
+    "config": "futurebiohackers {\"batch_schedule\": [[512, 0.5]], \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

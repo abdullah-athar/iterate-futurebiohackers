@@ -1,0 +1,39 @@
+{
+  "returncode": 1,
+  "wall_seconds": 191.4,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T205653Z-618a0229",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"autotune_backends\": \"ATEN\", \"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "aten-only",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"autotune_backends\": \"ATEN\", \"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"autotune_backends\": \"ATEN\", \"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.5
+        ]
+      ],
+      "epochs": 9.5,
+      "autotune_backends": "ATEN"
+    },
+    "hypothesis": "ATen/cuDNN-only autotuning: shorter cold build (measured separately), train-time cost read here",
+    "env": {},
+    "config": "futurebiohackers {\"autotune_backends\": \"ATEN\", \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

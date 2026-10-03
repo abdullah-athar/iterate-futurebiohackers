@@ -238,3 +238,15 @@
 {"time": "2026-10-03T21:56:59", "label": "r18/s3-a", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 491.2, "gpu_minutes": 8.44, "note": ""}
 {"time": "2026-10-03T21:57:05", "label": "candB-24q28h-e9.5-seeds0 (gpu-guard miss 1)", "gpu": "NVIDIA A100-SXM4-80GB", "power": "500.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: power limit 500.00 W is not 400 W"}
 {"time": "2026-10-03T21:57:26", "label": "r19/k19-a (gpu-guard miss 3)", "gpu": "NVIDIA A100-SXM4-80GB", "power": "500.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: power limit 500.00 W is not 400 W"}
+{"time": "2026-10-03T21:57:33", "label": "r19/k19-a (gpu-guard miss 4)", "gpu": "NVIDIA A100 80GB PCIe", "power": "300.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: GPU 'NVIDIA A100 80GB PCIe' is not 'NVIDIA A100-SXM4-80GB'"}
+{"time": "2026-10-03T22:01:44", "label": "r19/k19-b", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 322.2, "gpu_minutes": 5.62, "note": ""}
+{"time": "2026-10-03T22:01:57", "label": "r19/k19-g", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 331.0, "gpu_minutes": 5.77, "note": ""}
+{"time": "2026-10-03T22:02:42", "label": "r19/k19-c", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 378.3, "gpu_minutes": 6.56, "note": ""}
+{"time": "2026-10-03T22:03:05", "label": "r19/k19-a", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 329.2, "gpu_minutes": 5.74, "note": ""}
+{"time": "2026-10-03T22:04:10", "label": "r19/k19-e", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 466.3, "gpu_minutes": 8.02, "note": ""}
+{"time": "2026-10-03T22:04:17", "label": "r20/recal (gpu-guard miss 1)", "gpu": "NVIDIA A100 80GB PCIe", "power": "300.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: GPU 'NVIDIA A100 80GB PCIe' is not 'NVIDIA A100-SXM4-80GB'"}
+{"time": "2026-10-03T22:04:21", "label": "r19/k19-d", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 479.4, "gpu_minutes": 8.24, "note": ""}
+{"time": "2026-10-03T22:04:22", "label": "r20/recal (gpu-guard miss 2)", "gpu": "NVIDIA A100 80GB PCIe", "power": "300.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: GPU 'NVIDIA A100 80GB PCIe' is not 'NVIDIA A100-SXM4-80GB'"}
+{"time": "2026-10-03T22:04:53", "label": "r19/k19-f", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 510.8, "gpu_minutes": 8.76, "note": ""}
+{"time": "2026-10-03T22:05:03", "label": "candB-24q28h-e9.5-seeds0", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 473.0, "gpu_minutes": 8.13, "note": ""}
+{"time": "2026-10-03T22:05:24", "label": "r20/recal (gpu-guard miss 3)", "gpu": "NVIDIA A100 80GB PCIe", "power": "300.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: GPU 'NVIDIA A100 80GB PCIe' is not 'NVIDIA A100-SXM4-80GB'"}

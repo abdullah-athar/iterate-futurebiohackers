@@ -1,0 +1,39 @@
+{
+  "returncode": 0,
+  "wall_seconds": 124.7,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T205639Z-cc3173e5",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 9.5, \"label_smoothing\": 0.2, \"resolution_schedule\": [[24, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "ls0.2",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 9.5, \"label_smoothing\": 0.2, \"resolution_schedule\": [[24, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 9.5, \"label_smoothing\": 0.2, \"resolution_schedule\": [[24, 0.5]]}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.5
+        ]
+      ],
+      "epochs": 9.5,
+      "label_smoothing": 0.2
+    },
+    "hypothesis": "label smoothing 0.2 (untested on this recipe)",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 9.5, \"label_smoothing\": 0.2, \"resolution_schedule\": [[24, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

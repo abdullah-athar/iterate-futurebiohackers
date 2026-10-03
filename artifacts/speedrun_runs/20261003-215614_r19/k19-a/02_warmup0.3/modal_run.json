@@ -1,0 +1,39 @@
+{
+  "returncode": 1,
+  "wall_seconds": 70.0,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T210021Z-30998af7",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]], \"warmup\": 0.3}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "warmup0.3",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]], \"warmup\": 0.3}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]], \"warmup\": 0.3}",
+    "delta": {
+      "resolution_schedule": [
+        [
+          24,
+          0.5
+        ]
+      ],
+      "epochs": 9.5,
+      "warmup": 0.3
+    },
+    "hypothesis": "longer lr warmup",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 9.5, \"resolution_schedule\": [[24, 0.5]], \"warmup\": 0.3}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
