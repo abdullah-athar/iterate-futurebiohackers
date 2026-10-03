@@ -1,0 +1,219 @@
+{
+  "params": {},
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "eager": false,
+  "build_s": 261.7,
+  "prepare_s": 0.1061,
+  "prepare_pieces_s": {
+    "reset": 0.0018,
+    "h2d_normalize": 0.0467,
+    "whitening_init": 0.0017,
+    "flip": 0.0016,
+    "downsample_24px_matmul_pad": 0.0032,
+    "downsample_28px_matmul_pad": 0.0037,
+    "pad_32px": 0.0026,
+    "ema_copy": 0.0001
+  },
+  "per_epoch_augmentation_s": {
+    "24px_crop_flip_jitter": 0.0034,
+    "28px_crop_flip_jitter": 0.0044,
+    "32px_crop_flip_jitter": 0.0069,
+    "randperm": 0.00161
+  },
+  "epochs": 10.0,
+  "total_steps": 480,
+  "train_wall_s": 4.407,
+  "gpu_busy_s": 4.374,
+  "gpu_busy_fraction": 0.993,
+  "idle_s": 0.032,
+  "idle_per_step_ms": 0.067,
+  "idle_gaps": {
+    ">=50us": {
+      "count": 4,
+      "total_ms": 0.37
+    },
+    ">=200us": {
+      "count": 0,
+      "total_ms": 0.0
+    },
+    ">=1000us": {
+      "count": 0,
+      "total_ms": 0.0
+    }
+  },
+  "largest_gaps_ms_at_s": [
+    [
+      0.113,
+      0.003
+    ],
+    [
+      0.11,
+      0.003
+    ],
+    [
+      0.083,
+      0.003
+    ],
+    [
+      0.06,
+      0.003
+    ],
+    [
+      0.046,
+      0.002
+    ],
+    [
+      0.044,
+      0.003
+    ],
+    [
+      0.042,
+      0.003
+    ],
+    [
+      0.04,
+      0.002
+    ]
+  ],
+  "cuda_kernel_events": 87202,
+  "host_syncs": {
+    "cudaStreamSynchronize": 0,
+    "cudaDeviceSynchronize": 2,
+    "cudaEventSynchronize": 0,
+    "aten::item/_local_scalar_dense": 0
+  },
+  "memcpy_dtoh_events": 0,
+  "cpu_op_events_per_step": 354.1,
+  "top_kernels": [
+    {
+      "name": "void cutlass__5x_cudnn::Kernel<cutlass_tensorop_f16_s16816fprop_optimized_f16_128x128_32x3",
+      "calls": 2760,
+      "device_ms": 780.6,
+      "share_of_busy": 0.178
+    },
+    {
+      "name": "void cutlass__5x_cudnn::Kernel<cutlass_tensorop_f16_s16816dgrad_optimized_f16_128x128_32x4",
+      "calls": 2160,
+      "device_ms": 644.8,
+      "share_of_busy": 0.147
+    },
+    {
+      "name": "_ZN17cutlass__5x_cudnn6KernelINS_4conv6kernel23ImplicitGemmConvolutionINS1_11threadblock22",
+      "calls": 2040,
+      "device_ms": 632.4,
+      "share_of_busy": 0.145
+    },
+    {
+      "name": "sm80_xmma_dgrad_implicit_gemm_f16f16_f16f32_f32_nhwckrsc_nhwc_tilesize256x64x32_stage3_war",
+      "calls": 1200,
+      "device_ms": 195.8,
+      "share_of_busy": 0.045
+    },
+    {
+      "name": "sm80_xmma_wgrad_implicit_gemm_indexed_f16f16_f16f32_f32_nhwckrsc_nhwc_tilesize128x128x32_s",
+      "calls": 600,
+      "device_ms": 128.0,
+      "share_of_busy": 0.029
+    },
+    {
+      "name": "sm80_xmma_wgrad_implicit_gemm_indexed_f16f16_f16f32_f32_nhwckrsc_nhwc_tilesize64x64x64_sta",
+      "calls": 960,
+      "device_ms": 104.8,
+      "share_of_busy": 0.024
+    },
+    {
+      "name": "void cutlass__5x_cudnn::Kernel<cutlass_tensorop_f16_s16816fprop_optimized_f16_256x64_32x4_",
+      "calls": 480,
+      "device_ms": 103.8,
+      "share_of_busy": 0.024
+    },
+    {
+      "name": "_ZN17cutlass__5x_cudnn6KernelINS_4conv6kernel23ImplicitGemmConvolutionINS1_11threadblock22",
+      "calls": 480,
+      "device_ms": 96.0,
+      "share_of_busy": 0.022
+    },
+    {
+      "name": "triton_poi_fused__native_batch_norm_legit_functional_max_pool2d_with_indices_max_pool2d_wi",
+      "calls": 480,
+      "device_ms": 69.5,
+      "share_of_busy": 0.016
+    },
+    {
+      "name": "sm80_xmma_fprop_implicit_gemm_indexed_f16f16_f16f32_f32_nhwckrsc_nhwc_tilesize256x64x32_st",
+      "calls": 720,
+      "device_ms": 67.7,
+      "share_of_busy": 0.015
+    },
+    {
+      "name": "triton_poi_fused__native_batch_norm_legit_functional_max_pool2d_with_indices_max_pool2d_wi",
+      "calls": 480,
+      "device_ms": 57.9,
+      "share_of_busy": 0.013
+    },
+    {
+      "name": "triton_poi_fused__native_batch_norm_legit_functional_max_pool2d_with_indices_max_pool2d_wi",
+      "calls": 480,
+      "device_ms": 53.7,
+      "share_of_busy": 0.012
+    },
+    {
+      "name": "Optimizer.step#SGD.step",
+      "calls": 480,
+      "device_ms": 41.7,
+      "share_of_busy": 0.01
+    },
+    {
+      "name": "void at::native::(anonymous namespace)::multi_tensor_apply_kernel<at::native::(anonymous n",
+      "calls": 960,
+      "device_ms": 41.1,
+      "share_of_busy": 0.009
+    },
+    {
+      "name": "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native:",
+      "calls": 491,
+      "device_ms": 40.4,
+      "share_of_busy": 0.009
+    }
+  ],
+  "conv_backend_ms": {
+    "cudnn_or_xmma": 3596.1,
+    "triton_conv_templates": 182.6,
+    "implicit_gemm_other": 631.4
+  },
+  "bn_gelu_fusion": {
+    "fused_bn_gelu_kernels": 36,
+    "fused_calls_per_step": 43.0,
+    "bn_without_gelu_kernels": 26,
+    "bn_without_gelu_calls_per_step": 36.0,
+    "gelu_without_bn_kernels": 3,
+    "gelu_without_bn_calls_per_step": 1.6,
+    "examples": [
+      "triton_poi_fused__native_batch_norm_legit_functional_gelu_5",
+      "triton_poi_fused__native_batch_norm_legit_functional_add_gelu_6",
+      "triton_poi_fused__native_batch_norm_legit_functional_gelu_11",
+      "triton_red_fused__native_batch_norm_legit_functional_2",
+      "triton_red_fused__native_batch_norm_legit_functional_3",
+      "triton_per_fused__native_batch_norm_legit_functional__to_copy_4",
+      "triton_poi_fused_convolution_gelu_0",
+      "triton_red_fused_convolution_backward_gelu_gelu_backward_44",
+      "triton_red_fused_convolution_backward_gelu_gelu_backward_45"
+    ]
+  },
+  "kernels_per_step": 181.7,
+  "environment": {
+    "task_id": "ta-01M420A8FWYZT5CCZAX5ZG4DCR",
+    "hostname": "modal",
+    "region": "us-east",
+    "cloud": "CLOUD_PROVIDER_UNSPECIFIED",
+    "cpu_count": 20,
+    "affinity_cpus": 20,
+    "cgroup_cpu_max": "20000000",
+    "compile_threads_env": null,
+    "gpu_name": "NVIDIA A100-SXM4-80GB",
+    "gpu_memory": "81920 MiB",
+    "gpu_power_limit": "400.00 W",
+    "driver": "580.95.05",
+    "mig": "Disabled"
+  }
+}
