@@ -19,8 +19,9 @@ PROBLEM: Median String / Steiner String (NP-hard).
 Given strings S over an alphabet (DNA "ACGT" or 20 amino acids), return a string t
 minimising sum_{s in S} d(t, s). d is Levenshtein distance, or Hamming distance when
 instance.metric == "hamming" (then keep len(t) == len of inputs). Lower is better.
-Baseline per instance = set median (best input string). Instances are planted motifs with
-substitution noise 15-38% and indel noise 0-10%; the planted string's score is reported as
+Baseline per instance = set median (best input string). Objective instances are planted motifs:
+four DNA instances (280-688 chars, k=20-40 strings) and one 320 aa protein (k=15), with substitution
+noise 25-38% and indel noise 5-10%; the planted string's score is reported as
 "best_known" (a strong but not necessarily optimal reference).
 
 SOLVER CONTRACT: a single Python file defining `def solve(instance) -> str`.
@@ -38,8 +39,9 @@ median_string.metrics.levenshtein_distance is a fast C++ implementation (~2 us a
 """
 
 LONG_DESCRIPTION = DESCRIPTION.replace(
-    "Instances are planted motifs with\nsubstitution noise 15-38% and indel noise 0-10%",
-    "Instances are MSA-scale: four 1500 bp DNA\ninstances (k=10-20 strings, substitution noise 10-30%, indel noise 2-8%) and one\n"
+    "Objective instances are planted motifs:\nfour DNA instances (280-688 chars, k=20-40 strings) and one 320 aa protein (k=15), with substitution\n"
+    "noise 25-38% and indel noise 5-10%",
+    "Objective instances are MSA-scale: four 1500 bp DNA\ninstances (k=10-20 strings, substitution noise 10-30%, indel noise 2-8%) and one\n"
     "500 aa protein instance (k=12). All use Levenshtein distance. A full single-edit neighbourhood of\n"
     "a 1500-char center has ~13k moves (~6 s to score naively), so the budget forces targeted search")
 
@@ -106,10 +108,17 @@ class MedianStringProblem:
     confirm_split = "confirm"
     allowed_imports = ("median_string.metrics",)
     timeouts = {"screen": 30.0, "validate": 120.0, "confirm": 120.0, "holdout": 300.0}  # noqa: RUF012
-    _tiers = {"screen": "small", "validate": "medium", "confirm": "confirm", "holdout": "holdout"}  # noqa: RUF012
+    _tiers = {"screen": "small", "validate": "mid", "confirm": "confirm", "holdout": "holdout"}  # noqa: RUF012
+
+    # classical (non-agent) solvers from median_string/solvers, scored once per run for reference
+    baseline_solvers = ("set_median", "frequency_consensus", "template")
 
     def describe(self) -> str:
         return DESCRIPTION
+
+    def baseline_source(self, solver: str) -> str:
+        return (f"from median_string.solvers import get_solver\n_SOLVER = get_solver({solver!r})\n\n\n"
+                "def solve(instance):\n    return _SOLVER.solve(instance)\n")
 
     def seed_source(self) -> str:
         return SEED_PATH.read_text()

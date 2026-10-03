@@ -64,7 +64,7 @@ def test_agent_run():
         proposals = [
             (mp.SEED_DUPLICATE, "cosmetic rewrite of the seed", "tune"),
             (mp.SLOW_ON_VALIDATE, "set median, but slow on the objective split", "tune"),
-            (mp.FAST_DESCENT, "steepest descent with incremental DP over sub/ins/del", "tune"),
+            (mp.FAST_INDEL_SEARCH, "set median + substitution/insertion/deletion search", "tune"),
             (mp.BROKEN, "syntax error", "fix_losers"),
         ]
         entries = [run.submit(src, hyp, mode, [run.archive().global_best.id], proposer="test")
@@ -94,7 +94,7 @@ def test_swarm():
     tmp = Path(tempfile.mkdtemp(prefix="autoresearch-swarm-"))
     try:
         run = ResearchRun.create(RunStore(tmp / "run"), LoopConfig(problem="median_string"))
-        sources = [mp.FAST_DESCENT, mp.SEED_DUPLICATE, ""]
+        sources = [mp.FAST_INDEL_SEARCH, mp.SEED_DUPLICATE, ""]
 
         def propose_many(run, gen, assignments):
             return [{"assignment": a, "source": sources[a.worker % 3], "hypothesis": f"w{a.worker}",

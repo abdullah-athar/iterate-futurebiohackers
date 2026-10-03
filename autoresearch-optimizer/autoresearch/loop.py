@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import random
 import time
@@ -99,7 +100,29 @@ class ResearchRun:
             entry.improved_global = True
             entry.confirmed = run._confirmed(entry, None)
         store.append(entry)
+        run.write_baselines(evaluate)
         return run
+
+    def write_baselines(self, evaluate=None) -> dict:
+        """Score the problem's classical (non-agent) solvers on the objective and holdout splits
+        under the run's budget -> baselines.json (reference rows for the report and dashboard)."""
+        names = getattr(self.problem, "baseline_solvers", ())
+        evaluate = evaluate or get_evaluate()
+        out = {}
+        for name in names:
+            src = self.problem.baseline_source(name)
+            out[name] = {split: evaluate(self.problem_name, self.problem, src, split, self.config.time_budget_ms).to_dict()
+                         for split in (self.problem.objective_split, "holdout")}
+        if out:
+            (self.store.root / "baselines.json").write_text(json.dumps(out, indent=1))
+        return out
+
+    def baselines(self) -> dict[str, dict[str, EvalResult]]:
+        path = self.store.root / "baselines.json"
+        if not path.exists():
+            return {}
+        return {name: {split: EvalResult.from_dict(d) for split, d in rec.items()}
+                for name, rec in json.loads(path.read_text()).items()}
 
     def entries(self) -> list[Entry]:
         return self.store.entries()
