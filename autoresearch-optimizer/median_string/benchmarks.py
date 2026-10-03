@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import random
 from typing import Literal
 from .instance import ProblemInstance
@@ -176,63 +177,103 @@ def get_medium_suite() -> list[ProblemInstance]:
     ]
 
 
+HARD_SPECS = [
+    ("dna_hard_60bp_k20", "ACGT", 60, 20, 0.28, 0.06, "levenshtein"),
+    ("dna_hard_80bp_k25", "ACGT", 80, 25, 0.25, 0.05, "levenshtein"),
+    ("dna_hard_noisy_50bp", "ACGT", 50, 30, 0.38, 0.10, "levenshtein"),
+    ("protein_hard_40aa", "ACDEFGHIKLMNPQRSTVWY", 40, 15, 0.35, 0.05, "levenshtein"),
+    ("dna_large_cohort_35bp", "ACGT", 35, 40, 0.25, 0.05, "levenshtein"),
+]
+
+
 def get_hard_suite() -> list[ProblemInstance]:
-    """Challenging benchmark suite for thorough optimization (5 instances, lengths 50-100)."""
+    """Challenging benchmark suite (5 instances, lengths 35-86, 15-40 strings; fixed seeds 301-305)."""
+    return _fresh_suite(HARD_SPECS, 300, "Hard instance")
+
+
+# the hard specs at 8x the length (280-688 chars): with the fast C++ distance this is the smallest
+# size at which a 1000 ms CPU budget still limits a naive local search; objective of `median_string`
+MID_SPECS = [
+    ("dna_mid_480bp_k20", "ACGT", 480, 20, 0.28, 0.06, "levenshtein"),
+    ("dna_mid_640bp_k25", "ACGT", 640, 25, 0.25, 0.05, "levenshtein"),
+    ("dna_mid_noisy_400bp", "ACGT", 400, 30, 0.38, 0.10, "levenshtein"),
+    ("protein_mid_320aa", "ACDEFGHIKLMNPQRSTVWY", 320, 15, 0.35, 0.05, "levenshtein"),
+    ("dna_mid_cohort_280bp", "ACGT", 280, 40, 0.25, 0.05, "levenshtein"),
+]
+
+
+def get_mid_suite() -> list[ProblemInstance]:
+    """Search-time objective of `median_string` (fixed seeds 401-405)."""
+    return _fresh_suite(MID_SPECS, 400, "Mid instance")
+
+
+def get_confirm_suite(seed_offset: int | None = None) -> list[ProblemInstance]:
+    """Fresh instances with the mid-tier specs, used by the autoresearch loop to re-test a claimed
+    new best before accepting it (guards against selecting on evaluation noise/overfitting).
+
+    The seed comes from AUTORESEARCH_CONFIRM_SEED when set, so remote evaluators can use seeds
+    the proposing agents never see."""
+    if seed_offset is None:
+        seed_offset = int(os.environ.get("AUTORESEARCH_CONFIRM_SEED", 5000))
+    return _fresh_suite([("confirm_" + s[0], *s[1:]) for s in MID_SPECS], seed_offset, "Confirmation instance")
+
+
+def get_holdout_suite(seed_offset: int | None = None) -> list[ProblemInstance]:
+    """Fresh instances with the mid-tier specs and unseen seeds, for final reporting only.
+
+    The seed comes from AUTORESEARCH_HOLDOUT_SEED when set.
+    """
+    if seed_offset is None:
+        seed_offset = int(os.environ.get("AUTORESEARCH_HOLDOUT_SEED", 9000))
+    return _fresh_suite([("holdout_" + s[0], *s[1:]) for s in MID_SPECS], seed_offset, "Held-out instance")
+
+
+def _fresh_suite(specs, seed_offset: int, label: str) -> list[ProblemInstance]:
     return [
         generate_planted_instance(
-            name="dna_hard_60bp_k20",
-            alphabet="ACGT",
-            target_length=60,
-            num_strings=20,
-            mutation_rate=0.28,
-            indel_rate=0.06,
-            seed=301,
-            description="Long DNA sequence (60bp) across 20 sequences with indels",
-        ),
-        generate_planted_instance(
-            name="dna_hard_80bp_k25",
-            alphabet="ACGT",
-            target_length=80,
-            num_strings=25,
-            mutation_rate=0.25,
-            indel_rate=0.05,
-            seed=302,
-            description="80bp consensus across 25 sequences",
-        ),
-        generate_planted_instance(
-            name="dna_hard_noisy_50bp",
-            alphabet="ACGT",
-            target_length=50,
-            num_strings=30,
-            mutation_rate=0.38,
-            indel_rate=0.10,
-            seed=303,
-            description="Heavy noise Steiner string search (38% substitution, 10% indel, 30 sequences)",
-        ),
-        generate_planted_instance(
-            name="protein_hard_40aa",
-            alphabet="ACDEFGHIKLMNPQRSTVWY",
-            target_length=40,
-            num_strings=15,
-            mutation_rate=0.35,
-            indel_rate=0.05,
-            seed=304,
-            description="40-residue protein domain across 15 divergent sequences",
-        ),
-        generate_planted_instance(
-            name="dna_large_cohort_35bp",
-            alphabet="ACGT",
-            target_length=35,
-            num_strings=40,
-            mutation_rate=0.25,
-            indel_rate=0.05,
-            seed=305,
-            description="Large cohort test: 40 sequences of length ~35bp",
-        ),
+            name=name,
+            alphabet=alphabet,
+            target_length=length,
+            num_strings=k,
+            mutation_rate=mut,
+            indel_rate=indel,
+            seed=seed_offset + i,
+            metric=metric,
+            description=f"{label} (len={length}, k={k}, mut={mut}, indel={indel})",
+        )
+        for i, (name, alphabet, length, k, mut, indel, metric) in enumerate(specs, 1)
     ]
 
 
-BenchmarkTier = Literal["small", "medium", "hard"]
+LONG_SPECS = [
+    # MSA-scale instances: 1500 bp DNA and a 500 aa protein; the Hamming case is omitted because
+    # column majority solves it exactly.
+    ("dna_1500bp_k10_low_noise", "ACGT", 1500, 10, 0.10, 0.02, "levenshtein"),
+    ("dna_1500bp_k15", "ACGT", 1500, 15, 0.20, 0.04, "levenshtein"),
+    ("dna_1500bp_k10_noisy", "ACGT", 1500, 10, 0.30, 0.08, "levenshtein"),
+    ("dna_1500bp_k20", "ACGT", 1500, 20, 0.15, 0.05, "levenshtein"),
+    ("protein_500aa_k12", "ACDEFGHIKLMNPQRSTVWY", 500, 12, 0.25, 0.04, "levenshtein"),
+]
+
+
+def get_long_suite() -> list[ProblemInstance]:
+    """Search-time objective for the long variant (fixed seeds)."""
+    return _fresh_suite(LONG_SPECS, 600, "Long instance")
+
+
+def get_long_confirm_suite() -> list[ProblemInstance]:
+    """Fresh long instances for confirmation re-tests (AUTORESEARCH_CONFIRM_SEED when set)."""
+    seed = int(os.environ.get("AUTORESEARCH_CONFIRM_SEED", 5000)) + 100
+    return _fresh_suite([("confirm_" + s[0], *s[1:]) for s in LONG_SPECS], seed, "Long confirmation instance")
+
+
+def get_long_holdout_suite() -> list[ProblemInstance]:
+    """Fresh long instances for final reporting (AUTORESEARCH_HOLDOUT_SEED when set)."""
+    seed = int(os.environ.get("AUTORESEARCH_HOLDOUT_SEED", 9000)) + 100
+    return _fresh_suite([("holdout_" + s[0], *s[1:]) for s in LONG_SPECS], seed, "Long held-out instance")
+
+
+BenchmarkTier = Literal["small", "medium", "hard", "mid", "confirm", "holdout", "long", "long_confirm", "long_holdout"]
 
 
 def get_benchmark_suite(tier: BenchmarkTier = "small") -> list[ProblemInstance]:
@@ -243,5 +284,17 @@ def get_benchmark_suite(tier: BenchmarkTier = "small") -> list[ProblemInstance]:
         return get_medium_suite()
     elif tier == "hard":
         return get_hard_suite()
+    elif tier == "mid":
+        return get_mid_suite()
+    elif tier == "confirm":
+        return get_confirm_suite()
+    elif tier == "holdout":
+        return get_holdout_suite()
+    elif tier == "long":
+        return get_long_suite()
+    elif tier == "long_confirm":
+        return get_long_confirm_suite()
+    elif tier == "long_holdout":
+        return get_long_holdout_suite()
     else:
-        raise ValueError(f"Unknown benchmark tier '{tier}'. Choose from 'small', 'medium', 'hard'.")
+        raise ValueError(f"Unknown benchmark tier '{tier}'. Choose from 'small', 'medium', 'hard', 'mid', 'confirm', 'holdout', 'long', 'long_confirm', 'long_holdout'.")

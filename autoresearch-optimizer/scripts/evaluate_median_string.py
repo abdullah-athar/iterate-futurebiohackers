@@ -35,7 +35,7 @@ def main() -> None:
         "--tier",
         type=str,
         default="small",
-        choices=["small", "medium", "hard"],
+        choices=["small", "medium", "hard", "mid", "confirm", "holdout", "long"],
         help="Difficulty tier: 'small' (<0.1s), 'medium' (~1s), 'hard' (~5s).",
     )
     parser.add_argument(

@@ -1,60 +1,124 @@
-# futurebiohackers: airbench-style CIFAR-100 recipe
+# futurebiohackers: faster CIFAR-100 training
 
-An adaptation of Keller Jordan's [airbench](https://github.com/KellerJordan/cifar10-airbench)
-(MIT, Copyright (c) 2024 Keller Jordan; the original permission notice is in
-`LICENSE.airbench`) to CIFAR-100, trained from scratch with no test-time augmentation.
+A convolutional image classifier based on Keller Jordan's
+[airbench](https://github.com/KellerJordan/cifar10-airbench), trained from scratch.
+Three convolution groups of 64, 256 and 768 channels, three convolutions each with a
+residual connection over the last two. The first group is deliberately narrow: it
+runs at 31x31 and 15x15, where each channel costs 4-16x more than in the later
+groups and cuDNN reaches only 23-34% of A100 peak; the capacity sits in the last
+group, which runs at 3x3 at 78-89% of peak.
 
-## Recipe
+Training: 9 epochs at batch 1024, Nesterov SGD (lr 11.5, weight decay 0.017 per 1024
+examples, momentum 0.85, BatchNorm-bias lr 32x), label smoothing 0.25, logit scale
+1.25/9, BatchNorm momentum 0.5, lookahead weight average. The first half of the steps
+trains on 28x28 bilinear downsamples of the images (0.77x the FLOPs), the second half
+at 32x32. Augmentation: alternating flip, 2-pixel translation, per-image brightness
+and contrast jitter of 0.2. Normalization and patch whitening of the training images
+run inside the timer.
 
-- **Network**: frozen 2x2 patch-whitening conv (initialized from 5,000 training images in
-  `prepare`), then three conv groups of widths 64/256/768. Each group has three 3x3 convs
-  with 2x2 max-pooling after the first and a residual over the last two. BatchNorm has frozen
-  weights and momentum 0.7, activations are GELU, global max pooling feeds a linear head whose
-  logits are scaled by 1.25/9, and the model runs in fp16 and channels-last.
-- **Training**: 9.5 epochs, batch 1024, Nesterov SGD (lr 12.0, wd 0.0168 per 1024 examples,
-  momentum 0.85, 16x lr on BatchNorm biases) with PyTorch's fused SGD kernel. Label smoothing
-  0.25, computed by a compiled loss function. 23% warmup, then linear decay to 0.07x.
-  Lookahead EMA every 5 steps. The first quarter of the steps trains on 24x24 crops (a
-  bilinear downscale of the training set made in `prepare`), the rest on 32x32.
-- **Augmentation**: alternating flip, 2-pixel reflect-padded translation, and per-image
-  brightness/contrast jitter of strength 0.3 drawn from a generator seeded by the trial seed.
-- **Untimed `build`**: `torch.compile(mode="max-autotune")` for the 32x32 graph, a second
-  static graph in the default mode for the 24x24 steps, the compiled loss, plus a warmup of
-  the training and evaluation kernels on random synthetic images at both sizes. `prepare`
-  resets every parameter, BatchNorm statistic, optimizer, EMA buffer and the jitter
-  generator before each trial.
+Implementation details that change the time but not the model:
 
-Every setting can be overridden for experiments with `--params`; the defaults are the
-submitted recipe.
+- The SGD step is one fused CUDA kernel (`fused_sgd`).
+- BatchNorm runs in fp16 like the rest of the network (`bn_dtype: "half"`).
+- The forward pass and loss compile as one graph (`compile_step`), with static
+  shapes so no recompilation happens inside a trial; every (batch, resolution)
+  pair gets its own graph, warmed in `build`.
+- Random crops use one gather per epoch (`crop_mode: "indexed"`) instead of 25
+  masked copies, which also avoids host syncs.
+- The final global pool is `max(dim).values`. `adaptive_max_pool2d` backward uses
+  an atomic kernel (about 0.3 s per trial in the profile), and `amax` trains to
+  NaN under `torch.compile` in torch 2.4.
+- `prepare` takes 28 ms instead of 170 ms: the dirac part of the conv init is
+  vectorized (`nn.init.dirac_` launches one kernel per channel), and the 28 px
+  resize is two matmuls instead of `F.interpolate` (65 ms on fp16 channels-last).
 
 ## Development results
 
-40 trials per seed set with the official accuracy target and a cold `build`, on Modal
-NVIDIA A100-SXM4-80GB cards at the 400 W power limit (judging hardware):
+Each row pair ran back to back in one Modal A100-SXM4-80GB container on the same 40
+random seeds (drawn like the organizer seed file), 75% target enforced. Seed sets
+are independent draws; cards differ in speed, so compare within a pair.
 
-| GPU | Seeds | Mean accuracy | Accuracy std | Mean prepare + train | Time std |
-| --- | --- | ---: | ---: | ---: | ---: |
-| A100-SXM4-80GB, 400 W | 0-39 | 75.33% | 0.26 pp | 5.09 s | 0.09 s |
-| A100-SXM4-80GB, 400 W | 40-79 | 75.28% | 0.26 pp | 5.14 s | 0.07 s |
+| Seed set | Recipe | Mean accuracy | Mean preparation + training | Qualified |
+| --- | --- | ---: | ---: | --- |
+| F | **Current defaults** | **75.009% (sd 0.28)** | **4.646 s** (sd 0.010) | yes |
+| F | PR #14 as first opened (128/256/768, 8.25 ep) | 75.193% (sd 0.25) | 5.445 s (sd 0.009) | yes |
+| E | Current defaults before the `prepare` speedup | 75.083% (sd 0.25) | 5.321 s (sd 0.052) | yes |
+| E | PR #14 as first opened | 75.150% (sd 0.23) | 6.153 s (sd 0.060) | yes |
+| B | PR #14 as first opened | 75.130% (sd 0.29) | 6.048 s (sd 0.055) | yes |
+| B | PR #9 defaults | 75.268% (sd 0.28) | 6.319 s (sd 0.042) | yes |
 
-The cold `build` took 170 s and 197 s. No trial had a non-finite loss. Modal handed out no
-500 W card during the measurements; on this family of recipes the 500 W cards had run about 7%
-faster than the 400 W ones.
+The current defaults are 13.5-14.7% faster than PR #14 as first opened, which was
+3.2-4.3% faster than PR #9. The accuracy margin is thin: over 110 trials the current
+defaults average about 75.06%, so a 40-seed draw falls below 75% with an estimated
+10% probability. A batch-512, 8-epoch variant (`{"batch_size": 512, "lr": 16,
+"epochs": 8}`) matched this accuracy 4% faster over 10 trials and is being validated
+on five independent 40-seed sets; the defaults will follow that result.
 
-**Changes from the previous recipe** (96/256/768 at 8.75 epochs, bias lr 32x, lr 10.8, wd
-0.012: 75.34% in 5.76 s on 400 W): first group narrowed to 64 channels, BatchNorm bias lr 16x,
-lr 12.0, weight decay 0.0168, the loss compiled and the optimizer step fused, 9.5 epochs;
-measured gain 0.65 s (11%) at equal accuracy on the same card type.
+Run the defaults from the repository root with `just modal 40`.
 
-**How the defaults were chosen.** Every change was screened in paired A/B runs (same seeds,
-same container, 8 trials) on 400 W cards, scoring each by the time it saves plus the time
-its accuracy change is worth (about 1 pp per second on the narrow network). Narrowing the
-first group to 64 channels saved 0.7 s for 0.4 pp; on that narrower network the optimizer
-knobs that had been flat before became gainers (bias lr 16x +0.14 pp, lr 12 +0.16, weight
-decay x1.4 +0.19, together +0.6 pp at equal time), the compiled loss and fused SGD saved
-0.15 s for free, and 0.75 extra epochs (cheap here: 1.1 pp per second) restored the margin.
-The stack was confirmed at 16 paired trials (75.37% / 5.04 s against the previous recipe's
-75.24% / 5.58 s), then at 40 trials on seeds 0-39 and on fresh seeds 40-79 (table above).
-Rejected on this network: depth-2 groups (even widened or with a skip connection), 20 px or
-longer low-resolution phases, loss-based data filtering, proxy hard-example selection,
-batches of 1536/2048, cutout, momentum 0.8/0.9, lookahead every 3/10 steps.
+## Experiments and progress
+
+Tested in same-GPU comparisons against a control (4-10 trials each):
+
+| Option | Result |
+| --- | --- |
+| `batch_size: 512, lr: 16` | 8 epochs match 9 epochs of batch 1024, 4% faster; lr 11.5 or 18 loses 0.2 pt; 7.5 epochs fails |
+| `batch_size: 768, lr: 14`, 8.5 epochs | 2% faster at equal accuracy |
+| `batch_schedule` (512 during the 28 px phase) | pending |
+| `resolution_schedule: [[24, 0.33], [28, 0.67]]` | 24 px costs 0.8 pt at 10.5 epochs; worse than cutting epochs on CIFAR-100 |
+| `resolution_schedule: [[28, 0.6]]`, 9.25 epochs | same as 28 px for half |
+| `momentum: 0.9` | -0.08 pt, same time |
+| `whiten_bias_epochs: 1` | -0.08 pt, same time |
+| `widths: [64, 256, 896]` | more accurate, slower; on the same accuracy/time line |
+| `widths: [48, 256, 768]` or `[64, 192, 768]` | less accurate at equal time |
+| `inductor_tuning` | coordinate-descent tuning: 0.5% faster, within noise |
+| `optimizer: "muon"` (hiverge-style, batched) | 3.5 points less accurate at 8 epochs |
+| `activation: "silu"` | 2% faster, 0.4 points less accurate |
+| `stem: "patch4s2"` (4x4 stride-2 whitening) | 2-3 points less accurate |
+| `inner_kernels: [3, 3, 1]` (1x1 convs in group 3) | 1.9 points less accurate |
+| `pool_first` in group 3 | 1 point less accurate |
+| `bn_recal_batches` | no gain |
+| `ema_every: 0` | 0.6 points less accurate |
+| Vision transformer (patch 4, dim 256, 6 layers) | 37% at 9 epochs, 58% at 30 epochs (39 s) |
+
+Convolutions are about 65% of GPU time and Inductor's BatchNorm/activation kernels
+about 22%. Inductor's CUDA graphs are on and worth about 1.5%; a whole-run graph
+would add little since the GPU is already busy for the whole step.
+
+`--params` exposes smaller early crops (24 or 28 pixels followed by 32), different
+block widths/depths, proxy-based hard-example selection, alternative pooling and
+optimizer settings, and an optional Triton crop/flip kernel. These experiments are
+turned off in the selected defaults. In PR #5's tests, proxy-based selection did
+not improve the qualifying result, and the unsuccessful experimental BN/GELU
+fusion was excluded from the submitted source.
+
+`scripts/modal_experiments.py` runs bounded comparisons through the unchanged
+competition harness and reserves spending against a $50 cap.
+`scripts/track_speedrun.py` writes a live log under
+`artifacts/runtime-optimization/`, sorted by time, with each experiment's main
+changes, accuracy, trial count and paired control. It also generates a local
+review dashboard under `.lavish/`.
+
+## Data and evaluation checks
+
+Build warms compilation and kernels using random synthetic images only. Every
+trial resets model weights, BatchNorm statistics, gradients, optimizer state,
+moving averages and any proxy masks. Preparation and training use only the
+harness-provided training images and labels. Evaluation uses one image view and
+frozen training statistics; it does not fit to test images, use test-batch
+statistics or change registered model state.
+
+The [rules](https://github.com/AIDDA-Institute/CIFAR-100-speedrun/blob/main/RULES.md)
+allow comparing reported test accuracy during development. Test results never
+choose a stopping point or hard-example masks within a trial. Source review found
+no test-data leakage; official acceptance still requires organizer review and the
+prescribed environment.
+
+The correctness checks cover resets, immutable training inputs, evaluation state
+and batch independence (13 CPU tests), plus exact crop/flip equivalence across
+layouts and resolutions (36 GPU checks). The GPU benchmark applies the harness's
+own output and state checks. Run the CPU checks from `cifar100-speedrun/` with
+`uv run python -m pytest -q ../scripts/test_speedrun_recipe.py`.
+
+Adapted under the MIT license, Copyright (c) 2024 Keller Jordan. The full original
+permission notice is preserved in `LICENSE.airbench`.
