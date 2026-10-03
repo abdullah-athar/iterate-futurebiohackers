@@ -43,8 +43,8 @@ AGENTS.md
   Modal's SXM cards come at 400 W and 500 W power limits (500 W is ~7% faster): the power
   limit is recorded with every result and comparisons are only valid within one container.
   `GPU used: X/3000 min` is printed after every call from `artifacts/speedrun_runs/gpu_ledger.jsonl`.
-- Scripts: `scripts/check_reset.py` (reset rules), `scripts/check_variants.py` (control path
-  bit-identical to HEAD, every experimental switch runs), both via WSL on Windows.
+- Scripts: `scripts/check_reset.py` (reset rules), `scripts/check_variants.py` (default path
+  bit-identical to origin/main's recipe, every screened parameter variant runs), both via WSL on Windows.
 - Results: `cifar100-speedrun/results/<team>/<run_id>/` (for `just last`, gitignored) and
   `artifacts/speedrun_runs/<timestamp>_<tag>/` (summary.json, trials.jsonl, config.json,
   modal_run.json, `ab_summary.md`; `source/` is gitignored). Add a row to

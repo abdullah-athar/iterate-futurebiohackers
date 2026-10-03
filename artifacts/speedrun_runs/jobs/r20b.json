@@ -1,0 +1,30 @@
+{
+  "round": "r20",
+  "n": 8,
+  "seed": 0,
+  "control": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25},
+  "jobs": [
+    {
+      "name": "method-a",
+      "control_index": 1,
+      "variants": [
+        {"label": "A-augoff0.5", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25, "aug_off_last": 0.5},
+         "hypothesis": "no-augmentation finish: translation and jitter off for the last 0.5 epoch (alternating flip kept)"},
+        {"label": "A-augoff1.0", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25, "aug_off_last": 1.0},
+         "hypothesis": "no-augmentation finish for the last 1.0 epoch"},
+        {"label": "A-ls0.35to0.15", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25, "label_smoothing": 0.35, "label_smoothing_end": 0.15},
+         "hypothesis": "label smoothing scheduled linearly 0.35 -> 0.15 over the examples (smoothing as a tensor input, same graph)"}
+      ]
+    },
+    {
+      "name": "method-b",
+      "control_index": 1,
+      "variants": [
+        {"label": "A-skipg0", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25, "skip_residual_until": 0.25, "skip_residual_groups": [0]},
+         "hypothesis": "progressive depth: group 1 runs without its conv2/conv3 residual branch for the first 25% of the examples (skip graphs compiled in default mode)"},
+        {"label": "A-skipg1", "params": {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.25, "skip_residual_until": 0.25, "skip_residual_groups": [1]},
+         "hypothesis": "progressive depth: group 2 without its residual branch for the first 25%"}
+      ]
+    }
+  ]
+}
