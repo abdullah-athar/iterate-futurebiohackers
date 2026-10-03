@@ -142,6 +142,7 @@ def refresh():
             if paired_control:
                 record["control_seconds"] = paired_control["mean_training_time"]
                 record["control_run_id"] = paired_control["run_id"]
+                record["control_trials"] = paired_control["number_of_trials"]
             records[key] = record
         if pending:
             live_progress.append(f"{log.stem} / {pending['name']}: {pending['line']}")
@@ -175,6 +176,7 @@ def refresh():
                 "is_control": bool(record.get("control")),
                 "control_seconds": record.get("control_seconds"),
                 "control_run_id": record.get("control_run_id"),
+                "control_trials": record.get("control_trials"),
             }
         )
     for row in rows:
@@ -183,8 +185,13 @@ def refresh():
             row["effect"] = "Reference"
         elif control and row["seconds"] is not None:
             delta = 100 * (1 - row["seconds"] / control)
+            comparison = (
+                "40-seed pair"
+                if row["trials"] == 40 and row["control_trials"] == 40
+                else "screen"
+            )
             row["effect"] = (
-                f"{abs(delta):.1f}% {'faster' if delta >= 0 else 'slower'} (screen)"
+                f"{abs(delta):.1f}% {'faster' if delta >= 0 else 'slower'} ({comparison})"
             )
         else:
             row["effect"] = (
