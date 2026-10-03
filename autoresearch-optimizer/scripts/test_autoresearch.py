@@ -116,10 +116,48 @@ def test_swarm():
     print("  Swarm test passed!")
 
 
+def test_viz_lineage():
+    print("Testing the dashboard's idea-lineage chart (merges, duplicates, disjoint trees)...")
+    from autoresearch_viz.html import render
+    from autoresearch_viz.load import load_run
+
+    rows = [
+        {"id": 0, "parent_ids": [], "mode": "seed", "status": "seed", "objective": 100, "improved_global": True},
+        {"id": 1, "parent_ids": [0], "mode": "tune", "status": "kept", "objective": 90, "improved_global": True, "verdict": "supported", "generation": 1},
+        {"id": 2, "parent_ids": [0], "mode": "new_family", "status": "evaluated", "objective": 95, "verdict": "falsified", "generation": 1},
+        {"id": 3, "parent_ids": [0], "mode": "tune", "status": "rejected_duplicate", "verdict": "untested", "generation": 1,
+         "novelty": {"nearest_id": 1, "max_similarity": 0.99}},
+        {"id": 4, "parent_ids": [1, 2], "mode": "merge", "status": "kept", "objective": 80, "improved_global": True, "generation": 2,
+         "hypothesis": "combine <both> & \"quote\""},
+        {"id": 5, "parent_ids": [4], "mode": "fix_losers", "status": "rejected_duplicate", "generation": 3},
+        {"id": 6, "parent_ids": [4, 99], "mode": "tune", "status": "failed", "generation": 3},
+        {"id": 7, "parent_ids": [0], "mode": "new_family", "status": "evaluated", "objective": 97},
+        {"id": 8, "parent_ids": [7], "mode": "tune", "status": "evaluated", "objective": 96},
+    ]
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-viz-"))
+    try:
+        (tmp / "ledger.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        html = render([load_run(tmp)])
+        card = html[html.index("<h2>Idea lineage</h2>"):html.index("<h2>Research trajectory</h2>")]
+        ideas = card[card.index('data-group="linview0" data-key="ideas"'):card.index('data-group="linview0" data-key="evaluated"')]
+        assert ideas.count('class="ln') == 8 and 'data-id="0"' not in ideas, "seed must be hidden by default"
+        assert ideas.count('class="le') == 5, ideas.count('class="le')  # 1→4, 2→4, 4→5, 4→6, 7→8
+        assert "one-off idea" in ideas and "ideas from #1, #2" in ideas and "ideas from #7" in ideas
+        assert "★ #4 best" in ideas and "&lt;both&gt;" in ideas
+        evaluated = card[card.index('data-group="linview0" data-key="evaluated"'):card.index('data-group="linview0" data-key="seed"')]
+        assert evaluated.count('class="ln') == 6 and "duplicates hidden" in evaluated
+        with_seed = card[card.index('data-group="linview0" data-key="seed"'):]
+        assert with_seed.count('class="ln') == 9 and "9 ideas from #0" in with_seed
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Lineage chart test passed!")
+
+
 if __name__ == "__main__":
     random.seed(0)
     test_novelty_gate()
     test_import_guard()
     test_agent_run()
     test_swarm()
+    test_viz_lineage()
     print("\nAll autoresearch tests passed!")
