@@ -22,7 +22,7 @@ DEFAULT_RUN = "artifacts/runs/default"
 def _run(args) -> ResearchRun:
     store = RunStore(args.run)
     if not store.exists:
-        sys.exit(f"No run at {args.run}. Create one with: python -m autoresearch init --run {args.run}")
+        sys.exit(f"No run at {args.run}. Create one with: python -m autoresearch --run {args.run} init")
     return ResearchRun(store)
 
 
@@ -60,7 +60,7 @@ def cmd_status(args) -> None:
             print(f"  #{i} [{v}] {h}")
     print("\n## Diagnostics\n" + ctx.diagnostics)
     print("\n## Ledger\n" + ctx.digest)
-    print(f"\nNext: write a solver file, then `python -m autoresearch submit --run {run.store.root} --file <file> "
+    print(f"\nNext: write a solver file, then `python -m autoresearch --run {run.store.root} submit --file <file> "
           f"--hypothesis \"...\" --mode {ctx.mode} --parent {' '.join(str(p.id) for p in ctx.parents)}`")
 
 
@@ -111,7 +111,10 @@ def cmd_best(args) -> None:
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(prog="autoresearch", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--run", default=DEFAULT_RUN, help=f"run directory (default {DEFAULT_RUN})")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    # accept --run after the subcommand too, e.g. `autoresearch status --run artifacts/runs/x`
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--run", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    sub = p.add_subparsers(dest="cmd", required=True, parser_class=lambda **kw: argparse.ArgumentParser(parents=[common], **kw))
 
     s = sub.add_parser("init", help="create a run and evaluate the seed solver")
     s.add_argument("--problem", default="median_string")
