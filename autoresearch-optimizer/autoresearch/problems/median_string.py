@@ -81,6 +81,19 @@ def _budgeted(solve, budget_ms: int, cpu_ms: dict[str, float]):
 
 class MedianStringProblem:
     name = "median_string"
+    # research directions handed out round-robin so parallel agents in the same mode diverge
+    directions = (
+        "speed: faster distance kernels (incremental prefix/suffix DP rows, bit-parallel Myers) so more search fits the budget",
+        "starting points: better initial centers (weighted/positional consensus, progressive or star alignment, medoids)",
+        "neighbourhood: richer moves (block shifts, pair edits, insert+delete swaps) beyond single edits",
+        "acceptance: escape local optima (simulated annealing, tabu, plateau walks, late acceptance)",
+        "budget use: anytime design that splits instance.time_budget_ms between restarts/phases adaptively",
+        "instance-adaptive: detect metric, alphabet size, noise and indel level and switch strategy per instance",
+        "alignment-based consensus: iterative re-alignment of all strings to the center with smarter voting",
+        "population: keep several centers and recombine them (crossover of aligned segments, path relinking)",
+        "exactness on small inputs: exhaustive or branch-and-bound search where the instance is small enough",
+        "robustness: guard against regressions on the instances where the parent is already strong",
+    )
     splits = ("screen", "validate", "confirm", "holdout")
     objective_split = "validate"
     confirm_split = "confirm"

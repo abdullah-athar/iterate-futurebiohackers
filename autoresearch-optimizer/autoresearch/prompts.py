@@ -62,7 +62,7 @@ def _inst_score(entry: Entry, name: str) -> float:
     return f(entry, name)
 
 
-def format_digest(entries: list[Entry], limit: int = 12) -> str:
+def format_digest(entries: list[Entry], limit: int = 40) -> str:
     rows = []
     for e in entries[-limit:]:
         obj = "-" if e.objective is None else ("fail" if e.objective == float("inf") else f"{e.objective:g}")

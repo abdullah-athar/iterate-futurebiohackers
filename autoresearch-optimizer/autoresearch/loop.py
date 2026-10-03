@@ -174,7 +174,7 @@ class ResearchRun:
             extra["complementary"] = {e.id: won for e, won in comp}
         falsified = [e for e in entries if e.verdict in (VERDICT_FALSIFIED, VERDICT_UNCONFIRMED)]
         if falsified:
-            extra["falsified"] = [(e.id, e.verdict, e.hypothesis) for e in falsified[-8:]]
+            extra["falsified"] = [(e.id, e.verdict, e.hypothesis) for e in falsified[-20:]]
         return Context(mode=mode, parents=parents, parent_sources=[self.store.read_candidate(p) for p in parents],
                        diagnostics=diag, digest=format_digest(entries), rejection_note=rejection_note, extra=extra)
 

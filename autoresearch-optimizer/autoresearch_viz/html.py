@@ -326,13 +326,15 @@ def _live_card(runs: list[Run]) -> str:
         outcomes = {}
         for e in back:
             outcomes[e["outcome"]] = outcomes.get(e["outcome"], 0) + 1
-        cost = sum(e.cost for e in run.entries)
+        cost = max(sum(e.cost for e in run.entries),
+                   sum(e.get("cost_usd") or 0.0 for e in ev if e["type"] == "agent_done"))
         best = run.best
         tiles = [
             (f"gen {gen['gen'] if gen else '-'}", "generation", stage),
             (f"{int(elapsed // 60)}:{int(elapsed % 60):02d}", "elapsed", f"budget {budget // 60} min" if budget else ""),
             (fmt_num(best.objective) if best else "—", "best objective", f"#{best.id}" if best else ""),
-            (str(len(run.proposals)), "proposals", ", ".join(f"{k} {v}" for k, v in outcomes.items()) or "this generation: none back yet"),
+            (str(len(run.proposals)), "proposals recorded",
+             "this generation: " + (", ".join(f"{k} {v}" for k, v in outcomes.items()) or "none back yet")),
             (f"${cost:.2f}", "agent cost", "Claude Code reported cost"),
         ]
         recent = "".join(f"<li><code>{escape(format_event(e))}</code></li>" for e in ev[-14:][::-1])

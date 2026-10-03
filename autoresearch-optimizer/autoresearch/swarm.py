@@ -34,6 +34,7 @@ class Assignment:
     worker: int
     mode: str
     parent_ids: list[int]
+    direction: str = ""
 
 
 def allocate(run: ResearchRun, n: int, rng: random.Random) -> list[Assignment]:
@@ -53,7 +54,10 @@ def allocate(run: ResearchRun, n: int, rng: random.Random) -> list[Assignment]:
         for m in sorted(shares, key=lambda m: shares[m] - int(shares[m]), reverse=True)[: n - sum(counts.values())]:
             counts[m] += 1
     modes = [m for m in MODES if m in counts for _ in range(counts[m])]
-    return [Assignment(i, m, [p.id for p in run.pick_parents(m, archive, rng)]) for i, m in enumerate(modes)]
+    directions = list(getattr(run.problem, "directions", ()) or [""])
+    rng.shuffle(directions)
+    return [Assignment(i, m, [p.id for p in run.pick_parents(m, archive, rng)], directions[i % len(directions)])
+            for i, m in enumerate(modes)]
 
 
 AGENT_MD = """# Autoresearch worker {worker} — generation {gen}, mode `{mode}`
@@ -61,13 +65,16 @@ AGENT_MD = """# Autoresearch worker {worker} — generation {gen}, mode `{mode}`
 You are one of {n} agents proposing solvers in parallel this generation
 ({mix}). Your job: ONE hypothesis, ONE complete solver file. A harness evaluates it after you stop.
 
+Your research direction: **{direction}**
+Other agents cover the other directions, so stay on yours and make it work within your mode.
+Ideas already in the ledger (see STATUS.md) count as taken: build on them or go elsewhere.
+
 Time limit: {turn_s} s of wall clock; you are stopped at the deadline. Have a complete
 `candidate.py` and `hypothesis.txt` written by ~{half} s, then refine only if time remains.
 
 1. Read STATUS.md: the problem, your mode, the parent solver(s) (also saved here as parent_<id>.py;
    candidate.py starts as a copy of the first parent), per-instance diagnostics, the research
-   ledger and the falsified hypotheses. Agents in the same mode see the same evidence, so skip
-   the most obvious next step and pursue a distinctive idea.
+   ledger and the falsified hypotheses.
 2. Write one line to hypothesis.txt: what you change, why, and on which instances you expect a lower score.
 3. Edit candidate.py: a complete file defining `solve(instance) -> str`; stdlib + median_string.metrics
    only; deterministic; each solve() gets instance.time_budget_ms of CPU (over 1.25x = invalid instance).
@@ -84,7 +91,8 @@ def write_workspace(run: ResearchRun, a: Assignment, gen: int, n: int, mix: str,
     ctx = run.context(mode=a.mode, parent_ids=a.parent_ids)
     (ws / "STATUS.md").write_text(build_user_prompt(run.problem.describe(), ctx))
     (ws / "AGENT.md").write_text(AGENT_MD.format(worker=a.worker, gen=gen, mode=a.mode, n=n, mix=mix,
-                                                 turn_s=turn_s, half=turn_s // 2))
+                                                 turn_s=turn_s, half=turn_s // 2,
+                                                 direction=a.direction or "your choice"))
     for p, src in zip(ctx.parents, ctx.parent_sources):
         (ws / f"parent_{p.id}.py").write_text(src)
     (ws / "candidate.py").write_text(ctx.parent_sources[0])
