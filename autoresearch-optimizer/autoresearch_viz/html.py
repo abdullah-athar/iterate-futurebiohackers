@@ -10,7 +10,7 @@ from html import escape
 from .charts import (BarGroup, DagEdge, DagNode, RefLine, Series, dag_chart, fmt_num, grouped_hbars, metric_bars, stacked_hbars,
                      step_chart)
 from .load import STATUS_LABELS, STATUS_ORDER, STATUS_REJECTED_DUPLICATE, Run
-from .metrics import Summary, best_delta_text, best_so_far, model_switches, per_instance, summarize
+from .metrics import Summary, best_delta_text, best_so_far, held_out_gain_pct, model_switches, per_instance, summarize
 
 PALETTE = ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#0891b2", "#be185d", "#4d7c0f"]
 STATUS_COLORS = {
@@ -242,12 +242,6 @@ def _quality_efficiency_card(summaries: list[Summary], colors: dict[str, str], r
     if len(pairs) < 2:
         return ""
 
-    def held_out_gain(s: Summary, r: Run) -> float:
-        seed = r.seed.evals.get("holdout") if r.seed else None
-        if s.holdout_score is None or not seed or not seed.ok or not seed.score:
-            return math.nan
-        return 100.0 * (seed.score - s.holdout_score) / seed.score
-
     def per_dollar(s: Summary) -> float:
         return (s.seed_objective - s.best_objective) / s.cost_usd if s.cost_usd else math.nan
 
@@ -258,7 +252,7 @@ def _quality_efficiency_card(summaries: list[Summary], colors: dict[str, str], r
 
     quality = [("gain over the seed", f"{pairs[0][0].objective_split} split · higher is better",
                 lambda s, r: s.gain_vs_seed_pct, "pct", True),
-               ("held-out gain over the seed", "instances the search never saw · higher is better", held_out_gain, "pct", True)]
+               ("held-out gain over the seed", "instances the search never saw · higher is better", held_out_gain_pct, "pct", True)]
     efficiency = [("total agent cost", "Claude Code's estimate · lower is better", lambda s, r: s.cost_usd or math.nan, "usd", False),
                   ("wall-clock", "first to last ledger entry · lower is better", lambda s, r: s.seconds, "seconds", False),
                   ("objective points gained per dollar", "higher is better", lambda s, r: per_dollar(s), "", True)]

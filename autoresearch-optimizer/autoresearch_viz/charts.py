@@ -414,3 +414,94 @@ def dag_chart(
             out.append(f'<text class="nl" x="{x + n.radius + 2:.1f}" y="{y - n.radius:.1f}">{escape(n.label)}</text>')
     out.append("</svg>")
     return "\n".join(out)
+
+
+@dataclass
+class ScatterGroup:
+    label: str
+    color: str
+    points: list[tuple[float, float, str]]  # (x, y, tooltip): one per run
+
+
+def _mean_sd(vs: list[float]) -> tuple[float, float]:
+    vs = [v for v in vs if math.isfinite(v)]
+    if not vs:
+        return math.nan, math.nan
+    m = sum(vs) / len(vs)
+    return m, (sum((v - m) ** 2 for v in vs) / (len(vs) - 1)) ** 0.5 if len(vs) > 1 else 0.0
+
+
+def scatter_chart(
+    groups: list[ScatterGroup],
+    *,
+    x_label: str,
+    y_label: str,
+    x_unit: str = "",
+    y_unit: str = "",
+    width: int = 520,
+    height: int = 340,
+) -> str:
+    """Quality (y, higher is better) against a cost (x from zero, lower is better): one faint dot per run,
+    a large dot per group at the mean with ±1 sd whiskers, and a dashed line along the groups' Pareto front."""
+    ml, mr, mt, mb = 74, 18, 22, 46
+    pw, ph = width - ml - mr, height - mt - mb
+    xs = [x for g in groups for x, _, _ in g.points if math.isfinite(x)]
+    ys = [y for g in groups for _, y, _ in g.points if math.isfinite(y)]
+    if not xs or not ys:
+        return "<p class='muted'>No finished runs.</p>"
+    x_hi = max(xs) * 1.12 or 1
+    pad = (max(ys) - min(ys)) * 0.15 or 1
+    y_lo, y_hi = min(ys) - pad, max(ys) + pad
+
+    def X(x: float) -> float:
+        return ml + pw * x / x_hi
+
+    def Y(y: float) -> float:
+        return mt + ph * (1 - (y - y_lo) / (y_hi - y_lo))
+
+    out = [f'<svg class="chart" viewBox="0 0 {width} {height}" role="img">']
+    for t in nice_ticks(y_lo, y_hi, 5):
+        if y_lo <= t <= y_hi:
+            out.append(f'<line class="grid" x1="{ml}" x2="{ml + pw}" y1="{Y(t):.1f}" y2="{Y(t):.1f}"/>')
+            out.append(f'<text class="tick" x="{ml - 8}" y="{Y(t) + 4:.1f}" text-anchor="end">{fmt_num(t, y_unit)}</text>')
+    for t in nice_ticks(0, x_hi, 5):
+        if t <= x_hi:
+            out.append(f'<text class="tick" x="{X(t):.1f}" y="{mt + ph + 17}" text-anchor="middle">{fmt_num(t, x_unit)}</text>')
+    out.append(f'<line class="axis" x1="{ml}" x2="{ml + pw}" y1="{mt + ph}" y2="{mt + ph}"/>')
+    out.append(f'<line class="axis" x1="{ml}" x2="{ml}" y1="{mt}" y2="{mt + ph}"/>')
+    out.append(f'<text class="label" x="{ml + pw / 2:.0f}" y="{height - 8}" text-anchor="middle">{escape(x_label)}</text>')
+    out.append(f'<text class="label" transform="translate(14,{mt + ph / 2:.0f}) rotate(-90)" text-anchor="middle">{escape(y_label)}</text>')
+    out.append(f'<text class="tick" x="{ml + 6}" y="{mt + 12}">↖ better (more gain, less spent)</text>')
+    means = []
+    for g in groups:
+        mx, sx = _mean_sd([x for x, _, _ in g.points])
+        my, sy = _mean_sd([y for _, y, _ in g.points])
+        if math.isfinite(mx) and math.isfinite(my):
+            means.append((g, mx, sx, my, sy))
+    front, top = [], -math.inf
+    for g, mx, _, my, _ in sorted(means, key=lambda m: (m[1], -m[3])):
+        if my > top:
+            front.append((X(mx), Y(my)))
+            top = my
+    if len(front) > 1:
+        out.append('<polyline class="pareto" points="' + " ".join(f"{x:.1f},{y:.1f}" for x, y in front)
+                   + '" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4" data-tip="Pareto front of the mean results: '
+                   'no configuration is both cheaper and better than a point on it"/>')
+    for g, mx, sx, my, sy in means:
+        lab = escape(g.label, quote=True)
+        out.append(f'<g data-run="{lab}">')
+        for x, y, tip in g.points:
+            if math.isfinite(x) and math.isfinite(y):
+                out.append(f'<circle cx="{X(x):.1f}" cy="{Y(y):.1f}" r="4" fill="{g.color}" fill-opacity=".4" data-tip="{escape(tip, quote=True)}"/>')
+        cx, cy = X(mx), Y(my)
+        if sx:
+            out.append(f'<line x1="{X(mx - sx):.1f}" x2="{X(mx + sx):.1f}" y1="{cy:.1f}" y2="{cy:.1f}" stroke="{g.color}" stroke-width="1.5"/>')
+        if sy:
+            out.append(f'<line x1="{cx:.1f}" x2="{cx:.1f}" y1="{Y(my - sy):.1f}" y2="{Y(my + sy):.1f}" stroke="{g.color}" stroke-width="1.5"/>')
+        tip = (f"{g.label}: mean of {len(g.points)} run(s) {fmt_num(my, y_unit)} ± {fmt_num(sy, y_unit).lstrip('+')}, "
+               f"{fmt_num(mx, x_unit)} ± {fmt_num(sx, x_unit)}")
+        out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="7.5" fill="{g.color}" stroke="#fff" stroke-width="2" data-tip="{escape(tip, quote=True)}"/>')
+        anchor, dx = ("end", -11) if cx > ml + pw * 0.75 else ("start", 11)
+        out.append(f'<text class="end" x="{cx + dx:.1f}" y="{cy - 9:.1f}" text-anchor="{anchor}" font-weight="600">{escape(g.label)}</text></g>')
+    out.append("</svg>")
+    return "\n".join(out)

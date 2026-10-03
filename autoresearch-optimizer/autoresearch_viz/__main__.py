@@ -1,4 +1,4 @@
-"""CLI: `python -m autoresearch_viz render RUN... -o out.html` / `python -m autoresearch_viz serve RUN...`."""
+"""CLI: `python -m autoresearch_viz render RUN... -o out.html` / `serve RUN...` / `grid RUN... -o grid.html`."""
 
 from __future__ import annotations
 
@@ -24,6 +24,25 @@ def _render(specs: list[str], out: Path, title: str | None, open_browser: bool) 
             f"{s.label:45s} best={s.best_objective:>8.0f}  Δbaseline={s.gain_vs_baseline_pct:+6.1f}%  "
             f"evals={s.evaluated:3d}  dupes={s.counts.get('rejected_duplicate', 0):2d}  tokens={s.tokens:>8,d}"
         )
+    print(f"wrote {out}")
+    if open_browser:
+        webbrowser.open(out.resolve().as_uri())
+    return 0
+
+
+def _grid(specs: list[str], out: Path, open_browser: bool) -> int:
+    from .grid import config_name, render_grid
+
+    runs = load_runs(specs)
+    if not runs:
+        print("no runs found", file=sys.stderr)
+        return 1
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render_grid(runs))
+    for r in runs:
+        s = summarize(r)
+        print(f"{r.path.name:45s} {r.problem:20s} {config_name(r):8s} best={s.best_objective:>8.0f} "
+              f"gain={s.gain_vs_seed_pct:+5.1f}% cost=${s.cost_usd:.2f}")
     print(f"wrote {out}")
     if open_browser:
         webbrowser.open(out.resolve().as_uri())
@@ -93,7 +112,13 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--port", type=int, default=8765)
     v.add_argument("--title")
     v.add_argument("--open", action="store_true", help="open the dashboard in a browser")
+    g = sub.add_parser("grid", help="compare configurations (e.g. Sonnet / Opus / Sopus) across benchmarks and repeats")
+    g.add_argument("runs", nargs="+", help="run dirs or a parent dir of runs")
+    g.add_argument("-o", "--out", type=Path, default=Path("artifacts/viz/grid.html"))
+    g.add_argument("--open", action="store_true", help="open the result in a browser")
     a = p.parse_args(argv)
+    if a.cmd == "grid":
+        return _grid(a.runs, a.out, a.open)
     if a.cmd == "serve":
         return _serve(a.runs, a.port, a.title, a.open)
     return _render(a.runs, a.out, a.title, a.open)

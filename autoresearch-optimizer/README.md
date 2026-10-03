@@ -294,6 +294,16 @@ just autoresearch-viz serve artifacts/runs/swarm-1 --open          # live: refre
 just autoresearch-viz render artifacts/runs -o artifacts/viz/all.html   # static snapshot comparing all runs
 ```
 
+To compare configurations across benchmarks with repeats, `scripts/model_grid.sh TAG` runs Sonnet, Opus
+and Sopus on `median_string` and `median_string_long` for swarm seeds 0–2 (4 agents × 3 generations;
+override with `AGENTS`, `GENERATIONS`, `SEEDS`, `PROBLEMS`, `CONFIGS`). `grid` then draws one
+quality-vs-efficiency scatter per benchmark (gain against cost or wall clock, mean ± sd per
+configuration, Pareto front) and a mean ± sd table:
+
+```sh
+just autoresearch-viz grid artifacts/runs/TAG-* -o results/TAG.html
+```
+
 ## Work together
 
 1. Claim an unowned task in [TASKS.md](TASKS.md), and agree on the benchmark and evaluation contract before implementing the search loop.

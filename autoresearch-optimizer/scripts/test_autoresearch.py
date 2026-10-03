@@ -258,6 +258,40 @@ def test_swarm_model_schedule():
     print("  Model schedule test passed!")
 
 
+def test_viz_grid():
+    print("Testing the model-grid page (configurations x benchmarks x repeats)...")
+    from autoresearch_viz.grid import config_name, render_grid
+    from autoresearch_viz.load import load_run
+
+    def ev(score):
+        return {"split": "validate", "score": score, "baseline": 100, "instances": []}
+
+    def run(name, problem, models, best, cost):
+        d = tmp / name
+        d.mkdir()
+        (d / "config.json").write_text(json.dumps({"problem": problem}))
+        rows = [{"id": 0, "parent_ids": [], "mode": "seed", "status": "seed", "objective": 90, "evals": {"validate": ev(90)}, "timestamp": 1.0}]
+        for i, m in enumerate(models, 1):
+            rows.append({"id": i, "parent_ids": [i - 1], "mode": "tune", "status": "kept", "objective": best + len(models) - i,
+                         "improved_global": True, "evals": {"validate": ev(best + len(models) - i)}, "timestamp": 1.0 + 30 * i,
+                         "usage": {"cost_usd": cost / len(models)}, "proposer": f"claude-code:{m}"})
+        (d / "ledger.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        return load_run(d)
+
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-viz-grid-"))
+    try:
+        runs = [run("a-sonnet-s0", "p1", ["sonnet", "sonnet"], 80, 0.5), run("a-sonnet-s1", "p1", ["sonnet", "sonnet"], 82, 0.7),
+                run("a-sopus-s0", "p1", ["sonnet", "opus"], 75, 0.9), run("b-opus-s0", "p2", ["opus", "opus"], 70, 1.5)]
+        assert [config_name(r) for r in runs] == ["Sonnet", "Sonnet", "Sopus", "Opus"]
+        html = render_grid(runs)
+        assert html.count("<div class='facet'>") == 3 * 2, "one panel per benchmark in each of the three views"
+        assert "data-run='Sopus'" in html and 'class="pareto"' in html and "seed 1" in html
+        assert "$0.60 <span class='muted'>± $0.14</span>" in html, "mean ± sd of the two Sonnet repeats"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Model grid page test passed!")
+
+
 def test_viz_lineage():
     print("Testing the dashboard's idea-lineage chart (merges, duplicates, disjoint trees)...")
     from autoresearch_viz.html import render
@@ -354,4 +388,5 @@ if __name__ == "__main__":
     test_swarm_model_schedule()
     test_viz_lineage()
     test_viz_quality_efficiency()
+    test_viz_grid()
     print("\nAll autoresearch tests passed!")

@@ -45,6 +45,14 @@ def best_so_far(run: Run) -> list[Point]:
     return pts
 
 
+def held_out_gain_pct(s: Summary, run: Run) -> float:
+    """Best solver's gain over the seed on the held-out instances (both scored on the same fresh seeds)."""
+    seed = run.seed.evals.get("holdout") if run.seed else None
+    if s.holdout_score is None or not seed or not seed.ok or not seed.score:
+        return math.nan
+    return 100.0 * (seed.score - s.holdout_score) / seed.score
+
+
 def model_switches(run: Run) -> list[tuple[Point, str, str]]:
     """(point just before the switch, old proposer, new proposer) each time a run's proposer changes,
     e.g. a `--model sonnet,opus` schedule handing generation 2 to Opus."""
