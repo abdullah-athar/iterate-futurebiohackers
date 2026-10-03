@@ -1,0 +1,24 @@
+{
+  "returncode": 0,
+  "wall_seconds": 233.5,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T151036Z-0f6add1d",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "control",
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{}",
+    "config": "futurebiohackers {}"
+  }
+}

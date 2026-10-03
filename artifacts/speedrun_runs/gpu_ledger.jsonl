@@ -28,3 +28,4 @@
 {"time": "2026-10-03T16:10:17", "label": "p1a-lowres28x4 (pcie-guard attempt 1)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build"}
 {"time": "2026-10-03T16:10:21", "label": "p1a-lowres28x4 (pcie-guard attempt 2)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build"}
 {"time": "2026-10-03T16:10:25", "label": "p1a-lowres28x4 (pcie-guard attempt 3)", "gpu": "NVIDIA A100-SXM4-80GB", "container_seconds": 0.1, "gpu_minutes": 0.25, "note": "aborted before build"}
+{"time": "2026-10-03T16:22:07", "label": "p1a-lowres28x4", "gpu": "NVIDIA A100 80GB PCIe", "container_seconds": 697.2, "gpu_minutes": 11.87, "note": ""}
