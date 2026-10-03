@@ -23,7 +23,7 @@ from benchmark.api import BuildContext, TrainingData
 
 # Override any value with --params, e.g. '{"epochs": 9, "widths": [128, 384, 768]}'.
 DEFAULTS = {
-    "epochs": 9.0,
+    "epochs": 10.0,
     "batch_size": 1024,
     "lr": 11.5,  # per 1024 examples, decoupled from momentum (airbench convention)
     "momentum": 0.85,
@@ -42,7 +42,7 @@ DEFAULTS = {
     "resolution_switch": 0.5,  # fraction of steps before returning to 32 pixels
     # Multi-stage schedule, e.g. [[24, 0.33], [28, 0.67]]: resolution until that
     # fraction of steps, then 32. Overrides train_resolution/resolution_switch.
-    "resolution_schedule": [[28, 0.5]],
+    "resolution_schedule": [[24, 0.25], [28, 0.5]],
     # Batch-size schedule, e.g. [[512, 0.5]]: batch size until that fraction of the
     # training examples, then batch_size. Chosen per epoch. Weight decay per step
     # scales with the batch so the per-example decay is unchanged.
@@ -69,6 +69,10 @@ DEFAULTS = {
     "bn_recal_batches": 0,  # re-estimate BN statistics on center crops after training
     "stem": "patch2",  # "patch2": 2x2 whitening at 31x31; "patch4s2": 4x4 stride-2 at 15x15
     "inner_kernels": [3, 3, 3],  # kernel size of conv2/conv3 in each group (1 or 3)
+    # Group 3's residual pair (the two convs after conv1; the residual and the group output keep
+    # widths[2] channels): "full" = two 3x3 convs at widths[2]; "inner512" / "inner640" = the
+    # 3x3 pair through 512 / 640 channels; "bottleneck384" = 1x1 -> 384, 3x3 at 384, 1x1 back.
+    "g3_pair": "inner512",
     # "max" is max(dim).values; adaptive_max_pool2d's backward uses slow atomics and
     # "amax" trains to NaN under torch.compile in torch 2.4.
     "global_pool": "max",
@@ -79,6 +83,15 @@ DEFAULTS = {
     "muon_wd": 1.04e-6,  # per example
     "bias_lr": 0.0573,
     "head_lr": 0.5415,
+}
+
+
+# g3_pair variants: (kind, inner channels); None keeps the full-width pair.
+G3_PAIRS = {
+    "full": None,
+    "inner512": ("inner", 512),
+    "inner640": ("inner", 640),
+    "bottleneck384": ("bottleneck", 384),
 }
 
 
@@ -126,17 +139,41 @@ class Conv(nn.Conv2d):
 
 class ConvGroup(nn.Module):
     def __init__(
-        self, channels_in, channels_out, depth, bn_momentum, act, pool_first, kernel=3, pool=True
+        self,
+        channels_in,
+        channels_out,
+        depth,
+        bn_momentum,
+        act,
+        pool_first,
+        kernel=3,
+        pool=True,
+        pair=None,
     ):
         super().__init__()
         self.conv1 = Conv(channels_in, channels_out)
         self.pool = nn.MaxPool2d(2) if pool else nn.Identity()
         self.pool_first = pool_first
         self.norm1 = BatchNorm(channels_out, bn_momentum)
-        self.conv2 = Conv(channels_out, channels_out, kernel)
-        self.norm2 = BatchNorm(channels_out, bn_momentum)
-        self.conv3 = Conv(channels_out, channels_out, kernel) if depth == 3 else None
-        self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
+        if pair is None:
+            self.conv2 = Conv(channels_out, channels_out, kernel)
+            self.norm2 = BatchNorm(channels_out, bn_momentum)
+            self.conv3 = Conv(channels_out, channels_out, kernel) if depth == 3 else None
+            self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
+        else:
+            # A cheaper residual pair (g3_pair): the residual and the output keep channels_out.
+            kind, inner = pair
+            if kind == "bottleneck":
+                self.conv2a = Conv(channels_out, inner, 1)
+                self.norm2a = BatchNorm(inner, bn_momentum)
+                self.conv2 = Conv(inner, inner, kernel)
+                self.norm2 = BatchNorm(inner, bn_momentum)
+                self.conv3 = Conv(inner, channels_out, 1)
+            else:
+                self.conv2 = Conv(channels_out, inner, kernel)
+                self.norm2 = BatchNorm(inner, bn_momentum)
+                self.conv3 = Conv(inner, channels_out, kernel)
+            self.norm3 = BatchNorm(channels_out, bn_momentum)
         self.act = act
 
     def forward(self, x):
@@ -145,6 +182,9 @@ class ConvGroup(nn.Module):
         if self.conv3 is None:
             return self.norm2.activate(self.conv2(x), self.act)
         x0 = x
+        conv2a = getattr(self, "conv2a", None)
+        if conv2a is not None:  # bottleneck pair: 1x1 reduction before the 3x3
+            x = self.norm2a.activate(conv2a(x), self.act)
         x = self.norm2.activate(self.conv2(x), self.act)
         return self.norm3.activate(self.conv3(x), self.act, x0)
 
@@ -162,20 +202,33 @@ class Net(nn.Module):
         stem_width = 2 * 3 * patch * patch
         self.whiten = nn.Conv2d(3, stem_width, kernel_size=patch, padding=0, bias=True)
         self.whiten.weight.requires_grad = False
-        self.layers = nn.Sequential(
-            *(
-                ConvGroup(c_in, c_out, depth, bn_momentum, self.act, pool_first, kernel, pool)
-                for c_in, c_out, depth, pool_first, kernel, pool in zip(
-                    (stem_width, w1, w2),
-                    (w1, w2, w3),
-                    depths,
-                    hyp["pool_first"],
-                    hyp["inner_kernels"],
-                    (self.whiten_stride == 1, True, True),
-                    strict=True,
+        pair = G3_PAIRS[hyp["g3_pair"]]
+        groups = []
+        for index, (c_in, c_out, depth, pool_first, kernel, pool) in enumerate(
+            zip(
+                (stem_width, w1, w2),
+                (w1, w2, w3),
+                depths,
+                hyp["pool_first"],
+                hyp["inner_kernels"],
+                (self.whiten_stride == 1, True, True),
+                strict=True,
+            )
+        ):
+            groups.append(
+                ConvGroup(
+                    c_in,
+                    c_out,
+                    depth,
+                    bn_momentum,
+                    self.act,
+                    pool_first,
+                    kernel,
+                    pool,
+                    pair=pair if index == 2 else None,
                 )
             )
-        )
+        self.layers = nn.Sequential(*groups)
         self.head = nn.Linear(w3, num_classes, bias=False)
         self.scaling_factor = hyp["scaling_factor"]
         self.muon_head = hyp["optimizer"] == "muon"
@@ -403,6 +456,10 @@ def build(context: BuildContext):
         raise ValueError("resolution_schedule entries must be [16|20|24|28, fraction]")
     if len(hyp["inner_kernels"]) != 3 or any(k not in (1, 3) for k in hyp["inner_kernels"]):
         raise ValueError("inner_kernels must contain three values of 1 or 3")
+    if not isinstance(hyp["g3_pair"], str) or hyp["g3_pair"] not in G3_PAIRS:
+        raise ValueError(f"g3_pair must be one of {sorted(G3_PAIRS)}")
+    if hyp["g3_pair"] != "full" and (depths[2] != 3 or hyp["inner_kernels"][2] != 3):
+        raise ValueError("g3_pair variants need group 3 at depth 3 with 3x3 inner kernels")
     if hyp["stem"] not in ("patch2", "patch4s2"):
         raise ValueError("stem must be patch2 or patch4s2")
     if any(b <= 0 or not 0 <= f <= 1 for b, f in hyp["batch_schedule"]):
@@ -480,7 +537,7 @@ def build(context: BuildContext):
         crop_kernel=crop_kernel,
     )
     if hyp["hard_fraction"] < 1:
-        proxy_hyp = {**hyp, "widths": hyp["proxy_widths"], "depths": [2, 2, 2]}
+        proxy_hyp = {**hyp, "widths": hyp["proxy_widths"], "depths": [2, 2, 2], "g3_pair": "full"}
         proxy = Net(proxy_hyp, context.num_classes).to(
             device, dtype, memory_format=torch.channels_last
         )
