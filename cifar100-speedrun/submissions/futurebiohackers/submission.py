@@ -38,6 +38,9 @@ DEFAULTS = {
     "depths": None,  # optional per-group depths, e.g. [2, 3, 3]
     "train_resolution": 32,  # reduced resolution for the first training stage
     "resolution_switch": 0.5,  # fraction of steps before returning to 32 pixels
+    # Multi-stage schedule, e.g. [[24, 0.33], [28, 0.67]]: resolution until that
+    # fraction of steps, then 32. Overrides train_resolution/resolution_switch.
+    "resolution_schedule": [],
     "crop_mode": "masked",  # "indexed" preserves channels-last with one gather
     "fused_sgd": False,
     "compile_loss": False,
@@ -355,6 +358,10 @@ def build(context: BuildContext):
         raise ValueError("pool_first must contain three booleans")
     if hyp["activation"] not in ("gelu", "silu") or hyp["bn_dtype"] not in ("float", "half"):
         raise ValueError("activation must be gelu or silu; bn_dtype must be float or half")
+    if not hyp["resolution_schedule"] and hyp["train_resolution"] < 32:
+        hyp["resolution_schedule"] = [[hyp["train_resolution"], hyp["resolution_switch"]]]
+    if any(r not in (16, 20, 24, 28) or not 0 <= f <= 1 for r, f in hyp["resolution_schedule"]):
+        raise ValueError("resolution_schedule entries must be [16|20|24|28, fraction]")
     if hyp["global_pool"] not in ("adaptive", "amax", "max"):
         raise ValueError("global_pool must be adaptive, amax, or max")
     if hyp["optimizer"] not in ("sgd", "muon") or len(hyp["color_jitter"]) != 2:
@@ -433,7 +440,7 @@ def build(context: BuildContext):
             torch.randint(0, 256, (count, 3, 32, 32), dtype=torch.uint8),
             torch.randint(0, context.num_classes, (count,)),
         )
-        for resolution in sorted({hyp["train_resolution"], 32}):
+        for resolution in sorted({r for r, _ in hyp["resolution_schedule"]} | {32}):
             state.warmup_resolution = resolution
             for _ in range(2):
                 prepare(state, synthetic, seed=0)
@@ -473,18 +480,12 @@ def prepare(state, data: TrainingData, seed: int) -> None:
 
     # Alternating flip: flip a random half once, then mirror everything on odd epochs.
     images = batch_flip_lr(images)
-    if hyp["train_resolution"] < 32:
-        small = F.interpolate(
-            images,
-            size=(hyp["train_resolution"],) * 2,
-            mode="bilinear",
-            align_corners=False,
-        )
+    state.small_images = {}
+    for resolution, _ in hyp["resolution_schedule"]:
+        small = F.interpolate(images, size=(resolution,) * 2, mode="bilinear", align_corners=False)
         if hyp["translate"]:
             small = F.pad(small, (hyp["translate"],) * 4, "reflect")
-        state.small_images = small.to(memory_format=torch.channels_last)
-    else:
-        state.small_images = None
+        state.small_images[resolution] = small.to(memory_format=torch.channels_last)
     if hyp["translate"]:
         images = F.pad(images, (hyp["translate"],) * 4, "reflect")
     state.images = images
@@ -579,13 +580,12 @@ def _fit(state, total_steps, proxy_only=False):
                 break
             resolution = getattr(state, "warmup_resolution", None)
             if resolution is None:
-                resolution = (
-                    hyp["train_resolution"]
-                    if step < int(total_steps * hyp["resolution_switch"])
-                    else 32
+                resolution = next(
+                    (r for r, end in hyp["resolution_schedule"] if step < int(total_steps * end)),
+                    32,
                 )
             if resolution != current_resolution:
-                source = state.small_images if resolution < 32 else state.images
+                source = state.small_images[resolution] if resolution < 32 else state.images
                 if state.crop_kernel is not None:
                     images = state.crop_kernel(source, resolution, flip=epoch % 2 == 1)
                 else:
