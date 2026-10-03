@@ -2,7 +2,7 @@
 
 1. Default-path faithfulness: with default parameters the working-tree recipe must give a trial
    that is bit-identical (weights and predictions) to the reference recipe, by default the team
-   baseline on origin/main. Shared parameters whose defaults differ are set to OUR defaults on
+   baseline on origin/speedrun-24px-9.5ep (candidate B). Shared parameters whose defaults differ are set to OUR defaults on
    both sides (and printed) and parameters only our file knows are turned off, so the comparison
    tests the code path rather than promoted values. The control also keeps the reference's step
    count and prints nothing on stderr.
@@ -20,7 +20,7 @@
 CPU, synthetic images, well under a minute. Run from the speedrun env with cwd cifar100-speedrun:
     uv run python ../scripts/check_variants.py [reference_submission_dir]
     scripts/wsl_speedrun.sh python ../scripts/check_variants.py          # Windows, via WSL
-The reference defaults to `git show origin/main:...submission.py`; set CHECK_VARIANTS_REF=<git
+The reference defaults to `git show origin/speedrun-24px-9.5ep:...submission.py`; set CHECK_VARIANTS_REF=<git
 ref> to compare against another commit (it must share the baseline's state layout).
 """
 
@@ -47,7 +47,7 @@ from benchmark.worker import load_submission, seed_everything
 TEAM_DIR = (
     Path(__file__).resolve().parents[1] / "cifar100-speedrun" / "submissions" / "futurebiohackers"
 )
-REFERENCE_REF = os.environ.get("CHECK_VARIANTS_REF", "origin/main")
+REFERENCE_REF = os.environ.get("CHECK_VARIANTS_REF", "origin/speedrun-24px-9.5ep")
 # The synthetic split has 64 images: batch 8 gives 8 steps per epoch, 16 in two epochs.
 BASE = {"widths": [32, 64, 64], "epochs": 2.0, "batch_size": 8, "compile": ""}
 # "Off" values for parameters only our file knows. The control turns every such parameter off
@@ -58,6 +58,7 @@ OFF: dict[str, object] = {
     "skip_residual_until": 0.0,
     "skip_residual_groups": [],
     "label_smoothing_end": None,
+    "g3_pair": "full",
 }
 # --params deltas on top of BASE; every other value is the recipe's default (28 px first half).
 VARIANTS = {
@@ -119,6 +120,10 @@ VARIANTS = {
 # may not): name -> delta. count_nonfinite reports "NONFINITE_LOSSES n" on stderr after train.
 OWN_SWITCHES = {
     "count_nonfinite": {"count_nonfinite": True},
+    # cheaper residual pair in group 3 (residual and output stay at widths[2])
+    "g3_pair_inner512": {"g3_pair": "inner512"},
+    "g3_pair_inner640": {"g3_pair": "inner640"},
+    "g3_pair_bottleneck384": {"g3_pair": "bottleneck384"},
     # un-augmented finish over the last 1.0 / 0.5 of BASE's 2 epochs (steps 8-15 / 12-15), in
     # every crop layout: indexed (channels-last), masked and cutout (NCHW), translate 0 (source)
     "aug_off_last_1.0": {"aug_off_last": 1.0},
@@ -688,9 +693,15 @@ def main() -> int:
     )
     plan = getattr(new, "_skip_warmup", None)
     if plan is not None:
-        skip_hyp = {**new.DEFAULTS, "skip_residual_until": 0.25, "skip_residual_groups": [0]}
+        skip_hyp = {
+            **new.DEFAULTS,
+            "resolution_schedule": [[28, 0.5]],
+            "epochs": 9.0,
+            "skip_residual_until": 0.25,
+            "skip_residual_groups": [0],
+        }
         check(
-            "_skip_warmup: with the default schedule (28 px to 0.5, batch 1024, 3 of 9 whitening "
+            "_skip_warmup: with main's schedule (28 px to 0.5, batch 1024, 3 of 9 whitening "
             "epochs) the skip graph is warmed for (1024, 28) with the trained whitening bias only "
             "(whiten_bias_steps 6 of 6); 24 px to 0.25 then 28 px: (1024, 24) only; batch "
             "schedule [[512, 0.1]]: (512, 28) and (1024, 28); whiten_bias_epochs 1: both flags "
@@ -762,7 +773,50 @@ def main() -> int:
         )
 
     # 6. Combinations build must reject.
+    # g3_pair: conv shapes of group 3's pair, the residual/output width, and a probe forward.
+    for name, run in runs.items():
+        hyp, net = run.state.hyp, run.state.net
+        pair = hyp["g3_pair"]
+        if pair == "full":
+            continue
+        g, w3 = net.layers[2], hyp["widths"][2]
+        kind, inner = new.G3_PAIRS[pair]
+        shapes = {
+            "conv2": tuple(g.conv2.weight.shape),
+            "conv3": tuple(g.conv3.weight.shape),
+            "conv2a": tuple(g.conv2a.weight.shape)
+            if getattr(g, "conv2a", None) is not None
+            else None,
+        }
+        if kind == "bottleneck":
+            expected = {
+                "conv2": (inner, inner, 3, 3),
+                "conv3": (w3, inner, 1, 1),
+                "conv2a": (inner, w3, 1, 1),
+            }
+        else:
+            expected = {"conv2": (inner, w3, 3, 3), "conv3": (w3, inner, 3, 3), "conv2a": None}
+        with torch.inference_mode():
+            probe = g(torch.randn(2, hyp["widths"][1], 6, 6))
+        check(
+            f"{name}: group 3 pair shapes {shapes} == {expected}; output width {w3}; "
+            f"norm2 over {g.norm2.num_features} channels",
+            shapes == expected
+            and tuple(probe.shape) == (2, w3, 3, 3)
+            and g.norm2.num_features == inner
+            and g.norm3.num_features == w3,
+        )
+    check(
+        "g3_pair full (default) registers no conv2a and the same state_dict keys as the control",
+        getattr(d.state.net.layers[2], "conv2a", None) is None and set(d.weights) == set(b.weights),
+    )
+
     rejected = {
+        "g3_pair inner128 (unknown variant)": {"g3_pair": "inner128"},
+        "g3_pair inner512 with 1x1 inner kernels in group 3": {
+            "g3_pair": "inner512",
+            "inner_kernels": [3, 3, 1],
+        },
         "resolution_schedule [[30, 0.5]] (not 16/20/24/28)": {"resolution_schedule": [[30, 0.5]]},
         "batch_schedule [[0, 0.5]] (batch must be positive)": {"batch_schedule": [[0, 0.5]]},
         "an unknown parameter (our old 'jitter' switch)": {"jitter": 0.3},

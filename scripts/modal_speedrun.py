@@ -156,6 +156,7 @@ GRAPH_KEYS = {
     "pool_first",
     "stem",
     "inner_kernels",
+    "g3_pair",
     "gelu_approximate",
     "activation",
     "scaling_factor",
