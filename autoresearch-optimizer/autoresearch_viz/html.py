@@ -45,7 +45,7 @@ h1{font-size:28px;margin:0 0 4px}h2{font-size:19px;margin:0 0 4px}h3{font-size:1
 svg.chart{max-width:100%;height:auto;display:block}
 svg .grid{stroke:#eef2f7;stroke-width:1}svg .axis{stroke:#cbd5e1;stroke-width:1}
 svg .tick,svg .val,svg .seg{font-size:11px;fill:#64748b}svg .seg{fill:#fff;font-weight:600}svg .label{font-size:12px;fill:#334155}
-svg .ref{font-size:11px}svg .cat{font-size:12px;fill:#0f172a}
+svg .ref{font-size:11px}svg .end{font-size:11px;fill:var(--ink)}svg .endbg{fill:var(--card);opacity:.92}svg .cat{font-size:12px;fill:#0f172a}
 svg [data-tip]{cursor:pointer}svg.chart circle[data-tip]:hover{r:7}
 .linbar{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;margin:0 0 4px}.linbar .tabs{margin:0;align-items:center}.linbar .tabs>span{font-size:13px;color:var(--muted);margin-right:2px}
 .linzoom button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 10px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted);margin-left:4px}
@@ -172,7 +172,8 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
                 if p.improved:
                     e = next(x for x in run.entries if x.id == p.entry_id)
                     marks.append((getattr(p, key), p.best, f"#{e.id} [{e.mode}] → {fmt_num(p.best)}\n{e.hypothesis}"))
-            series.append(Series(run.label, colors[run.label], xy, marks))
+            end = max((x for x, _ in xy), default=None) if key != "evals" and len(runs) > 1 else None
+            series.append(Series(run.label, colors[run.label], xy, marks, end))
         max_x = max((getattr(p, key) for r in runs for p in best_so_far(r)), default=0)
         panels.append(
             f'<div class="panel {"on" if i == 0 else ""}" data-group="x" data-key="{key}">'

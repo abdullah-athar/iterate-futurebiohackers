@@ -302,6 +302,7 @@ def test_viz_quality_efficiency():
         assert "Quality · Strong wins" in card and "Efficiency · Cheap wins" in card
         assert "+22.2% ★" in card and "$0.50 ★" in card and "20 ★" in card  # gain, cost, points per dollar (10 / 0.5)
         assert 'data-key="cost">vs cost</button>' in html
+        assert "Cheap end · $0.50" in html and "Strong end · $2.00" in html, "each run's real end is marked on the cost axis"
         assert "<h2>Quality vs efficiency</h2>" not in render([strong]), "the card needs two runs"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

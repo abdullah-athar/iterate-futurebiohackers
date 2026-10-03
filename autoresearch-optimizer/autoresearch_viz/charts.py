@@ -47,6 +47,7 @@ class Series:
     color: str
     points: list[tuple[float, float]]
     markers: list[tuple[float, float, str]] = field(default_factory=list)  # (x, y, tooltip)
+    end: float | None = None  # where the run really stopped spending; drawn as a dashed vertical line
 
 
 @dataclass
@@ -104,6 +105,18 @@ def step_chart(
         out.append(
             f'<text class="ref" x="{ml + pw - 4}" y="{Y(r.y) - 5:.1f}" text-anchor="end" fill="{r.color}">{escape(r.label)} = {fmt_num(r.y)}</text>'
         )
+    ends = [s for s in series if s.end is not None and s.points]
+    for i, s in enumerate(ends):
+        x, tip = X(s.end), f"{s.label}: run ended at {fmt_num(s.end, x_unit)}"
+        out.append(
+            f'<line x1="{x:.1f}" x2="{x:.1f}" y1="{mt}" y2="{mt + ph}" stroke="{s.color}" stroke-dasharray="5 4" '
+            f'stroke-width="1.5" data-tip="{escape(tip, quote=True)}"/>'
+        )
+        text = f"{s.label} end · {fmt_num(s.end, x_unit)}"
+        w, y = 6.2 * len(text) + 6, mt + 14 + 16 * i
+        anchor, dx, bx = ("end", -6, x - 3 - w) if x > ml + pw * 0.85 else ("start", 6, x + 3)
+        out.append(f'<rect class="endbg" x="{bx:.1f}" y="{y - 11}" width="{w:.0f}" height="15" rx="3"/>')
+        out.append(f'<text class="end" x="{x + dx:.1f}" y="{y}" text-anchor="{anchor}">{escape(text)}</text>')
     for s in series:
         if not s.points:
             continue
