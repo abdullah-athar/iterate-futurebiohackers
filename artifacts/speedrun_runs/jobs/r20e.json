@@ -1,0 +1,91 @@
+{
+  "round": "r20",
+  "n": 8,
+  "seed": 0,
+  "control": {
+    "resolution_schedule": [
+      [
+        24,
+        0.25
+      ],
+      [
+        28,
+        0.5
+      ]
+    ],
+    "epochs": 9.25
+  },
+  "jobs": [
+    {
+      "name": "method-c",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "A-skipg0-ro",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.25
+              ],
+              [
+                28,
+                0.5
+              ]
+            ],
+            "epochs": 9.25,
+            "skip_residual_until": 0.25,
+            "skip_residual_groups": [
+              0
+            ],
+            "skip_compile": "reduce-overhead"
+          },
+          "hypothesis": "progressive depth: group 1 without its residual pair for the first 25%, skip graph compiled with reduce-overhead (CUDA graphs)"
+        },
+        {
+          "label": "A-skipg1-ro",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.25
+              ],
+              [
+                28,
+                0.5
+              ]
+            ],
+            "epochs": 9.25,
+            "skip_residual_until": 0.25,
+            "skip_residual_groups": [
+              1
+            ],
+            "skip_compile": "reduce-overhead"
+          },
+          "hypothesis": "progressive depth: group 2 without its residual pair for the first 25%, reduce-overhead skip graph"
+        },
+        {
+          "label": "A-skipg0-default",
+          "params": {
+            "resolution_schedule": [
+              [
+                24,
+                0.25
+              ],
+              [
+                28,
+                0.5
+              ]
+            ],
+            "epochs": 9.25,
+            "skip_residual_until": 0.25,
+            "skip_residual_groups": [
+              0
+            ]
+          },
+          "hypothesis": "same as skipg0 with the skip graph in default mode (no CUDA graphs): isolates the compile-mode penalty"
+        }
+      ]
+    }
+  ]
+}
