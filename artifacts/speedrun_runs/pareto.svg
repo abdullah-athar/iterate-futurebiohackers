@@ -2,7 +2,7 @@
 <title>CIFAR-100 speedrun: accuracy vs prepare+train time</title>
 <rect width="800" height="500" fill="#fcfcfb"/>
 <text x="62" y="24" font-size="14" font-weight="600" fill="#0b0b0b">CIFAR-100 speedrun: mean accuracy vs mean prepare+train time</text>
-<text x="776" y="24" text-anchor="end" font-size="10" fill="#898781">2026-10-04 00:39; k = 1 pp/s</text>
+<text x="776" y="24" text-anchor="end" font-size="10" fill="#898781">2026-10-04 00:58; k = 1 pp/s</text>
 <circle cx="68" cy="44" r="5" fill="#2a78d6"/>
 <text x="78" y="48" fill="#52514e">round calib</text>
 <circle cx="168.0" cy="44" r="5" fill="#eb6834"/>
@@ -58,15 +58,17 @@
 <circle cx="244.0" cy="92" r="5" fill="#898781"/>
 <text x="254.0" y="96" fill="#52514e">round r26</text>
 <circle cx="332.0" cy="92" r="5" fill="#898781"/>
-<text x="342.0" y="96" fill="#52514e">round reference</text>
-<circle cx="456.0" cy="92" r="5" fill="#898781"/>
-<text x="466.0" y="96" fill="#52514e">round single</text>
-<rect x="557.0" y="87" width="10" height="10" fill="#52514e"/>
-<text x="572.0" y="96" fill="#52514e">control</text>
-<line x1="632.0" y1="92" x2="644.0" y2="92" stroke="#52514e" stroke-width="2"/>
-<text x="648.0" y="96" fill="#52514e">Pareto frontier</text>
-<line x1="62" y1="108" x2="74" y2="108" stroke="#898781" stroke-width="1.5" stroke-dasharray="4 3"/>
-<text x="78" y="112" fill="#52514e">75 % target</text>
+<text x="342.0" y="96" fill="#52514e">round r28</text>
+<circle cx="420.0" cy="92" r="5" fill="#898781"/>
+<text x="430.0" y="96" fill="#52514e">round reference</text>
+<circle cx="544.0" cy="92" r="5" fill="#898781"/>
+<text x="554.0" y="96" fill="#52514e">round single</text>
+<rect x="645.0" y="87" width="10" height="10" fill="#52514e"/>
+<text x="660.0" y="96" fill="#52514e">control</text>
+<line x1="62" y1="108" x2="74" y2="108" stroke="#52514e" stroke-width="2"/>
+<text x="78" y="112" fill="#52514e">Pareto frontier</text>
+<line x1="186.0" y1="108" x2="198.0" y2="108" stroke="#898781" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text x="202.0" y="112" fill="#52514e">75 % target</text>
 <line x1="62.0" y1="130" x2="62.0" y2="448" stroke="#e1e0d9"/>
 <text x="62.0" y="464" text-anchor="middle" fill="#898781">0</text>
 <line x1="204.8" y1="130" x2="204.8" y2="448" stroke="#e1e0d9"/>
@@ -97,7 +99,7 @@
 <text transform="translate(16 289.0) rotate(-90)" text-anchor="middle" fill="#52514e">mean accuracy (%)</text>
 <line x1="62" y1="193.6" x2="776" y2="193.6" stroke="#898781" stroke-width="1.5" stroke-dasharray="5 4"/>
 <text x="772" y="188.6" text-anchor="end" font-size="10" fill="#898781">75.0 % target</text>
-<polyline points="215.4,426.0 333.3,225.0 339.5,201.3 351.1,197.8 355.4,196.4 356.4,190.2 375.1,190.0 376.9,189.1 377.7,189.0 377.9,187.8 380.6,187.8 382.2,187.2 385.7,186.5 391.3,186.4 402.3,185.5 409.2,183.5 419.8,183.4 419.8,180.1 427.1,177.1 462.3,176.4" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="215.4,426.0 333.3,225.0 339.5,201.3 351.1,197.8 355.4,196.4 356.4,190.2 375.1,190.0 376.9,189.1 377.7,189.0 377.9,187.8 380.6,187.8 382.2,187.2 385.7,186.5 391.3,186.4 402.3,185.5 409.2,183.5 419.8,183.4 419.8,180.1 427.1,177.1 430.3,176.0" fill="none" stroke="#52514e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
 <g><title>control (control, round calib): 75.13 % acc, 7.35 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="586.8" cy="190.4" r="12" fill="#000" fill-opacity="0"/>
 <rect x="581.8" y="185.4" width="10" height="10" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
@@ -541,6 +543,14 @@
 <g><title>control (control, round r26): 75.07 % acc, 4.48 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="381.7" cy="191.8" r="12" fill="#000" fill-opacity="0"/>
 <rect x="376.7" y="186.8" width="10" height="10" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>control (control, round r28): 75.04 % acc, 4.36 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="373.4" cy="192.6" r="12" fill="#000" fill-opacity="0"/>
+<rect x="368.4" y="187.6" width="10" height="10" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>control (control, round r28): 75.07 % acc, 4.39 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="375.5" cy="191.8" r="12" fill="#000" fill-opacity="0"/>
+<rect x="370.5" y="186.8" width="10" height="10" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>w128-256-768 (variant, round r1): 75.23 % acc, 6.18 s; dacc +0.03 +- 0.15 pp; dtime -1.16 s; dtime_adj -1.24 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="503.2" cy="187.7" r="12" fill="#000" fill-opacity="0"/>
@@ -1218,6 +1228,10 @@
 <circle cx="408.5" cy="196.1" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="408.5" cy="196.1" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>w128-d233-e8.25 (variant, round r28): 74.84 % acc, 4.26 s; dacc -0.19 +- 0.16 pp; dtime -0.10 s; dtime_adj +0.10 s; BELOW 75%</title>
+<circle cx="366.5" cy="197.6" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="366.5" cy="197.6" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>res28-s0.75 (variant, round r3): 74.25 % acc, 5.44 s; dacc -0.73 +- 0.09 pp; dtime -0.62 s; dtime_adj +0.11 s; BELOW 75%</title>
 <circle cx="450.7" cy="212.6" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="450.7" cy="212.6" r="5" fill="#eda100" stroke="#fcfcfb" stroke-width="2"/>
@@ -1250,6 +1264,10 @@
 <circle cx="358.5" cy="193.5" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="358.5" cy="193.5" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>w128-d233-e9.0 (variant, round r28): 75.17 % acc, 4.62 s; dacc +0.13 +- 0.15 pp; dtime +0.26 s; dtime_adj +0.13 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="392.2" cy="189.3" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="392.2" cy="189.3" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>g3-inner640-e9.75 (variant, round r22): 75.09 % acc, 4.64 s; dacc -0.12 +- 0.09 pp; dtime +0.02 s; dtime_adj +0.13 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="393.1" cy="191.4" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="393.1" cy="191.4" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
@@ -1261,6 +1279,10 @@
 <g><title>switch0.35 (variant, round r6): 75.05 % acc, 5.36 s; dacc -0.32 +- 0.12 pp; dtime -0.31 s; dtime_adj +0.14 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="444.4" cy="192.3" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="444.4" cy="192.3" r="5" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>
+</g>
+<g><title>w128-d233-e10.0 (variant, round r28): 75.69 % acc, 5.16 s; dacc +0.62 +- 0.10 pp; dtime +0.77 s; dtime_adj +0.15 s; QUALIFIED (&gt;= 75%); on the Pareto frontier</title>
+<circle cx="430.3" cy="176.0" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="430.3" cy="176.0" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
 <g><title>bn0.6 (variant, round r15): 75.32 % acc, 5.02 s; dacc -0.21 +- 0.10 pp; dtime -0.14 s; dtime_adj +0.15 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="420.7" cy="185.4" r="12" fill="#000" fill-opacity="0"/>
@@ -1390,11 +1412,15 @@
 <circle cx="442.0" cy="198.1" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="442.0" cy="198.1" r="5" fill="#e34948" stroke="#fcfcfb" stroke-width="2"/>
 </g>
+<g><title>w128-d233-e9.5 (variant, round r28): 75.29 % acc, 4.93 s; dacc +0.22 +- 0.09 pp; dtime +0.54 s; dtime_adj +0.32 s; QUALIFIED (&gt;= 75%)</title>
+<circle cx="414.0" cy="186.1" r="12" fill="#000" fill-opacity="0"/>
+<circle cx="414.0" cy="186.1" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+</g>
 <g><title>k-e10.0 (variant, round r14): 75.48 % acc, 5.32 s; dacc -0.05 +- 0.07 pp; dtime +0.25 s; dtime_adj +0.32 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="442.1" cy="181.4" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="442.1" cy="181.4" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
-<g><title>k-e10.5 (variant, round r14): 75.68 % acc, 5.61 s; dacc +0.15 +- 0.09 pp; dtime +0.53 s; dtime_adj +0.32 s; QUALIFIED (&gt;= 75%); on the Pareto frontier</title>
+<g><title>k-e10.5 (variant, round r14): 75.68 % acc, 5.61 s; dacc +0.15 +- 0.09 pp; dtime +0.53 s; dtime_adj +0.32 s; QUALIFIED (&gt;= 75%)</title>
 <circle cx="462.3" cy="176.4" r="12" fill="#000" fill-opacity="0"/>
 <circle cx="462.3" cy="176.4" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
 </g>
@@ -1800,15 +1826,17 @@
 <text x="372.5" y="389.6" text-anchor="start" font-size="10" fill="#52514e">hard0.5-offline</text>
 <text x="373.2" y="220.5" text-anchor="start" font-size="10" fill="#52514e">k331</text>
 <text x="374.5" y="241.3" text-anchor="start" font-size="10" fill="#52514e">d222</text>
-<text x="375.3" y="188.5" text-anchor="start" font-size="10" fill="#52514e">r24h-e9.75</text>
-<text x="377.5" y="205.8" text-anchor="start" font-size="10" fill="#52514e">cold4cpu-res24q</text>
-<text x="378.4" y="191.6" text-anchor="start" font-size="10" fill="#52514e">r20-24-28-e9.5</text>
-<text x="379.0" y="205.7" text-anchor="start" font-size="10" fill="#52514e">bsched512</text>
-<text x="379.2" y="188.1" text-anchor="start" font-size="10" fill="#52514e">bsched512-lr14</text>
-<text x="379.4" y="207.0" text-anchor="start" font-size="10" fill="#52514e">r24q25-28q60</text>
-<text x="380.2" y="190.5" text-anchor="start" font-size="10" fill="#52514e">g3-inner512-e9.75</text>
-<text x="380.8" y="204.7" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="381.1" y="186.6" text-anchor="start" font-size="10" fill="#52514e">res24q-28h</text>
+<text x="374.5" y="192.6" text-anchor="start" font-size="10" fill="#52514e">w128-d233-e8.25</text>
+<text x="375.3" y="206.5" text-anchor="start" font-size="10" fill="#52514e">r24h-e9.75</text>
+<text x="377.5" y="187.8" text-anchor="start" font-size="10" fill="#52514e">cold4cpu-res24q</text>
+<text x="378.4" y="209.6" text-anchor="start" font-size="10" fill="#52514e">r20-24-28-e9.5</text>
+<text x="379.0" y="187.7" text-anchor="start" font-size="10" fill="#52514e">bsched512</text>
+<text x="379.2" y="206.1" text-anchor="start" font-size="10" fill="#52514e">bsched512-lr14</text>
+<text x="379.4" y="189.0" text-anchor="start" font-size="10" fill="#52514e">r24q25-28q60</text>
+<text x="380.2" y="208.5" text-anchor="start" font-size="10" fill="#52514e">g3-inner512-e9.75</text>
+<text x="380.8" y="186.7" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="381.1" y="204.6" text-anchor="start" font-size="10" fill="#52514e">res24q-28h</text>
+<text x="381.4" y="187.6" text-anchor="start" font-size="10" fill="#52514e">control</text>
 <text x="381.6" y="208.7" text-anchor="start" font-size="10" fill="#52514e">e8.5</text>
 <text x="382.0" y="192.8" text-anchor="start" font-size="10" fill="#52514e">whiten5</text>
 <text x="382.8" y="205.7" text-anchor="start" font-size="10" fill="#52514e">cdt-aggfusion</text>
@@ -1816,78 +1844,80 @@
 <text x="383.1" y="203.0" text-anchor="start" font-size="10" fill="#52514e">g3-inner512-e10.0-augoff0.5</text>
 <text x="383.4" y="192.0" text-anchor="start" font-size="10" fill="#52514e">cold4cpu-cdt</text>
 <text x="383.4" y="204.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="383.6" y="187.5" text-anchor="start" font-size="10" fill="#52514e">candA-24q28h-e9.25-seeds0</text>
-<text x="383.6" y="204.2" text-anchor="start" font-size="10" fill="#52514e">r24h-e10.0</text>
-<text x="384.1" y="187.3" text-anchor="start" font-size="10" fill="#52514e">A-bnrecal2</text>
-<text x="384.1" y="217.6" text-anchor="start" font-size="10" fill="#52514e">S3-d223</text>
-<text x="384.9" y="184.1" text-anchor="start" font-size="10" fill="#52514e">r24h-e10.25</text>
-<text x="385.6" y="202.3" text-anchor="start" font-size="10" fill="#52514e">B-augoff0.5-e9.25</text>
-<text x="385.7" y="186.2" text-anchor="start" font-size="10" fill="#52514e">A-bnrecal5</text>
-<text x="385.7" y="202.0" text-anchor="start" font-size="10" fill="#52514e">B-24q30-28h</text>
-<text x="385.9" y="182.8" text-anchor="start" font-size="10" fill="#52514e">r24q-28h-e9.25</text>
-<text x="386.2" y="204.8" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="386.3" y="187.5" text-anchor="start" font-size="10" fill="#52514e">g3-inner640</text>
-<text x="386.6" y="206.7" text-anchor="start" font-size="10" fill="#52514e">bn0.7</text>
-<text x="386.6" y="187.7" text-anchor="start" font-size="10" fill="#52514e">bias16</text>
-<text x="386.7" y="202.4" text-anchor="start" font-size="10" fill="#52514e">g3-inner512-e10.0</text>
-<text x="386.7" y="191.3" text-anchor="start" font-size="10" fill="#52514e">wd0.024</text>
-<text x="387.5" y="204.1" text-anchor="start" font-size="10" fill="#52514e">aten-only</text>
-<text x="387.7" y="186.4" text-anchor="start" font-size="10" fill="#52514e">triton-only</text>
-<text x="387.7" y="204.8" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="388.1" y="183.5" text-anchor="start" font-size="10" fill="#52514e">g3-inner512-e10.0-n16</text>
-<text x="388.3" y="204.8" text-anchor="start" font-size="10" fill="#52514e">aggfusion</text>
-<text x="388.4" y="186.7" text-anchor="start" font-size="10" fill="#52514e">cold4cpu-g3-512-e10</text>
-<text x="388.5" y="205.3" text-anchor="start" font-size="10" fill="#52514e">ls0.2</text>
-<text x="388.6" y="182.8" text-anchor="start" font-size="10" fill="#52514e">A-augoff0.5</text>
-<text x="388.9" y="203.9" text-anchor="start" font-size="10" fill="#52514e">ls0.3</text>
-<text x="388.9" y="183.7" text-anchor="start" font-size="10" fill="#52514e">A-augoff1.0</text>
-<text x="389.0" y="207.8" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="389.1" y="188.1" text-anchor="start" font-size="10" fill="#52514e">A-ls0.35to0.15</text>
-<text x="389.2" y="204.4" text-anchor="start" font-size="10" fill="#52514e">warmup0.15</text>
-<text x="389.3" y="187.7" text-anchor="start" font-size="10" fill="#52514e">cold4cpu-candB</text>
-<text x="389.3" y="201.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="389.3" y="185.0" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="389.7" y="204.8" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="390.2" y="182.2" text-anchor="start" font-size="10" fill="#52514e">candC-g3-512-e10-seeds40</text>
-<text x="390.5" y="201.5" text-anchor="start" font-size="10" fill="#52514e">g3-inner512-e10.25</text>
-<text x="390.5" y="234.8" text-anchor="start" font-size="10" fill="#52514e">res24-s0.75</text>
-<text x="390.8" y="212.1" text-anchor="start" font-size="10" fill="#52514e">B-24q-28q75</text>
-<text x="390.9" y="190.9" text-anchor="start" font-size="10" fill="#52514e">r20-24-28-e9.75</text>
-<text x="391.0" y="202.0" text-anchor="start" font-size="10" fill="#52514e">g3-inner512-e10.0-s40</text>
-<text x="391.4" y="190.6" text-anchor="start" font-size="10" fill="#52514e">wd0.012</text>
-<text x="391.6" y="203.2" text-anchor="start" font-size="10" fill="#52514e">lr12.5</text>
-<text x="391.8" y="183.4" text-anchor="start" font-size="10" fill="#52514e">g3-inner512-e10.0-s0</text>
-<text x="391.8" y="202.1" text-anchor="start" font-size="10" fill="#52514e">candB-24q28h-e9.5-seeds0</text>
-<text x="392.0" y="184.6" text-anchor="start" font-size="10" fill="#52514e">candA-24q28h-e9.25-seeds40</text>
-<text x="392.1" y="205.3" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="392.3" y="183.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="392.6" y="205.1" text-anchor="start" font-size="10" fill="#52514e">lr10.5</text>
-<text x="393.0" y="226.6" text-anchor="start" font-size="10" fill="#52514e">S3-poolfirst-g3</text>
-<text x="393.1" y="227.9" text-anchor="start" font-size="10" fill="#52514e">d332</text>
-<text x="393.1" y="183.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="393.7" y="199.5" text-anchor="start" font-size="10" fill="#52514e">B-augoff0.5</text>
-<text x="393.9" y="183.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="383.5" y="186.8" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="383.6" y="205.5" text-anchor="start" font-size="10" fill="#52514e">candA-24q28h-e9.25-seeds0</text>
+<text x="383.6" y="186.2" text-anchor="start" font-size="10" fill="#52514e">r24h-e10.0</text>
+<text x="384.1" y="205.3" text-anchor="start" font-size="10" fill="#52514e">A-bnrecal2</text>
+<text x="384.1" y="199.6" text-anchor="start" font-size="10" fill="#52514e">S3-d223</text>
+<text x="384.9" y="202.1" text-anchor="start" font-size="10" fill="#52514e">r24h-e10.25</text>
+<text x="385.6" y="184.3" text-anchor="start" font-size="10" fill="#52514e">B-augoff0.5-e9.25</text>
+<text x="385.7" y="204.2" text-anchor="start" font-size="10" fill="#52514e">A-bnrecal5</text>
+<text x="385.7" y="184.0" text-anchor="start" font-size="10" fill="#52514e">B-24q30-28h</text>
+<text x="385.9" y="200.8" text-anchor="start" font-size="10" fill="#52514e">r24q-28h-e9.25</text>
+<text x="386.2" y="186.8" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="386.3" y="205.5" text-anchor="start" font-size="10" fill="#52514e">g3-inner640</text>
+<text x="386.6" y="188.7" text-anchor="start" font-size="10" fill="#52514e">bn0.7</text>
+<text x="386.6" y="205.7" text-anchor="start" font-size="10" fill="#52514e">bias16</text>
+<text x="386.7" y="184.4" text-anchor="start" font-size="10" fill="#52514e">g3-inner512-e10.0</text>
+<text x="386.7" y="209.3" text-anchor="start" font-size="10" fill="#52514e">wd0.024</text>
+<text x="387.5" y="186.1" text-anchor="start" font-size="10" fill="#52514e">aten-only</text>
+<text x="387.7" y="204.4" text-anchor="start" font-size="10" fill="#52514e">triton-only</text>
+<text x="387.7" y="186.8" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="388.1" y="201.5" text-anchor="start" font-size="10" fill="#52514e">g3-inner512-e10.0-n16</text>
+<text x="388.3" y="186.8" text-anchor="start" font-size="10" fill="#52514e">aggfusion</text>
+<text x="388.4" y="204.7" text-anchor="start" font-size="10" fill="#52514e">cold4cpu-g3-512-e10</text>
+<text x="388.5" y="187.3" text-anchor="start" font-size="10" fill="#52514e">ls0.2</text>
+<text x="388.6" y="200.8" text-anchor="start" font-size="10" fill="#52514e">A-augoff0.5</text>
+<text x="388.9" y="185.9" text-anchor="start" font-size="10" fill="#52514e">ls0.3</text>
+<text x="388.9" y="201.7" text-anchor="start" font-size="10" fill="#52514e">A-augoff1.0</text>
+<text x="389.0" y="189.8" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="389.1" y="206.1" text-anchor="start" font-size="10" fill="#52514e">A-ls0.35to0.15</text>
+<text x="389.2" y="186.4" text-anchor="start" font-size="10" fill="#52514e">warmup0.15</text>
+<text x="389.3" y="205.7" text-anchor="start" font-size="10" fill="#52514e">cold4cpu-candB</text>
+<text x="389.3" y="183.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="389.3" y="203.0" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="389.7" y="186.8" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="390.2" y="200.2" text-anchor="start" font-size="10" fill="#52514e">candC-g3-512-e10-seeds40</text>
+<text x="390.5" y="183.5" text-anchor="start" font-size="10" fill="#52514e">g3-inner512-e10.25</text>
+<text x="390.5" y="252.8" text-anchor="start" font-size="10" fill="#52514e">res24-s0.75</text>
+<text x="390.8" y="194.1" text-anchor="start" font-size="10" fill="#52514e">B-24q-28q75</text>
+<text x="390.9" y="208.9" text-anchor="start" font-size="10" fill="#52514e">r20-24-28-e9.75</text>
+<text x="391.0" y="184.0" text-anchor="start" font-size="10" fill="#52514e">g3-inner512-e10.0-s40</text>
+<text x="391.4" y="208.6" text-anchor="start" font-size="10" fill="#52514e">wd0.012</text>
+<text x="391.6" y="185.2" text-anchor="start" font-size="10" fill="#52514e">lr12.5</text>
+<text x="391.8" y="201.4" text-anchor="start" font-size="10" fill="#52514e">g3-inner512-e10.0-s0</text>
+<text x="391.8" y="184.1" text-anchor="start" font-size="10" fill="#52514e">candB-24q28h-e9.5-seeds0</text>
+<text x="392.0" y="202.6" text-anchor="start" font-size="10" fill="#52514e">candA-24q28h-e9.25-seeds40</text>
+<text x="392.1" y="187.3" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="392.3" y="201.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="392.6" y="187.1" text-anchor="start" font-size="10" fill="#52514e">lr10.5</text>
+<text x="393.0" y="244.6" text-anchor="start" font-size="10" fill="#52514e">S3-poolfirst-g3</text>
+<text x="393.1" y="209.9" text-anchor="start" font-size="10" fill="#52514e">d332</text>
+<text x="393.1" y="201.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="393.7" y="181.5" text-anchor="start" font-size="10" fill="#52514e">B-augoff0.5</text>
 <text x="393.9" y="201.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
 <text x="393.9" y="183.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="394.6" y="201.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="394.8" y="182.2" text-anchor="start" font-size="10" fill="#52514e">candB-24q28h-e9.5-seeds40</text>
-<text x="395.7" y="201.7" text-anchor="start" font-size="10" fill="#52514e">candC-g3-512-e10-seeds0</text>
-<text x="395.7" y="211.1" text-anchor="start" font-size="10" fill="#52514e">d222-skip-e9.5</text>
-<text x="395.9" y="201.9" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="397.0" y="194.3" text-anchor="start" font-size="10" fill="#52514e">S3-w64-192-768</text>
-<text x="397.9" y="202.1" text-anchor="start" font-size="10" fill="#52514e">B-augoff0.5-e9.375</text>
-<text x="398.2" y="183.2" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="398.6" y="204.3" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="398.6" y="184.5" text-anchor="start" font-size="10" fill="#52514e">jitter0.3</text>
-<text x="398.7" y="206.1" text-anchor="start" font-size="10" fill="#52514e">wd0.0238</text>
-<text x="398.8" y="185.4" text-anchor="start" font-size="10" fill="#52514e">bn0.7</text>
-<text x="398.8" y="202.0" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="398.9" y="187.5" text-anchor="start" font-size="10" fill="#52514e">bs512-lr16-e8</text>
-<text x="399.0" y="203.6" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="399.2" y="219.3" text-anchor="start" font-size="10" fill="#52514e">d222-e9.5</text>
-<text x="399.3" y="199.4" text-anchor="start" font-size="10" fill="#52514e">r24q-28h-e9.5</text>
-<text x="399.7" y="187.6" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="400.0" y="201.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="393.9" y="201.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="394.6" y="183.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="394.8" y="200.2" text-anchor="start" font-size="10" fill="#52514e">candB-24q28h-e9.5-seeds40</text>
+<text x="395.7" y="183.7" text-anchor="start" font-size="10" fill="#52514e">candC-g3-512-e10-seeds0</text>
+<text x="395.7" y="229.1" text-anchor="start" font-size="10" fill="#52514e">d222-skip-e9.5</text>
+<text x="395.9" y="183.9" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="397.0" y="212.3" text-anchor="start" font-size="10" fill="#52514e">S3-w64-192-768</text>
+<text x="397.9" y="184.1" text-anchor="start" font-size="10" fill="#52514e">B-augoff0.5-e9.375</text>
+<text x="398.2" y="201.2" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="398.6" y="186.3" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="398.6" y="202.5" text-anchor="start" font-size="10" fill="#52514e">jitter0.3</text>
+<text x="398.7" y="188.1" text-anchor="start" font-size="10" fill="#52514e">wd0.0238</text>
+<text x="398.8" y="203.4" text-anchor="start" font-size="10" fill="#52514e">bn0.7</text>
+<text x="398.8" y="184.0" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="398.9" y="205.5" text-anchor="start" font-size="10" fill="#52514e">bs512-lr16-e8</text>
+<text x="399.0" y="185.6" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="399.2" y="237.3" text-anchor="start" font-size="10" fill="#52514e">d222-e9.5</text>
+<text x="399.3" y="181.4" text-anchor="start" font-size="10" fill="#52514e">r24q-28h-e9.5</text>
+<text x="399.7" y="205.6" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="400.0" y="183.4" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="400.2" y="202.3" text-anchor="start" font-size="10" fill="#52514e">w128-d233-e9.0</text>
 <text x="400.2" y="184.3" text-anchor="start" font-size="10" fill="#52514e">control</text>
 <text x="400.8" y="207.6" text-anchor="start" font-size="10" fill="#52514e">bs768-lr14-e8.5</text>
 <text x="401.1" y="186.4" text-anchor="start" font-size="10" fill="#52514e">g3-inner640-e9.75</text>
@@ -1956,54 +1986,56 @@
 <text x="421.6" y="203.6" text-anchor="start" font-size="10" fill="#52514e">S3-e9.25</text>
 <text x="421.8" y="187.1" text-anchor="start" font-size="10" fill="#52514e">S3-e9.0</text>
 <text x="422.0" y="267.8" text-anchor="start" font-size="10" fill="#52514e">S3-poolfirst-g1</text>
-<text x="422.4" y="180.6" text-anchor="start" font-size="10" fill="#52514e">safety-e9.5-seeds40</text>
-<text x="422.5" y="202.3" text-anchor="start" font-size="10" fill="#52514e">S-e9.0</text>
-<text x="423.9" y="181.6" text-anchor="start" font-size="10" fill="#52514e">safety-e9.5-seeds0</text>
-<text x="425.1" y="203.6" text-anchor="start" font-size="10" fill="#52514e">S2-e9.0</text>
-<text x="425.2" y="192.8" text-anchor="start" font-size="10" fill="#52514e">s20x25-24x50</text>
-<text x="425.4" y="223.5" text-anchor="start" font-size="10" fill="#52514e">res24-s0.5-stack4</text>
-<text x="425.4" y="200.0" text-anchor="start" font-size="10" fill="#52514e">d332-e10.5</text>
-<text x="425.8" y="198.5" text-anchor="start" font-size="10" fill="#52514e">cold4cpu-safety-e9.5</text>
-<text x="426.1" y="191.2" text-anchor="start" font-size="10" fill="#52514e">w64-256-768</text>
-<text x="427.3" y="217.8" text-anchor="start" font-size="10" fill="#52514e">stack6-res24-s0.5</text>
-<text x="427.3" y="216.3" text-anchor="start" font-size="10" fill="#52514e">hard0.75-online</text>
-<text x="427.4" y="199.6" text-anchor="start" font-size="10" fill="#52514e">safe-stack-e9.5</text>
-<text x="427.8" y="178.4" text-anchor="start" font-size="10" fill="#52514e">lr13.2</text>
-<text x="427.8" y="193.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="427.8" y="180.1" text-anchor="start" font-size="10" fill="#52514e">ls0.3</text>
-<text x="428.2" y="193.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="428.7" y="180.4" text-anchor="start" font-size="10" fill="#52514e">bn0.6</text>
-<text x="428.8" y="194.6" text-anchor="start" font-size="10" fill="#52514e">translate1</text>
-<text x="429.2" y="175.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="430.2" y="197.3" text-anchor="start" font-size="10" fill="#52514e">S3-e9.5</text>
-<text x="430.6" y="175.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="430.9" y="198.7" text-anchor="start" font-size="10" fill="#52514e">res24-28</text>
-<text x="431.1" y="181.7" text-anchor="start" font-size="10" fill="#52514e">wd0.0202</text>
-<text x="431.2" y="193.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="431.6" y="207.0" text-anchor="start" font-size="10" fill="#52514e">d222-e10.5</text>
-<text x="432.1" y="193.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="432.2" y="177.0" text-anchor="start" font-size="10" fill="#52514e">whiten4</text>
-<text x="432.4" y="193.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="433.2" y="220.5" text-anchor="start" font-size="10" fill="#52514e">hard0.75-offline</text>
-<text x="433.3" y="222.4" text-anchor="start" font-size="10" fill="#52514e">s16x15-20x30-24x45-28x60</text>
-<text x="433.3" y="197.2" text-anchor="start" font-size="10" fill="#52514e">filt5-0.75</text>
-<text x="433.4" y="207.6" text-anchor="start" font-size="10" fill="#52514e">head-lr0.5</text>
-<text x="433.4" y="180.2" text-anchor="start" font-size="10" fill="#52514e">final-S3-e9.5-seeds0-400W</text>
-<text x="433.9" y="198.3" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="434.1" y="184.1" text-anchor="start" font-size="10" fill="#52514e">e9.25</text>
-<text x="434.3" y="211.4" text-anchor="start" font-size="10" fill="#52514e">s20x20-24x40-28x60</text>
-<text x="434.5" y="177.6" text-anchor="start" font-size="10" fill="#52514e">S2-e9.25</text>
-<text x="434.7" y="200.4" text-anchor="start" font-size="10" fill="#52514e">S3-e9.25</text>
-<text x="434.7" y="199.7" text-anchor="start" font-size="10" fill="#52514e">w64-d233</text>
-<text x="435.1" y="190.1" text-anchor="start" font-size="10" fill="#52514e">e10.0</text>
-<text x="435.2" y="193.9" text-anchor="start" font-size="10" fill="#52514e">gelu-tanh</text>
-<text x="435.3" y="194.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="435.6" y="183.8" text-anchor="start" font-size="10" fill="#52514e">S-e9.25</text>
-<text x="435.9" y="195.8" text-anchor="start" font-size="10" fill="#52514e">bias12</text>
-<text x="435.9" y="177.4" text-anchor="start" font-size="10" fill="#52514e">whiten-eps4x</text>
-<text x="436.6" y="193.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
-<text x="436.7" y="181.5" text-anchor="start" font-size="10" fill="#52514e">final-S3-e9.5-seeds40-400W</text>
-<text x="437.8" y="216.4" text-anchor="start" font-size="10" fill="#52514e">stem-whiten3s2-e10.25</text>
+<text x="422.0" y="181.1" text-anchor="start" font-size="10" fill="#52514e">w128-d233-e9.5</text>
+<text x="422.4" y="198.6" text-anchor="start" font-size="10" fill="#52514e">safety-e9.5-seeds40</text>
+<text x="422.5" y="184.3" text-anchor="start" font-size="10" fill="#52514e">S-e9.0</text>
+<text x="423.9" y="199.6" text-anchor="start" font-size="10" fill="#52514e">safety-e9.5-seeds0</text>
+<text x="425.1" y="185.6" text-anchor="start" font-size="10" fill="#52514e">S2-e9.0</text>
+<text x="425.2" y="210.8" text-anchor="start" font-size="10" fill="#52514e">s20x25-24x50</text>
+<text x="425.4" y="205.5" text-anchor="start" font-size="10" fill="#52514e">res24-s0.5-stack4</text>
+<text x="425.4" y="218.0" text-anchor="start" font-size="10" fill="#52514e">d332-e10.5</text>
+<text x="425.8" y="180.5" text-anchor="start" font-size="10" fill="#52514e">cold4cpu-safety-e9.5</text>
+<text x="426.1" y="209.2" text-anchor="start" font-size="10" fill="#52514e">w64-256-768</text>
+<text x="427.3" y="199.8" text-anchor="start" font-size="10" fill="#52514e">stack6-res24-s0.5</text>
+<text x="427.3" y="234.3" text-anchor="start" font-size="10" fill="#52514e">hard0.75-online</text>
+<text x="427.4" y="181.6" text-anchor="start" font-size="10" fill="#52514e">safe-stack-e9.5</text>
+<text x="427.8" y="196.4" text-anchor="start" font-size="10" fill="#52514e">lr13.2</text>
+<text x="427.8" y="175.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="427.8" y="198.1" text-anchor="start" font-size="10" fill="#52514e">ls0.3</text>
+<text x="428.2" y="175.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="428.7" y="198.4" text-anchor="start" font-size="10" fill="#52514e">bn0.6</text>
+<text x="428.8" y="176.6" text-anchor="start" font-size="10" fill="#52514e">translate1</text>
+<text x="429.2" y="193.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="430.2" y="179.3" text-anchor="start" font-size="10" fill="#52514e">S3-e9.5</text>
+<text x="430.6" y="193.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="430.9" y="180.7" text-anchor="start" font-size="10" fill="#52514e">res24-28</text>
+<text x="431.1" y="199.7" text-anchor="start" font-size="10" fill="#52514e">wd0.0202</text>
+<text x="431.2" y="175.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="431.6" y="225.0" text-anchor="start" font-size="10" fill="#52514e">d222-e10.5</text>
+<text x="432.1" y="175.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="432.2" y="195.0" text-anchor="start" font-size="10" fill="#52514e">whiten4</text>
+<text x="432.4" y="175.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="433.2" y="238.5" text-anchor="start" font-size="10" fill="#52514e">hard0.75-offline</text>
+<text x="433.3" y="204.4" text-anchor="start" font-size="10" fill="#52514e">s16x15-20x30-24x45-28x60</text>
+<text x="433.3" y="215.2" text-anchor="start" font-size="10" fill="#52514e">filt5-0.75</text>
+<text x="433.4" y="189.6" text-anchor="start" font-size="10" fill="#52514e">head-lr0.5</text>
+<text x="433.4" y="198.2" text-anchor="start" font-size="10" fill="#52514e">final-S3-e9.5-seeds0-400W</text>
+<text x="433.9" y="180.3" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="434.1" y="202.1" text-anchor="start" font-size="10" fill="#52514e">e9.25</text>
+<text x="434.3" y="193.4" text-anchor="start" font-size="10" fill="#52514e">s20x20-24x40-28x60</text>
+<text x="434.5" y="195.6" text-anchor="start" font-size="10" fill="#52514e">S2-e9.25</text>
+<text x="434.7" y="182.4" text-anchor="start" font-size="10" fill="#52514e">S3-e9.25</text>
+<text x="434.7" y="217.7" text-anchor="start" font-size="10" fill="#52514e">w64-d233</text>
+<text x="435.1" y="172.1" text-anchor="start" font-size="10" fill="#52514e">e10.0</text>
+<text x="435.2" y="211.9" text-anchor="start" font-size="10" fill="#52514e">gelu-tanh</text>
+<text x="435.3" y="176.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="435.6" y="201.8" text-anchor="start" font-size="10" fill="#52514e">S-e9.25</text>
+<text x="435.9" y="177.8" text-anchor="start" font-size="10" fill="#52514e">bias12</text>
+<text x="435.9" y="195.4" text-anchor="start" font-size="10" fill="#52514e">whiten-eps4x</text>
+<text x="436.6" y="175.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
+<text x="436.7" y="199.5" text-anchor="start" font-size="10" fill="#52514e">final-S3-e9.5-seeds40-400W</text>
+<text x="437.8" y="198.4" text-anchor="start" font-size="10" fill="#52514e">stem-whiten3s2-e10.25</text>
+<text x="438.3" y="189.0" text-anchor="start" font-size="10" fill="#52514e">w128-d233-e10.0</text>
 <text x="438.6" y="216.2" text-anchor="start" font-size="10" fill="#52514e">stem-whiten4s2-w96</text>
 <text x="438.6" y="193.1" text-anchor="start" font-size="10" fill="#52514e">S3-e9.5</text>
 <text x="439.1" y="175.1" text-anchor="start" font-size="10" fill="#52514e">control</text>
