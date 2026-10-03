@@ -100,6 +100,11 @@ def cmd_try(args) -> None:
 def cmd_swarm(args) -> None:
     from . import swarm
 
+    if sys.platform == "darwin":
+        # keep the Mac awake: sleep pauses the monotonic clock behind the agents' turn deadline
+        import subprocess
+        subprocess.Popen(["caffeinate", "-i", "-w", str(os.getpid())])
+
     if args.eval == "modal":
         os.environ["AUTORESEARCH_EVAL"] = "modal"
         if not args.no_deploy:

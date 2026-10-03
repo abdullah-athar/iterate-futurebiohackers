@@ -48,7 +48,8 @@ flowchart TD
    - **Reward:** 1 for a confirmed new global best, 0.5 for a new best on some instance only.
    - **Allocation:** each generation's agents are split across the arms by UCB score, so modes
      that pay off get more agents while rarely-tried modes keep an exploration bonus.
-   - **Plateau detector:** `tune` is switched off after a plateau.
+   - **Plateau detector:** `tune` is switched off after a whole generation with no new best
+     (after 4 flat proposals in single-agent mode).
    - **Merge:** offered only when the archive holds complementary solvers.
 2. **Parallel proposals.** N headless Claude Code agents run per generation, each in its own
    workspace, each with a mode, a parent from the archive and a research direction. Agents see:
@@ -77,6 +78,17 @@ flowchart TD
 
 Watch it live with `just autoresearch-viz serve ...`.
 
+### Problems
+
+| Problem | Objective instances | Notes |
+| --- | --- | --- |
+| `median_string` | 5 instances, 20–43 chars, k = 10–15 | Saturated: the 16-agent swarm-1 reached 511, which no 2-edit move or 300 unbounded restarts improve |
+| `median_string_long` | four 1500 bp DNA (k = 10–20, 10–30% substitutions, 2–8% indels) + one 500 aa protein | MSA-scale; seed 29,656 vs planted 21,612, so plenty of headroom under 1000 ms |
+
+`median_string.metrics.levenshtein_distance` uses rapidfuzz (C++, ~0.1 ms at 1500×1500), and
+`levenshtein_editops` gives solvers optimal alignments. Pure-Python DP code is ~3000× slower and
+cannot fit the budget at 1500 bp.
+
 ### Budgets
 
 | Budget | Default | Where to change |
@@ -100,6 +112,7 @@ uv run modal secret create autoresearch-heldout AUTORESEARCH_CONFIRM_SEED=<int> 
 # from the repo root
 just autoresearch-swarm-smoke                                   # 2 agents, 1 generation, ~1-2 min
 just autoresearch-swarm --run artifacts/runs/swarm-1            # 32 agents/generation, 20 min
+just autoresearch-swarm --run artifacts/runs/long-1 --problem median_string_long   # MSA-scale 1500 bp instances
 just autoresearch-swarm --run artifacts/runs/swarm-1 --agents 8 --budget-min 10 --model opus
 just autoresearch-viz serve artifacts/runs/swarm-1 --open      # live dashboard (run in a second terminal)
 
