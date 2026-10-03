@@ -1,0 +1,5 @@
+# Local inputs and generated outputs
+/data/*
+!/data/.gitkeep
+/artifacts/*
+!/artifacts/.gitkeep
