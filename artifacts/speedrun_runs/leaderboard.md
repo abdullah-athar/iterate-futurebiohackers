@@ -1,8 +1,8 @@
 # CIFAR-100 speedrun leaderboard
 
-- Generated 2026-10-03 19:09 from `artifacts/speedrun_runs/registry.jsonl`: 94 variant rows, 33 control rows.
+- Generated 2026-10-03 19:18 from `artifacts/speedrun_runs/registry.jsonl`: 109 variant rows, 38 control rows.
 - k = 0.7 pp/s from `artifacts/speedrun_runs/k.json` (r6/k2 on the promoted recipe (8.75 ep, 24 px first quarter, stack), SXM 400 W, n=8 paired, control 75.37 pct / 5.67 s: e8.25 -0.23 pp / -0.37 s, e9.25 +0.17 pp / +0.24 s; least squares 0.65 pp/s, rounded to 0.7. Earlier bases: 128/384/576 (rounds calib, r1) 0.445; 96/256/768 at 8.5 ep (rounds r3, r4, r5) 1.0., 2026-10-03T19:30:00)
-- GPU used: 639.7/1263 min (ledger `artifacts/speedrun_runs/gpu_ledger.jsonl`: 108 containers, 55 guard misses, 14.0 min lost).
+- GPU used: 694.8/1263 min (ledger `artifacts/speedrun_runs/gpu_ledger.jsonl`: 124 containers, 66 guard misses, 16.8 min lost).
 
 Score: `dtime_adj = dtime - dacc_pp / k` (seconds; dtime = variant minus control mean prepare+train time, dacc in accuracy percentage points, both from paired trials); lower is better. dtime_adj is recomputed from the current k for every row with paired data; rows without paired data sit at the bottom sorted by dtime. `!` marks nonfinite > 0 or a verdict that is not qualified/complete; `*` marks a dtime_adj computed from the row's own k_used (no k.json).
 
@@ -49,63 +49,78 @@ Score: `dtime_adj = dtime - dacc_pp / k` (seconds; dtime = variant minus control
 | 37 | cutout4 | r1 | `{"cutout":4}` | small cutout as extra regularisation (airbench96 uses cut... | 8/8 | 75.20 | 0.16 | +0.08 +- 0.10 | +0.00 | -0.18 | 6.96 | 10 warm | 0 | A100 SXM4 @ 500 W | QUALIFIED (>= 75%) |
 | 38 | jitter0.2 | r1 | `{"jitter":0.2}` | moderate photometric jitter; same mechanism, stronger | 8/8 | 75.34 | 0.23 | +0.08 +- 0.12 | +0.00 | -0.17 | 7.34 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
 | 39 | scale0.1389 | r3 | `{"scaling_factor":0.1388888888888889}` | old net: +0.10 pp at equal time (sharper logits) | 8/8 | 75.23 | 0.29 | +0.24 +- 0.16 | +0.07 | -0.17 | 6.25 | 36 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 40 | ! res24-s0.25 | r3 | `{"train_resolution":24,"resolution_switch":0.25}` | 24 px for the first quarter of the steps; low-res graph c... | 8/8 | 74.63 | 0.24 | -0.35 +- 0.14 | -0.49 | -0.14 | 5.54 | 77 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 41 | stack2 | r3 | `{"bias_scaler":32.0,"label_smoothing":0.25}` | the two strongest gainers together: additivity test | 8/8 | 75.21 | 0.18 | +0.22 +- 0.06 | +0.09 | -0.13 | 6.27 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 42 | whiten4 | r1 | `{"whiten_bias_epochs":4}` | train the whitening bias longer | 8/8 | 75.21 | 0.22 | +0.08 +- 0.05 | +0.05 | -0.13 | 7.32 | 17 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 43 | bias32 | r3 | `{"bias_scaler":32.0}` | old net: +0.32 pp at equal time; BN biases learn too fast... | 8/8 | 75.09 | 0.27 | +0.11 +- 0.14 | -0.02 | -0.13 | 6.04 | 17 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 44 | translate1 | r1 | `{"translate":1}` | less translation = less regularisation, closer fit in few... | 8/8 | 75.26 | 0.18 | +0.04 +- 0.13 | -0.03 | -0.12 | 7.37 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 45 | ! res28-s0.5 | r3 | `{"train_resolution":28,"resolution_switch":0.5}` | 28 px for the first half | 8/8 | 74.70 | 0.26 | -0.28 +- 0.12 | -0.39 | -0.11 | 5.67 | 68 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 46 | jitter0.1 | r1 | `{"jitter":0.1}` | mild per-image brightness/contrast jitter regularises; ac... | 8/8 | 75.31 | 0.32 | +0.04 +- 0.12 | -0.02 | -0.11 | 7.32 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 47 | lr7.2 | r1 | `{"lr":7.2}` | lr x0.8: the 8.5-epoch schedule may be over-aggressive | 8/8 | 75.17 | 0.25 | +0.04 +- 0.12 | +0.02 | -0.08 | 7.33 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 48 | ! S7-res28s0.75-e9.0 | r4 | `{"bias_scaler":32.0,"label_smoothing":0.25,"lr":10.8,"bn_momentum":0.7,"jitter":0.3,"scaling_factor":0.1388888888888889,"train_resolution":28,"resolution_switch":0.75,"epochs":9.0}` | 28 px for three quarters (-0.62 s, -0.73 pp alone) at 9.0... | 8/8 | 74.74 | 0.27 | -0.24 +- 0.10 | -0.31 | -0.07 | 5.65 | 73 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 49 | wd0.0168 | r1 | `{"weight_decay":0.0168}` | wd x1.4: stronger regularisation; with lookahead EMA may... | 8/8 | 75.33 | 0.15 | +0.03 +- 0.12 | +0.01 | -0.06 | 7.30 | 21 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 50 | ls0.25 | r3 | `{"label_smoothing":0.25}` | old net: +0.21 pp at equal time | 8/8 | 75.00 | 0.28 | +0.02 +- 0.08 | -0.04 | -0.06 | 6.01 | 17 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 51 | lr10.8 | r3 | `{"lr":10.8}` | old net: +0.17 pp at equal time | 8/8 | 75.02 | 0.15 | +0.04 +- 0.11 | -0.02 | -0.06 | 6.04 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 52 | warmup0.15 | r1 | `{"warmup":0.15}` | shorter warmup leaves more steps at high lr | 8/8 | 75.15 | 0.26 | +0.03 +- 0.15 | +0.01 | -0.05 | 7.45 | 22 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 53 | ! e8.0 | calib | `{"epochs":8.0}` | exchange-rate calibration: 0.5 fewer epochs; k = dacc/dtime | 8/8 | 74.97 | 0.31 | -0.16 +- 0.13 | -0.41 | -0.05 | 6.95 | 18 warm |  | A100 SXM4 @ 400 W | BELOW 75% |
-| 54 | bn0.7 | r3 | `{"bn_momentum":0.7}` | old net: +0.16 pp at equal time | 8/8 | 75.01 | 0.30 | +0.03 +- 0.14 | -0.01 | -0.04 | 6.08 | 45 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 55 | e8.25 | r6 | `{"epochs":8.25}` | k on the promoted recipe: 0.5 epoch less | 8/8 | 75.13 | 0.27 | -0.23 +- 0.14 | -0.37 | -0.03 | 5.30 | 27 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 56 | jitter0.3 | r3 | `{"jitter":0.3}` | old net: +0.11 pp at equal time; own RNG keeps pairing | 8/8 | 75.03 | 0.27 | +0.05 +- 0.13 | +0.02 | -0.03 | 6.11 | 21 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 57 | e9.0 | r3 | `{"epochs":9.0}` | k upward: 0.5 more epochs | 8/8 | 75.34 | 0.15 | +0.36 +- 0.11 | +0.35 | -0.01 | 6.35 | 23 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 58 | final0.15 | r1 | `{"final_lr":0.15}` | decay less: the lookahead EMA already averages the noise | 8/8 | 75.13 | 0.14 | +0.00 +- 0.12 | -0.01 | -0.01 | 6.99 | 10 warm | 0 | A100 SXM4 @ 500 W | QUALIFIED (>= 75%) |
-| 59 | e9.25 | r6 | `{"epochs":9.25}` | k on the promoted recipe: 0.5 epoch more | 8/8 | 75.54 | 0.25 | +0.17 +- 0.12 | +0.24 | -0.00 | 5.91 | 27 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 60 | w96-384-576 | r1 | `{"widths":[96,384,576]}` | group 1 is 36% of forward time at 31x31; narrowing it sav... | 8/8 | 75.05 | 0.20 | -0.26 +- 0.10 | -0.58 | +0.00 | 6.81 | 53 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 61 | ! e7.5 | calib | `{"epochs":7.5}` | exchange-rate calibration: 1.0 fewer epochs; k = dacc/dtime | 8/8 | 74.75 | 0.12 | -0.38 +- 0.11 | -0.83 | +0.01 | 6.52 | 17 warm |  | A100 SXM4 @ 400 W | BELOW 75% |
-| 62 | translate3 | r1 | `{"translate":3}` | more translation = more regularisation; accuracy gain buy... | 8/8 | 75.22 | 0.23 | +0.01 +- 0.12 | +0.03 | +0.02 | 7.43 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 63 | w128-384-512 | r1 | `{"widths":[128,384,512]}` | narrower head group: small time saving, tests whether gro... | 8/8 | 75.01 | 0.23 | -0.19 +- 0.14 | -0.39 | +0.02 | 6.94 | 110 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 64 | ! e8.0 | r3 | `{"epochs":8.0}` | k on Abdullah's 96/256/768 network: 0.5 fewer epochs | 8/8 | 74.63 | 0.27 | -0.35 +- 0.13 | -0.31 | +0.04 | 5.69 | 20 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 65 | no-cudagraphs | r1 | `{"compile":"max-autotune-no-cudagraphs"}` | cheaper build; measures what CUDA graphs are worth per step | 8/8 | 75.13 | 0.22 | +0.00 +- 0.00 | +0.05 | +0.05 | 7.39 | 44 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 66 | ! w96-320-640 | r1 | `{"widths":[96,320,640]}` | narrow groups 1 and 2, widen group 3: time saving with pa... | 8/8 | 74.75 | 0.17 | -0.37 +- 0.08 | -0.76 | +0.08 | 6.16 | 77 warm | 0 | A100 SXM4 @ 500 W | BELOW 75% |
-| 67 | ! silu | r1 | `{"activation":"silu"}` | SiLU is cheaper than erf-GELU and often equal in accuracy... | 8/8 | 75.00 | 0.38 | -0.13 +- 0.18 | -0.21 | +0.09 | 7.24 | 69 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 68 | ! res28-s0.75 | r3 | `{"train_resolution":28,"resolution_switch":0.75}` | 28 px for three quarters | 8/8 | 74.25 | 0.15 | -0.73 +- 0.09 | -0.62 | +0.11 | 5.44 | 38 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 69 | final0.03 | r1 | `{"final_lr":0.03}` | decay further at the end for a sharper final convergence | 8/8 | 75.07 | 0.34 | -0.05 +- 0.09 | -0.01 | +0.11 | 6.99 | 10 warm | 0 | A100 SXM4 @ 500 W | QUALIFIED (>= 75%) |
-| 70 | switch0.35 | r6 | `{"resolution_switch":0.35}` | 24 px for 35% of the steps instead of 25%: more saving, a... | 8/8 | 75.05 | 0.14 | -0.32 +- 0.12 | -0.31 | +0.14 | 5.36 | 24 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 71 | ! mom0.8 | r3 | `{"momentum":0.8}` | old net: +0.11 pp at equal time | 8/8 | 74.83 | 0.33 | -0.15 +- 0.11 | +0.01 | +0.16 | 6.10 | 20 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 72 | ! silu-gather | r1 | `{"activation":"silu","crop_gather":true}` | cheap-swaps bundle: SiLU plus the sync-free vectorised crop | 8/8 | 74.95 | 0.25 | -0.18 +- 0.13 | -0.23 | +0.16 | 7.11 | 37 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 73 | warmup0.3 | r1 | `{"warmup":0.3}` | longer warmup stabilises the fp16 early phase | 8/8 | 75.05 | 0.36 | -0.08 +- 0.18 | -0.01 | +0.17 | 6.98 | 10 warm | 0 | A100 SXM4 @ 500 W | QUALIFIED (>= 75%) |
-| 74 | bs1536 | r1 | `{"batch_size":1536}` | larger batch = fewer steps and less Python overhead per e... | 8/8 | 75.11 | 0.25 | -0.16 +- 0.09 | -0.18 | +0.17 | 7.25 | 115 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 75 | scale0.0889 | r1 | `{"scaling_factor":0.08888888888888889}` | logit scale x0.8: softer logits with label smoothing 0.3 | 8/8 | 75.02 | 0.20 | -0.10 +- 0.07 | -0.02 | +0.21 | 7.32 | 36 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 76 | bias128 | r1 | `{"bias_scaler":128.0}` | BN biases can learn faster still (airbench uses 64x on CI... | 8/8 | 75.03 | 0.36 | -0.09 +- 0.19 | +0.01 | +0.22 | 7.47 | 21 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 77 | mom0.9 | r1 | `{"momentum":0.9}` | higher momentum smooths the noisy few-epoch trajectory | 8/8 | 75.19 | 0.22 | -0.11 +- 0.16 | +0.01 | +0.24 | 7.30 | 21 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 78 | ! res24-s0.75 | r3 | `{"train_resolution":24,"resolution_switch":0.75}` | 24 px for three quarters: largest saving, largest accurac... | 8/8 | 73.18 | 0.20 | -1.80 +- 0.11 | -1.54 | +0.26 | 4.49 | 32 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 79 | whiten2 | r1 | `{"whiten_bias_epochs":2}` | freeze the whitening bias earlier: the bias-grad graph ru... | 8/8 | 75.15 | 0.18 | -0.15 +- 0.12 | -0.03 | +0.30 | 7.29 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 80 | ! cutout4 | r3 | `{"cutout":4}` | old net: +0.08 pp at equal time | 8/8 | 74.73 | 0.25 | -0.26 +- 0.12 | +0.05 | +0.31 | 6.23 | 16 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 81 | ema3 | r1 | `{"ema_every":3}` | more frequent lookahead averaging | 8/8 | 75.16 | 0.22 | -0.14 +- 0.14 | +0.03 | +0.35 | 7.35 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 82 | e9.5 | r3 | `{"epochs":9.5}` | his selected recipe (75.25% / 6.86 s at n=40) in the same... | 8/8 | 75.25 | 0.29 | +0.27 +- 0.14 | +0.68 | +0.41 | 6.68 | 22 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 83 | ema10 | r1 | `{"ema_every":10}` | less frequent lookahead averaging: fewer EMA kernels, may... | 8/8 | 75.11 | 0.14 | -0.18 +- 0.14 | +0.01 | +0.42 | 7.33 | 15 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 84 | ! w64-384-576 | r1 | `{"widths":[64,384,576]}` | halve group 1; big time saving, accuracy risk | 8/8 | 74.37 | 0.22 | -0.94 +- 0.11 | -1.58 | +0.54 | 5.82 | 55 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 85 | ! cutout8 | r1 | `{"cutout":8}` | larger cutout; likely too strong for 8.5 epochs | 8/8 | 74.70 | 0.20 | -0.42 +- 0.11 | +0.01 | +0.96 | 6.96 | 10 warm | 0 | A100 SXM4 @ 500 W | BELOW 75% |
-| 86 | ! ema-off | r1 | `{"ema_every":0}` | no lookahead EMA: saves the EMA kernels (0.33 ms x 82) at... | 8/8 | 74.65 | 0.45 | -0.48 +- 0.19 | +0.01 | +1.09 | 7.47 | 21 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 87 | ! d3-3-2 | r1 | `{"depths":[3,3,2]}` | drop the residual pair in group 3 (cheapest group): small... | 8/8 | 74.19 | 0.13 | -0.94 +- 0.08 | -0.33 | +1.78 | 7.11 | 57 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 88 | ! wd0.0084 | r1 | `{"weight_decay":0.0084}` | wd x0.7: less regularisation for a short schedule | 8/8 | 74.50 | 0.20 | -0.80 +- 0.14 | +0.02 | +1.82 | 7.31 | 21 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
-| 89 | final2-defaults-400W | final | `{"count_nonfinite":true}` |  | 40/40 | 75.30 | 0.25 |  |  |  | 5.72 | 187 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 90 | final-S7-res24q-e8.75-400W | final | `{"bias_scaler":32.0,"label_smoothing":0.25,"lr":10.8,"bn_momentum":0.7,"jitter":0.3,"scaling_factor":0.1388888888888889,"train_resolution":24,"resolution_switch":0.25,"epochs":8.75,"count_nonfinite":true}` |  | 40/40 | 75.34 | 0.28 |  |  |  | 5.76 | 187 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 91 | final-S7-res24q-e9.0-400W | final | `{"bias_scaler":32.0,"label_smoothing":0.25,"lr":10.8,"bn_momentum":0.7,"jitter":0.3,"scaling_factor":0.1388888888888889,"train_resolution":24,"resolution_switch":0.25,"epochs":9.0,"count_nonfinite":true}` |  | 40/40 | 75.40 | 0.27 |  |  |  | 5.87 | 157 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 92 | defaults-torchlogs | r6 | `{}` | priority 1: do the 24->32 resolution switch or the first... | 3/3 | 75.51 | 0.21 |  |  |  | 5.99 | 44 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
-| 93 | ref-sxm500-n40 | reference | `{}` | reference: current main recipe, cold build, official target | 40/40 | 75.19 | 0.25 |  |  |  | 6.94 | 95 cold |  | A100 SXM4 @ 500 W | QUALIFIED (>= 75%) |
-| 94 | ref-sxm400-n40 | reference | `{}` | reference: current main recipe, cold build, official target | 40/40 | 75.20 | 0.28 |  |  |  | 7.41 | 133 cold |  | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 40 | ! w64-256-768 | r6 | `{"widths":[64,256,768]}` | priority 5: group 1 at 64 channels (largest maps); on the... | 8/8 | 74.90 | 0.22 | -0.40 +- 0.13 | -0.71 | -0.15 | 4.99 | 92 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 41 | crop-triton | r6 | `{"crop_mode":"triton"}` | PR #5's Triton crop/flip kernel instead of the 25-mask cr... | 8/8 | 75.36 | 0.26 | +0.07 +- 0.08 | -0.04 | -0.14 | 5.71 | 80 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 42 | ! res24-s0.25 | r3 | `{"train_resolution":24,"resolution_switch":0.25}` | 24 px for the first quarter of the steps; low-res graph c... | 8/8 | 74.63 | 0.24 | -0.35 +- 0.14 | -0.49 | -0.14 | 5.54 | 77 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 43 | stack2 | r3 | `{"bias_scaler":32.0,"label_smoothing":0.25}` | the two strongest gainers together: additivity test | 8/8 | 75.21 | 0.18 | +0.22 +- 0.06 | +0.09 | -0.13 | 6.27 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 44 | whiten4 | r1 | `{"whiten_bias_epochs":4}` | train the whitening bias longer | 8/8 | 75.21 | 0.22 | +0.08 +- 0.05 | +0.05 | -0.13 | 7.32 | 17 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 45 | bias32 | r3 | `{"bias_scaler":32.0}` | old net: +0.32 pp at equal time; BN biases learn too fast... | 8/8 | 75.09 | 0.27 | +0.11 +- 0.14 | -0.02 | -0.13 | 6.04 | 17 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 46 | d2-3-3 | r6 | `{"depths":[2,3,3]}` | depth 2 in group 1 (drop its residual pair) | 8/8 | 75.05 | 0.15 | -0.24 +- 0.11 | -0.47 | -0.12 | 5.23 | 68 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 47 | translate1 | r1 | `{"translate":1}` | less translation = less regularisation, closer fit in few... | 8/8 | 75.26 | 0.18 | +0.04 +- 0.13 | -0.03 | -0.12 | 7.37 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 48 | ! res28-s0.5 | r3 | `{"train_resolution":28,"resolution_switch":0.5}` | 28 px for the first half | 8/8 | 74.70 | 0.26 | -0.28 +- 0.12 | -0.39 | -0.11 | 5.67 | 68 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 49 | jitter0.1 | r1 | `{"jitter":0.1}` | mild per-image brightness/contrast jitter regularises; ac... | 8/8 | 75.31 | 0.32 | +0.04 +- 0.12 | -0.02 | -0.11 | 7.32 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 50 | lr7.2 | r1 | `{"lr":7.2}` | lr x0.8: the 8.5-epoch schedule may be over-aggressive | 8/8 | 75.17 | 0.25 | +0.04 +- 0.12 | +0.02 | -0.08 | 7.33 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 51 | ! S7-res28s0.75-e9.0 | r4 | `{"bias_scaler":32.0,"label_smoothing":0.25,"lr":10.8,"bn_momentum":0.7,"jitter":0.3,"scaling_factor":0.1388888888888889,"train_resolution":28,"resolution_switch":0.75,"epochs":9.0}` | 28 px for three quarters (-0.62 s, -0.73 pp alone) at 9.0... | 8/8 | 74.74 | 0.27 | -0.24 +- 0.10 | -0.31 | -0.07 | 5.65 | 73 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 52 | wd0.0168 | r1 | `{"weight_decay":0.0168}` | wd x1.4: stronger regularisation; with lookahead EMA may... | 8/8 | 75.33 | 0.15 | +0.03 +- 0.12 | +0.01 | -0.06 | 7.30 | 21 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 53 | w96-256-640 | r6 | `{"widths":[96,256,640]}` | group 3 at 640 channels | 8/8 | 75.10 | 0.20 | -0.19 +- 0.06 | -0.33 | -0.06 | 5.30 | 113 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 54 | ls0.25 | r3 | `{"label_smoothing":0.25}` | old net: +0.21 pp at equal time | 8/8 | 75.00 | 0.28 | +0.02 +- 0.08 | -0.04 | -0.06 | 6.01 | 17 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 55 | lr10.8 | r3 | `{"lr":10.8}` | old net: +0.17 pp at equal time | 8/8 | 75.02 | 0.15 | +0.04 +- 0.11 | -0.02 | -0.06 | 6.04 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 56 | warmup0.15 | r1 | `{"warmup":0.15}` | shorter warmup leaves more steps at high lr | 8/8 | 75.15 | 0.26 | +0.03 +- 0.15 | +0.01 | -0.05 | 7.45 | 22 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 57 | ! e8.0 | calib | `{"epochs":8.0}` | exchange-rate calibration: 0.5 fewer epochs; k = dacc/dtime | 8/8 | 74.97 | 0.31 | -0.16 +- 0.13 | -0.41 | -0.05 | 6.95 | 18 warm |  | A100 SXM4 @ 400 W | BELOW 75% |
+| 58 | bn0.7 | r3 | `{"bn_momentum":0.7}` | old net: +0.16 pp at equal time | 8/8 | 75.01 | 0.30 | +0.03 +- 0.14 | -0.01 | -0.04 | 6.08 | 45 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 59 | e8.25 | r6 | `{"epochs":8.25}` | k on the promoted recipe: 0.5 epoch less | 8/8 | 75.13 | 0.27 | -0.23 +- 0.14 | -0.37 | -0.03 | 5.30 | 27 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 60 | jitter0.3 | r3 | `{"jitter":0.3}` | old net: +0.11 pp at equal time; own RNG keeps pairing | 8/8 | 75.03 | 0.27 | +0.05 +- 0.13 | +0.02 | -0.03 | 6.11 | 21 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 61 | e9.0 | r3 | `{"epochs":9.0}` | k upward: 0.5 more epochs | 8/8 | 75.34 | 0.15 | +0.36 +- 0.11 | +0.35 | -0.01 | 6.35 | 23 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 62 | final0.15 | r1 | `{"final_lr":0.15}` | decay less: the lookahead EMA already averages the noise | 8/8 | 75.13 | 0.14 | +0.00 +- 0.12 | -0.01 | -0.01 | 6.99 | 10 warm | 0 | A100 SXM4 @ 500 W | QUALIFIED (>= 75%) |
+| 63 | e9.25 | r6 | `{"epochs":9.25}` | k on the promoted recipe: 0.5 epoch more | 8/8 | 75.54 | 0.25 | +0.17 +- 0.12 | +0.24 | -0.00 | 5.91 | 27 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 64 | w96-384-576 | r1 | `{"widths":[96,384,576]}` | group 1 is 36% of forward time at 31x31; narrowing it sav... | 8/8 | 75.05 | 0.20 | -0.26 +- 0.10 | -0.58 | +0.00 | 6.81 | 53 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 65 | ! e7.5 | calib | `{"epochs":7.5}` | exchange-rate calibration: 1.0 fewer epochs; k = dacc/dtime | 8/8 | 74.75 | 0.12 | -0.38 +- 0.11 | -0.83 | +0.01 | 6.52 | 17 warm |  | A100 SXM4 @ 400 W | BELOW 75% |
+| 66 | translate3 | r1 | `{"translate":3}` | more translation = more regularisation; accuracy gain buy... | 8/8 | 75.22 | 0.23 | +0.01 +- 0.12 | +0.03 | +0.02 | 7.43 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 67 | w128-384-512 | r1 | `{"widths":[128,384,512]}` | narrower head group: small time saving, tests whether gro... | 8/8 | 75.01 | 0.23 | -0.19 +- 0.14 | -0.39 | +0.02 | 6.94 | 110 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 68 | ! e8.0 | r3 | `{"epochs":8.0}` | k on Abdullah's 96/256/768 network: 0.5 fewer epochs | 8/8 | 74.63 | 0.27 | -0.35 +- 0.13 | -0.31 | +0.04 | 5.69 | 20 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 69 | no-cudagraphs | r1 | `{"compile":"max-autotune-no-cudagraphs"}` | cheaper build; measures what CUDA graphs are worth per step | 8/8 | 75.13 | 0.22 | +0.00 +- 0.00 | +0.05 | +0.05 | 7.39 | 44 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 70 | scale1.5 | r6 | `{"scaling_factor":0.16666666666666666}` | priority 6: logit scale 1.5/9 (1.25/9 gave +0.24 pp over... | 8/8 | 75.32 | 0.24 | +0.03 +- 0.13 | +0.11 | +0.06 | 5.85 | 116 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 71 | d3-2-3 | r6 | `{"depths":[3,2,3]}` | depth 2 in group 2 (on the old net: -0.87 s for -0.11 pp) | 8/8 | 75.04 | 0.19 | -0.25 +- 0.08 | -0.29 | +0.07 | 5.34 | 76 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 72 | ! w96-320-640 | r1 | `{"widths":[96,320,640]}` | narrow groups 1 and 2, widen group 3: time saving with pa... | 8/8 | 74.75 | 0.17 | -0.37 +- 0.08 | -0.76 | +0.08 | 6.16 | 77 warm | 0 | A100 SXM4 @ 500 W | BELOW 75% |
+| 73 | w80-256-768 | r6 | `{"widths":[80,256,768]}` | group 1 at 80 channels | 8/8 | 75.10 | 0.22 | -0.19 +- 0.12 | -0.18 | +0.09 | 5.52 | 87 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 74 | ! silu | r1 | `{"activation":"silu"}` | SiLU is cheaper than erf-GELU and often equal in accuracy... | 8/8 | 75.00 | 0.38 | -0.13 +- 0.18 | -0.21 | +0.09 | 7.24 | 69 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 75 | ! res28-s0.75 | r3 | `{"train_resolution":28,"resolution_switch":0.75}` | 28 px for three quarters | 8/8 | 74.25 | 0.15 | -0.73 +- 0.09 | -0.62 | +0.11 | 5.44 | 38 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 76 | final0.03 | r1 | `{"final_lr":0.03}` | decay further at the end for a sharper final convergence | 8/8 | 75.07 | 0.34 | -0.05 +- 0.09 | -0.01 | +0.11 | 6.99 | 10 warm | 0 | A100 SXM4 @ 500 W | QUALIFIED (>= 75%) |
+| 77 | switch0.35 | r6 | `{"resolution_switch":0.35}` | 24 px for 35% of the steps instead of 25%: more saving, a... | 8/8 | 75.05 | 0.14 | -0.32 +- 0.12 | -0.31 | +0.14 | 5.36 | 24 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 78 | jitter0.45 | r6 | `{"jitter":0.45}` | stronger photometric jitter | 8/8 | 75.22 | 0.29 | -0.07 +- 0.14 | +0.06 | +0.16 | 5.80 | 32 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 79 | ! mom0.8 | r3 | `{"momentum":0.8}` | old net: +0.11 pp at equal time | 8/8 | 74.83 | 0.33 | -0.15 +- 0.11 | +0.01 | +0.16 | 6.10 | 20 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 80 | ! silu-gather | r1 | `{"activation":"silu","crop_gather":true}` | cheap-swaps bundle: SiLU plus the sync-free vectorised crop | 8/8 | 74.95 | 0.25 | -0.18 +- 0.13 | -0.23 | +0.16 | 7.11 | 37 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 81 | warmup0.3 | r1 | `{"warmup":0.3}` | longer warmup stabilises the fp16 early phase | 8/8 | 75.05 | 0.36 | -0.08 +- 0.18 | -0.01 | +0.17 | 6.98 | 10 warm | 0 | A100 SXM4 @ 500 W | QUALIFIED (>= 75%) |
+| 82 | bs1536 | r1 | `{"batch_size":1536}` | larger batch = fewer steps and less Python overhead per e... | 8/8 | 75.11 | 0.25 | -0.16 +- 0.09 | -0.18 | +0.17 | 7.25 | 115 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 83 | w96-256-896 | r6 | `{"widths":[96,256,896]}` | group 3 at 896 channels: accuracy to trade for epochs | 8/8 | 75.63 | 0.24 | +0.34 +- 0.12 | +0.67 | +0.18 | 6.30 | 110 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 84 | scale0.0889 | r1 | `{"scaling_factor":0.08888888888888889}` | logit scale x0.8: softer logits with label smoothing 0.3 | 8/8 | 75.02 | 0.20 | -0.10 +- 0.07 | -0.02 | +0.21 | 7.32 | 36 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 85 | bias128 | r1 | `{"bias_scaler":128.0}` | BN biases can learn faster still (airbench uses 64x on CI... | 8/8 | 75.03 | 0.36 | -0.09 +- 0.19 | +0.01 | +0.22 | 7.47 | 21 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 86 | mom0.9 | r1 | `{"momentum":0.9}` | higher momentum smooths the noisy few-epoch trajectory | 8/8 | 75.19 | 0.22 | -0.11 +- 0.16 | +0.01 | +0.24 | 7.30 | 21 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 87 | ! res24-s0.75 | r3 | `{"train_resolution":24,"resolution_switch":0.75}` | 24 px for three quarters: largest saving, largest accurac... | 8/8 | 73.18 | 0.20 | -1.80 +- 0.11 | -1.54 | +0.26 | 4.49 | 32 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 88 | whiten2 | r1 | `{"whiten_bias_epochs":2}` | freeze the whitening bias earlier: the bias-grad graph ru... | 8/8 | 75.15 | 0.18 | -0.15 +- 0.12 | -0.03 | +0.30 | 7.29 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 89 | ! cutout4 | r3 | `{"cutout":4}` | old net: +0.08 pp at equal time | 8/8 | 74.73 | 0.25 | -0.26 +- 0.12 | +0.05 | +0.31 | 6.23 | 16 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 90 | bs1536-e9.25 | r6 | `{"batch_size":1536,"epochs":9.25}` | batch 1536 with the time saving spent on 0.5 epoch | 8/8 | 75.12 | 0.13 | -0.18 +- 0.11 | +0.10 | +0.35 | 5.77 | 24 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 91 | ema3 | r1 | `{"ema_every":3}` | more frequent lookahead averaging | 8/8 | 75.16 | 0.22 | -0.14 +- 0.14 | +0.03 | +0.35 | 7.35 | 16 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 92 | ! bs1536 | r6 | `{"batch_size":1536}` | priority 4: fewer steps, better GEMM tiling; sum loss kee... | 8/8 | 74.86 | 0.30 | -0.43 +- 0.17 | -0.21 | +0.41 | 5.46 | 154 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 93 | e9.5 | r3 | `{"epochs":9.5}` | his selected recipe (75.25% / 6.86 s at n=40) in the same... | 8/8 | 75.25 | 0.29 | +0.27 +- 0.14 | +0.68 | +0.41 | 6.68 | 22 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 94 | ema10 | r1 | `{"ema_every":10}` | less frequent lookahead averaging: fewer EMA kernels, may... | 8/8 | 75.11 | 0.14 | -0.18 +- 0.14 | +0.01 | +0.42 | 7.33 | 15 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 95 | ! w64-384-576 | r1 | `{"widths":[64,384,576]}` | halve group 1; big time saving, accuracy risk | 8/8 | 74.37 | 0.22 | -0.94 +- 0.11 | -1.58 | +0.54 | 5.82 | 55 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 96 | ! cutout8 | r1 | `{"cutout":8}` | larger cutout; likely too strong for 8.5 epochs | 8/8 | 74.70 | 0.20 | -0.42 +- 0.11 | +0.01 | +0.96 | 6.96 | 10 warm | 0 | A100 SXM4 @ 500 W | BELOW 75% |
+| 97 | ! ema-off | r1 | `{"ema_every":0}` | no lookahead EMA: saves the EMA kernels (0.33 ms x 82) at... | 8/8 | 74.65 | 0.45 | -0.48 +- 0.19 | +0.01 | +1.09 | 7.47 | 21 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 98 | ! bs2048 | r6 | `{"batch_size":2048}` | batch 2048 (NaN watch) | 8/8 | 74.32 | 0.25 | -0.97 +- 0.12 | -0.26 | +1.13 | 5.41 | 149 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 99 | ! hard0.75-online | r6 | `{"hard_fraction":0.75,"proxy_mode":"online"}` | same selection scored online by the proxy every batch | 8/8 | 73.91 | 0.24 | -1.38 +- 0.11 | -0.65 | +1.33 | 5.00 | 62 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 100 | ! hard0.75-offline | r6 | `{"hard_fraction":0.75}` | priority 3: PR #5's proxy hard-example selection (offline... | 8/8 | 73.75 | 0.17 | -1.55 +- 0.11 | -0.56 | +1.64 | 5.09 | 405 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 101 | ! d3-3-2 | r1 | `{"depths":[3,3,2]}` | drop the residual pair in group 3 (cheapest group): small... | 8/8 | 74.19 | 0.13 | -0.94 +- 0.08 | -0.33 | +1.78 | 7.11 | 57 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 102 | ! wd0.0084 | r1 | `{"weight_decay":0.0084}` | wd x0.7: less regularisation for a short schedule | 8/8 | 74.50 | 0.20 | -0.80 +- 0.14 | +0.02 | +1.82 | 7.31 | 21 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 103 | ! hard0.5-offline | r6 | `{"hard_fraction":0.5}` | keep the hardest half of each batch | 8/8 | 67.81 | 0.53 | -7.49 +- 0.21 | -1.41 | +9.28 | 4.24 | 176 warm | 0 | A100 SXM4 @ 400 W | BELOW 75% |
+| 104 | final2-defaults-400W | final | `{"count_nonfinite":true}` |  | 40/40 | 75.30 | 0.25 |  |  |  | 5.72 | 187 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 105 | final-S7-res24q-e8.75-400W | final | `{"bias_scaler":32.0,"label_smoothing":0.25,"lr":10.8,"bn_momentum":0.7,"jitter":0.3,"scaling_factor":0.1388888888888889,"train_resolution":24,"resolution_switch":0.25,"epochs":8.75,"count_nonfinite":true}` |  | 40/40 | 75.34 | 0.28 |  |  |  | 5.76 | 187 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 106 | final-S7-res24q-e9.0-400W | final | `{"bias_scaler":32.0,"label_smoothing":0.25,"lr":10.8,"bn_momentum":0.7,"jitter":0.3,"scaling_factor":0.1388888888888889,"train_resolution":24,"resolution_switch":0.25,"epochs":9.0,"count_nonfinite":true}` |  | 40/40 | 75.40 | 0.27 |  |  |  | 5.87 | 157 cold | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 107 | defaults-torchlogs | r6 | `{}` | priority 1: do the 24->32 resolution switch or the first... | 3/3 | 75.51 | 0.21 |  |  |  | 5.99 | 44 warm | 0 | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
+| 108 | ref-sxm500-n40 | reference | `{}` | reference: current main recipe, cold build, official target | 40/40 | 75.19 | 0.25 |  |  |  | 6.94 | 95 cold |  | A100 SXM4 @ 500 W | QUALIFIED (>= 75%) |
+| 109 | ref-sxm400-n40 | reference | `{}` | reference: current main recipe, cold build, official target | 40/40 | 75.20 | 0.28 |  |  |  | 7.41 | 133 cold |  | A100 SXM4 @ 400 W | QUALIFIED (>= 75%) |
 
-## Controls (power limits seen: A100 SXM4 @ 400 W x30, A100 SXM4 @ 500 W x3)
+## Controls (power limits seen: A100 SXM4 @ 400 W x35, A100 SXM4 @ 500 W x3)
 
 | job | label | round | GPU @ power | n | mean acc % | acc std | mean time s | time std | build s | verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -142,20 +157,25 @@ Score: `dtime_adj = dtime - dacc_pp / k` (seconds; dtime = variant minus control
 | confirm16 | control | r5 | A100 SXM4 @ 400 W | 16/16 | 74.91 | 0.25 | 6.01 | 0.01 | 18 warm | BELOW 75% |
 | confirm16b | control | r5 | A100 SXM4 @ 400 W | 16/16 | 74.91 | 0.25 | 6.08 | 0.01 | 17 warm | BELOW 75% |
 | k2 | control | r6 | A100 SXM4 @ 400 W | 8/8 | 75.37 | 0.25 | 5.67 | 0.13 | 25 warm | QUALIFIED (>= 75%) |
+| arch-a | control | r6 | A100 SXM4 @ 400 W | 8/8 | 75.29 | 0.24 | 5.70 | 0.11 | 24 warm | QUALIFIED (>= 75%) |
+| arch-b | control | r6 | A100 SXM4 @ 400 W | 8/8 | 75.29 | 0.24 | 5.63 | 0.04 | 24 warm | QUALIFIED (>= 75%) |
+| fine-sys | control | r6 | A100 SXM4 @ 400 W | 8/8 | 75.29 | 0.24 | 5.75 | 0.02 | 33 warm | QUALIFIED (>= 75%) |
+| batch | control | r6 | A100 SXM4 @ 400 W | 8/8 | 75.29 | 0.24 | 5.67 | 0.01 | 25 warm | QUALIFIED (>= 75%) |
+| select | control | r6 | A100 SXM4 @ 400 W | 8/8 | 75.29 | 0.24 | 5.65 | 0.01 | 25 warm | QUALIFIED (>= 75%) |
 
 ## GPU hit rates (from the ledger)
 
 | GPU @ power | containers | share | guard misses | GPU min |
 | --- | --- | --- | --- | --- |
-| A100 SXM4 @ 400 W | 47 | 44% | 10 | 503.8 |
-| A100 SXM4 @ ? | 23 | 21% | 22 | 15.7 |
-| A100 PCIe @ 300 W | 18 | 17% | 17 | 4.2 |
-| A100 SXM4 @ 500 W | 10 | 9% | 6 | 34.9 |
-| A100 PCIe @ ? | 6 | 6% | 0 | 39.9 |
+| A100 SXM4 @ 400 W | 61 | 49% | 19 | 558.3 |
+| A100 SXM4 @ ? | 23 | 19% | 22 | 15.7 |
+| A100 PCIe @ 300 W | 20 | 16% | 19 | 4.8 |
+| A100 SXM4 @ 500 W | 10 | 8% | 6 | 34.9 |
+| A100 PCIe @ ? | 6 | 5% | 0 | 39.9 |
 | A100 (mixed) @ ? | 2 | 2% | 0 | 33.8 |
 | ? @ ? | 1 | 1% | 0 | 3.4 |
 | A100 PCIe / SXM4 @ ? | 1 | 1% | 0 | 4.0 |
 
-Guard misses: 55/108 containers (51%), 14.0 GPU min lost; ledger total 639.7 min.
+Guard misses: 66/124 containers (53%), 16.8 GPU min lost; ledger total 694.8 min.
 
 Pareto plot: `pareto.svg` (x = mean prepare+train s, y = mean accuracy %).

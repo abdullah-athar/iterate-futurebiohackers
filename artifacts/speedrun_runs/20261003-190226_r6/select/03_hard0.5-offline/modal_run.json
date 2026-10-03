@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 221.1,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T181409Z-65ab85d4",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"hard_fraction\": 0.5}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "hard0.5-offline",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"hard_fraction\": 0.5}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"hard_fraction\": 0.5}",
+    "delta": {
+      "hard_fraction": 0.5
+    },
+    "hypothesis": "keep the hardest half of each batch",
+    "env": {},
+    "config": "futurebiohackers {\"hard_fraction\": 0.5}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

@@ -1,0 +1,53 @@
+{
+  "round": "r7",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "staged-a",
+      "control_index": 1,
+      "variants": [
+        {"label": "s20x25-28x50", "params": {"res_schedule": [[20, 0.25], [28, 0.5]]}, "hypothesis": "priority 2: 20 px for the first quarter (instead of 24), 28 px for the second quarter, then 32"},
+        {"label": "s20x20-24x40-28x60", "params": {"res_schedule": [[20, 0.2], [24, 0.4], [28, 0.6]]}, "hypothesis": "three-stage ramp 20->24->28->32 over 60% of the steps"},
+        {"label": "s24x25-28x50", "params": {"res_schedule": [[24, 0.25], [28, 0.5]]}, "hypothesis": "the promoted 24 px first quarter plus a 28 px second quarter"}
+      ]
+    },
+    {
+      "name": "staged-b",
+      "control_index": 1,
+      "variants": [
+        {"label": "s20x35", "params": {"res_schedule": [[20, 0.35]]}, "hypothesis": "20 px alone for 35% of the steps"},
+        {"label": "s20x25-24x50", "params": {"res_schedule": [[20, 0.25], [24, 0.5]]}, "hypothesis": "20 then 24 px over the first half"},
+        {"label": "s16x15-20x30-24x45-28x60", "params": {"res_schedule": [[16, 0.15], [20, 0.3], [24, 0.45], [28, 0.6]]}, "hypothesis": "four-stage ramp from 16 px (exploratory; the cold build may exceed 300 s with five graphs)"}
+      ]
+    },
+    {
+      "name": "staged-epochs",
+      "control_index": 1,
+      "variants": [
+        {"label": "s20x20-24x40-28x60-e9.25", "params": {"res_schedule": [[20, 0.2], [24, 0.4], [28, 0.6]], "epochs": 9.25}, "hypothesis": "three-stage ramp with half an epoch bought back"},
+        {"label": "s20x20-24x40-28x60-e9.5", "params": {"res_schedule": [[20, 0.2], [24, 0.4], [28, 0.6]], "epochs": 9.5}, "hypothesis": "three-stage ramp with 0.75 epoch bought back"},
+        {"label": "s20x25-28x50-e9.25", "params": {"res_schedule": [[20, 0.25], [28, 0.5]], "epochs": 9.25}, "hypothesis": "two-stage 20/28 ramp with half an epoch bought back"}
+      ]
+    },
+    {
+      "name": "filter",
+      "control_index": 1,
+      "variants": [
+        {"label": "filt6-0.75", "params": {"filter_start": 6, "filter_keep": 0.75}, "hypothesis": "priority 3 (airbench96_faster spirit): from epoch 6 skip the 25% most confident examples (confidence from training losses)"},
+        {"label": "filt5-0.75", "params": {"filter_start": 5, "filter_keep": 0.75}, "hypothesis": "filter from epoch 5"},
+        {"label": "filt6-0.5", "params": {"filter_start": 6, "filter_keep": 0.5}, "hypothesis": "from epoch 6 train on the hardest half only"}
+      ]
+    },
+    {
+      "name": "stack-arch",
+      "control_index": 1,
+      "variants": [
+        {"label": "w64-d233", "params": {"widths": [64, 256, 768], "depths": [2, 3, 3]}, "hypothesis": "priority 5 stack: the two favourable group-1 cuts together (-0.71 s and -0.47 s alone)"},
+        {"label": "w64-d233-triton-e9.5", "params": {"widths": [64, 256, 768], "depths": [2, 3, 3], "crop_mode": "triton", "epochs": 9.5}, "hypothesis": "group-1 cuts plus the Triton crop, with 0.75 epoch bought back"},
+        {"label": "w64-triton-s20x20-24x40-28x60-e9.5", "params": {"widths": [64, 256, 768], "crop_mode": "triton", "res_schedule": [[20, 0.2], [24, 0.4], [28, 0.6]], "epochs": 9.5}, "hypothesis": "group 1 at 64 plus the three-stage ramp and the Triton crop, 9.5 epochs"}
+      ]
+    }
+  ]
+}
