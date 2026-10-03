@@ -1,0 +1,28 @@
+{
+  "returncode": 0,
+  "wall_seconds": 412.0,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T203158Z-1431d65f",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 40 --seed 0 --params '{\"epochs\": 9.5}'",
+  "spec": {
+    "label": "safety-e9.5-seeds0",
+    "n": 40,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "40",
+      "--seed",
+      "0",
+      "--params",
+      "{\"epochs\": 9.5}"
+    ],
+    "params": "{\"epochs\": 9.5}",
+    "delta": {
+      "epochs": 9.5
+    },
+    "config": "futurebiohackers --n 40 --seed 0 --params {\"epochs\": 9.5}"
+  },
+  "nonfinite": null,
+  "build_mode": "cold"
+}

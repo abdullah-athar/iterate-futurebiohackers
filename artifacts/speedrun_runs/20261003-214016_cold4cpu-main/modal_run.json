@@ -1,0 +1,24 @@
+{
+  "returncode": 0,
+  "wall_seconds": 282.3,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T203542Z-d888e669",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 2 --seed 0",
+  "spec": {
+    "label": "cold4cpu-main",
+    "n": 2,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "2",
+      "--seed",
+      "0"
+    ],
+    "params": "{}",
+    "delta": {},
+    "config": "futurebiohackers --n 2 --seed 0 [cpus 4]"
+  },
+  "nonfinite": null,
+  "build_mode": "cold"
+}
