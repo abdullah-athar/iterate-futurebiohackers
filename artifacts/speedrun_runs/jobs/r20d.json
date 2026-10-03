@@ -113,7 +113,13 @@
             "epochs": 9.5
           },
           "hypothesis": "28 px phase extended to 75%: fewer 32 px steps"
-        },
+        }
+      ]
+    },
+    {
+      "name": "schedB-b",
+      "control_index": 1,
+      "variants": [
         {
           "label": "B-28to80",
           "params": {
