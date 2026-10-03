@@ -1,5 +1,6 @@
 """Refresh the local Markdown/HTML progress log from streamed experiment results."""
 
+import ast
 import json
 import subprocess
 import time
@@ -13,6 +14,24 @@ VISUAL = ROOT / ".lavish"
 
 def describe_change(record):
     p = record.get("params", {})
+    if record["name"].startswith("selected-default") and record.get("result_path"):
+        source = (
+            OUT
+            / Path(record["result_path"]).relative_to("/results")
+            / "source/submission.py"
+        )
+        if source.exists():
+            for node in ast.parse(source.read_text()).body:
+                if isinstance(node, ast.Assign) and any(
+                    isinstance(t, ast.Name) and t.id == "DEFAULTS" for t in node.targets
+                ):
+                    values = {
+                        k.value: ast.literal_eval(v)
+                        for k, v in zip(node.value.keys, node.value.values)
+                        if isinstance(k, ast.Constant)
+                        and k.value in ("widths", "epochs")
+                    }
+                    p = {**values, **p}
     if record.get("control") or "Initial reproduction" in record["name"]:
         return "Frozen PR #3 control"
     changes = []
@@ -113,6 +132,7 @@ def refresh():
                 "params": record.get("params", {}),
                 "run_id": key,
                 "qualifies": qualified,
+                "is_control": bool(record.get("control")),
                 "control_seconds": record.get("control_seconds"),
                 "control_run_id": record.get("control_run_id"),
             }
@@ -205,8 +225,8 @@ let data; const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;',
 function render(){
  if(!data)return;
  const valid=data.rows.filter(r=>r.qualifies&&r.seconds!==null).sort((a,b)=>a.seconds-b.seconds);
- document.getElementById('best').textContent=valid.length?valid[0].seconds.toFixed(3)+' s · '+valid[0].accuracy+'%':'None yet';
- document.getElementById('validation').textContent=data.rows.some(r=>r.status==='40-seed validated')?'40-seed run passed':'No new 40-seed validation';
+ document.getElementById('best').textContent=valid.length?valid[0].seconds.toFixed(3)+' s · '+valid[0].accuracy+'% · n='+valid[0].trials:'None yet';
+ document.getElementById('validation').textContent=data.rows.some(r=>!r.is_control&&r.status==='40-seed validated')?'40-seed recipe passed':'No new 40-seed validation';
  document.getElementById('spend').textContent=data.metered_spend_delta===null?'Pending':'$'+data.metered_spend_delta.toFixed(2);
  document.getElementById('current').textContent=data.status.current||'Starting';
  document.getElementById('updated').textContent='Updated '+data.updated;

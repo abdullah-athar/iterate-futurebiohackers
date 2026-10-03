@@ -6,7 +6,7 @@ The selected model uses three convolution blocks with 96, 256 and 768 channels.
 It makes the first two blocks smaller, where images are largest and processing is
 expensive, and gives the final block more capacity to distinguish the 100 classes.
 
-Training uses 8.5 epochs, batches of 1024 images, half precision, channels-last
+Training uses 9.5 epochs, batches of 1024 images, half precision, channels-last
 memory layout, Nesterov SGD and label smoothing. A moving average stabilizes the
 weights. Training-image normalization and patch whitening happen inside the timer.
 The final spatial pooling now covers the whole feature map, so experimental
@@ -14,35 +14,35 @@ smaller-crop training also works.
 
 ## Development results
 
-The latest completed screen compares both recipes on the same Modal A100 SXM GPU
-allocation, with three trials each:
+The 8.5-epoch candidate initially averaged 75.143% in 6.501 s over three trials.
+The required longer check then showed why the small screen was insufficient:
 
-| Recipe | Mean accuracy | Mean preparation + training |
-| --- | ---: | ---: |
-| Original 128/384/576 model | 75.150% | 7.991 s |
-| Selected 96/256/768 model | 75.143% | 6.501 s |
+| Recipe | Trials | Mean accuracy | Mean preparation + training |
+| --- | ---: | ---: | ---: |
+| Original 128/384/576 model, 8.5 epochs | 40 | 75.327% | 6.977 s |
+| Smaller 96/256/768 model, 8.5 epochs | 40 | 74.902% | 5.772 s |
 
-The selected model was **18.6% faster** in this screen. A fresh 40-trial comparison
-is running; these three-trial results do not establish challenge qualification.
+These runs shared the same Modal A100 SXM allocation and used seeds 10000–10039;
+all trials completed, with none discarded. The smaller model was faster but did
+not qualify. Its training schedule is now extended to **9.5 epochs**, and another
+40-trial check is running with fresh seeds starting at 20000.
+
 The under-three-second target has not been reached. Modal A100 SXM measurements
 are development results; official judging requires an A100 80GB PCIe and the
-organizer's 40 seeds.
-
-The original recipe in PR #3 previously reached 75.29% in 8.11 s across 40 trials
-on another Modal allocation. Allocation differences make its time unsuitable as
-a paired control for this screen.
+organizer's 40 seeds. The original recipe in PR #3 previously reached 75.29% in
+8.11 s across 40 trials on another Modal allocation.
 
 Run the selected defaults from the repository root with `just modal 40`.
-The three-trial selected screen is `20261003T153812Z-d85ef349`; its paired control
-is `20261003T152954Z-bb27a23e`.
+The unsuccessful 40-trial candidate is `20261003T154736Z-304b8a2b`; its paired
+control is `20261003T154214Z-9b6bf221`.
 
 ## Experiments and progress
 
 `--params` exposes smaller early crops (24 or 28 pixels followed by 32), different
 block widths/depths, proxy-based hard-example selection, alternative pooling and
 optimizer settings, and an optional Triton crop/flip kernel. These experiments are
-turned off in the selected defaults. Reduced-resolution candidates lost their
-accuracy margin in repeated trials; proxy selection and fused optimizer settings
+turned off in the selected defaults. The 28px, nine-epoch candidate missed
+the target over five fresh trials; proxy selection and fused optimizer settings
 also failed to improve the qualifying result. The unsuccessful experimental
 BN/GELU fusion was excluded from the submitted source.
 

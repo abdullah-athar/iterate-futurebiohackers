@@ -2,7 +2,7 @@
 
 Adapted from Keller Jordan's airbench (https://github.com/KellerJordan/cifar10-airbench),
 Copyright (c) 2024 Keller Jordan, released under the MIT License. Changes: 100-class
-head with a wider last block, label smoothing 0.3, an 8.5-epoch schedule, the
+head with a wider last block, label smoothing 0.3, a 9.5-epoch schedule, the
 harness build/prepare/train split, and no test-time augmentation.
 
 Untimed build() compiles the network and warms up every kernel on synthetic data.
@@ -21,7 +21,7 @@ from benchmark.api import BuildContext, TrainingData
 
 # Override any value with --params, e.g. '{"epochs": 9, "widths": [128, 384, 768]}'.
 DEFAULTS = {
-    "epochs": 8.5,
+    "epochs": 9.5,
     "batch_size": 1024,
     "lr": 9.0,  # per 1024 examples, decoupled from momentum (airbench convention)
     "momentum": 0.85,
