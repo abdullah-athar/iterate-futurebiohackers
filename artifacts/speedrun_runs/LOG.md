@@ -429,3 +429,5 @@ in the public repo (organizers keep calibration recipes in a gitignored `.local/
 | 2026-10-03 | cold4cpu-candB | futurebiohackers --n 2 --seed 0 --params {"resolution_schedule": [[24, 0.25], [28, 0.5]], "epochs": 9.5} [cpus 4] | 2 | 75.03 | 0.30 | 4.47 | NVIDIA A100-SXM4-80GB (400.00 W) | QUALIFIED (>= 75%); BUILD > 300 s (371 s cold); build 370.96 s cold, eval 0.076 s, nonfinite 0. |
 
 **4 Oct ~00:05.** Candidate B exact config under 4 CPUs: cold build 371 s (same graphs at 9.25 ep: 339 s); passes the build clause (< 400 s). Build policy corrected by the user: no 4-CPU builds during screening; finalists pass if their graph count <= a measured config (4 graphs: 254.6 / 208.8 s; 6 graphs: 339 / 371 s); a real 4-CPU build only before a PR/submission or for more graphs than measured. Launcher verdict now reports the graph count against the measured table.
+
+**PR #22 opened (4 Oct ~00:15):** candidate B (24 px first quarter + 28 px half, 9.5 epochs), single PR for both tracks, branch speedrun-24px-9.5ep (0a9d655). Candidate A (same schedule, 9.25 ep) holds neither floor (75.04 / 75.16). NIGHT MODE: continue without stopping; drafts only for new records.
