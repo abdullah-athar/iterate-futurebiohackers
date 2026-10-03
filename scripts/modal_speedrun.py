@@ -132,6 +132,8 @@ GRAPH_KEYS = {
     "depth2_residual",
     "pool_first",
     "stem",
+    "conv1_stride",
+    "conv_kernels",
     "gelu_approximate",
     "activation",
     "scaling_factor",

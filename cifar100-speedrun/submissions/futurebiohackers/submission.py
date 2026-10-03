@@ -53,6 +53,10 @@ DEFAULTS = {
     "pool_first": [False, False, False],  # move selected group pools before conv1
     "depth2_residual": False,  # depth-2 groups keep a skip connection over their second conv
     "stem": "conv",  # how the frozen whitening feeds group 1; the alternatives are in STEMS
+    "conv1_stride": 1,  # 2: group 1's first conv downsamples (padding 0) and replaces its pool
+    "conv_kernels": [3, 3, 3],  # kernel of each group's second and third conv (1 or 3)
+    "head_lr": 1.0,  # learning-rate multiplier for the linear head
+    "whiten_eps": 5e-4,  # added to the patch-covariance eigenvalues before the inverse sqrt
     "scaling_factor": 1.25 / 9,  # logit scale (airbench uses 1/9)
     "bn_momentum": 0.7,
     "ema_every": 5,  # lookahead EMA period in steps; 0 disables it
@@ -92,16 +96,24 @@ def _stem_channels(stem):
     return 2 * 3 * unshuffle**2 * kernel**2
 
 
-def _stem_sizes(stem, resolution):
+def _stem_sizes(stem, resolution, conv1_stride=1):
     """Spatial sizes after the stem and after each group for one input resolution. Raises
     when a 2x2 pool would see a map smaller than 2x2, i.e. before any map reaches 0x0."""
-    unshuffle, kernel, stride, _, first_pool = STEMS[stem]
+    unshuffle, kernel, stride, first_kernel, first_pool = STEMS[stem]
     if resolution % unshuffle:
         raise ValueError(f"stem {stem} needs even input sizes, not {resolution} px")
     size = (resolution // unshuffle - kernel) // stride + 1
     sizes = [size]
-    for pool in (first_pool, True, True):
-        if pool:
+    strided = first_kernel is not None and conv1_stride > 1
+    for group, pool in enumerate((first_pool, True, True)):
+        if group == 0 and strided:  # the first conv downsamples with padding 0, no pool
+            if size < first_kernel:
+                raise ValueError(
+                    f"stem {stem}: a {size}x{size} map meets a stride-{conv1_stride} "
+                    f"{first_kernel}x{first_kernel} conv at {resolution} px"
+                )
+            size = (size - first_kernel) // conv1_stride + 1
+        elif pool:
             if size < 2:
                 raise ValueError(
                     f"stem {stem}: a {size}x{size} map meets a 2x2 pool at {resolution} px"
@@ -129,9 +141,14 @@ class BatchNorm(nn.BatchNorm2d):
 
 
 class Conv(nn.Conv2d):
-    def __init__(self, channels_in, channels_out, kernel_size=3):
+    def __init__(self, channels_in, channels_out, kernel_size=3, stride=1):
         super().__init__(
-            channels_in, channels_out, kernel_size=kernel_size, padding="same", bias=False
+            channels_in,
+            channels_out,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding="same" if stride == 1 else 0,
+            bias=False,
         )
 
     def reset_parameters(self):
@@ -159,6 +176,8 @@ class ConvGroup(nn.Module):
         depth2_residual=False,
         first_kernel=3,
         first_pool=True,
+        first_stride=1,
+        inner_kernel=3,
     ):
         super().__init__()
         if first_kernel is None:
@@ -168,13 +187,14 @@ class ConvGroup(nn.Module):
                 raise ValueError("a group without a first conv needs channels_in == channels_out")
             self.conv1 = self.pool = self.norm1 = None
         else:
-            self.conv1 = Conv(channels_in, channels_out, first_kernel)
-            self.pool = nn.MaxPool2d(2) if first_pool else nn.Identity()
+            self.conv1 = Conv(channels_in, channels_out, first_kernel, first_stride)
+            # a strided first conv does the downsampling itself
+            self.pool = nn.MaxPool2d(2) if first_pool and first_stride == 1 else nn.Identity()
             self.norm1 = BatchNorm(channels_out, bn_momentum)
         self.pool_first = pool_first
-        self.conv2 = Conv(channels_out, channels_out)
+        self.conv2 = Conv(channels_out, channels_out, inner_kernel)
         self.norm2 = BatchNorm(channels_out, bn_momentum)
-        self.conv3 = Conv(channels_out, channels_out) if depth == 3 else None
+        self.conv3 = Conv(channels_out, channels_out, inner_kernel) if depth == 3 else None
         self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
         self.approximate = gelu_approximate
         self.depth2_residual = depth2_residual  # depth 2: skip connection over conv2
@@ -217,12 +237,28 @@ class Net(nn.Module):
                 skip,
                 first_kernel=first_kernel,
                 first_pool=first_pool,
+                first_stride=hyp["conv1_stride"],
+                inner_kernel=hyp["conv_kernels"][0],
             ),
             ConvGroup(
-                w1, w2, depths[1], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][1], skip
+                w1,
+                w2,
+                depths[1],
+                bn_momentum,
+                hyp["gelu_approximate"],
+                hyp["pool_first"][1],
+                skip,
+                inner_kernel=hyp["conv_kernels"][1],
             ),
             ConvGroup(
-                w2, w3, depths[2], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][2], skip
+                w2,
+                w3,
+                depths[2],
+                bn_momentum,
+                hyp["gelu_approximate"],
+                hyp["pool_first"][2],
+                skip,
+                inner_kernel=hyp["conv_kernels"][2],
             ),
             nn.AdaptiveMaxPool2d(1),
         )
@@ -460,8 +496,23 @@ def build(context: BuildContext):
         )
     if not STEMS[stem][4] and hyp["pool_first"][0]:
         raise ValueError(f"stem {stem} removes group 1's pool: pool_first[0] must be false")
+    if hyp["conv1_stride"] not in (1, 2):
+        raise ValueError("conv1_stride must be 1 or 2")
+    if hyp["conv1_stride"] == 2:
+        if STEMS[stem][3] is None:
+            raise ValueError(f"conv1_stride 2 needs a stem with a first conv, not {stem}")
+        if hyp["pool_first"][0]:
+            raise ValueError("conv1_stride 2 replaces group 1's pool: pool_first[0] must be false")
+    kernels = hyp["conv_kernels"]
+    if not (isinstance(kernels, list) and len(kernels) == 3 and all(k in (1, 3) for k in kernels)):
+        raise ValueError("conv_kernels must be three values from {1, 3}")
+    if not hyp["head_lr"] > 0:
+        raise ValueError("head_lr must be positive")
+    if not hyp["whiten_eps"] > 0:
+        raise ValueError("whiten_eps must be positive")
     for resolution in _resolutions(hyp):
-        _stem_sizes(stem, resolution)  # every resolution must keep a map >= 2x2 at each pool
+        # every resolution must keep a map >= 2x2 at each pool (and >= 3x3 at a strided conv)
+        _stem_sizes(stem, resolution, hyp["conv1_stride"])
     if type(hyp["filter_start"]) is not int or hyp["filter_start"] < 0:
         raise ValueError("filter_start must be a non-negative epoch index")
     if not 0 < hyp["filter_keep"] <= 1:
@@ -592,7 +643,7 @@ def prepare(state, data: TrainingData, seed: int) -> None:
     state.classifier.std.copy_(std)
     images = ((raw - mean) / std).to(state.dtype, memory_format=torch.channels_last)
     del raw
-    net.init_whiten(net.space_to_depth(images[:5000]))
+    net.init_whiten(net.space_to_depth(images[:5000]), eps=hyp["whiten_eps"])
     if state.proxy is not None:
         state.proxy.reset()
         state.proxy.zero_grad(set_to_none=True)
@@ -648,11 +699,19 @@ def prepare(state, data: TrainingData, seed: int) -> None:
 def _make_optimizer(net, lr, lr_biases, wd, hyp, device):
     norm_biases = [p for name, p in net.named_parameters() if "norm" in name and p.requires_grad]
     others = [p for name, p in net.named_parameters() if "norm" not in name and p.requires_grad]
+    groups = [
+        dict(params=norm_biases, lr=lr_biases, weight_decay=wd / lr_biases),
+        dict(params=others, lr=lr, weight_decay=wd / lr),
+    ]
+    if hyp["head_lr"] != 1.0 and hasattr(net, "head"):
+        # The linear head gets its own learning rate; its decoupled weight decay is unchanged.
+        head = list(net.head.parameters())
+        head_ids = {id(q) for q in head}
+        groups[1]["params"] = [q for q in others if id(q) not in head_ids]
+        lr_head = lr * hyp["head_lr"]
+        groups.append(dict(params=head, lr=lr_head, weight_decay=wd / lr_head))
     optimizer = torch.optim.SGD(
-        [
-            dict(params=norm_biases, lr=lr_biases, weight_decay=wd / lr_biases),
-            dict(params=others, lr=lr, weight_decay=wd / lr),
-        ],
+        groups,
         momentum=hyp["momentum"],
         nesterov=True,
         fused=hyp["fused_sgd"] and device.type == "cuda",

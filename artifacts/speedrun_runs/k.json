@@ -1,7 +1,13 @@
 {
   "k": 0.7,
   "unit": "accuracy percentage points per second of prepare+train",
-  "source": "r6/k2 on the promoted recipe (8.75 ep, 24 px first quarter, stack), SXM 400 W, n=8 paired, control 75.37 pct / 5.67 s: e8.25 -0.23 pp / -0.37 s, e9.25 +0.17 pp / +0.24 s; least squares 0.65 pp/s, rounded to 0.7. Earlier bases: 128/384/576 (rounds calib, r1) 0.445; 96/256/768 at 8.5 ep (rounds r3, r4, r5) 1.0.",
+  "source": "Scalar kept at 0.7 (the geometric mean of the two directions below). Round r14/k3 on the promoted recipe (64/256/768 stack, 9.5 ep, SXM 400 W, n=8 paired, control 75.53 pct / 5.08 s): e9.0 -0.47 +- 0.13 pp / -0.26 s, e10.0 -0.05 +- 0.07 pp / +0.25 s, e10.5 +0.15 +- 0.09 pp / +0.53 s. The accuracy-vs-epochs curve has a knee at 9.5 epochs: k_down ~1.8 pp/s when cutting epochs, k_up ~0.3 pp/s when adding them. So a cut that loses accuracy cannot be bought back with epochs (judge cuts by direct equal-time runs), and a gainer converts to time at ~1.8 pp/s by trimming epochs. Earlier: r6/k2 on the 8.75-ep 96/256/768 recipe gave 0.65 pp/s (rounded 0.7); 128/384/576 (calib, r1) 0.445; 96/256/768 at 8.5 ep (r3-r5) 1.0.",
+  "k_down": 1.8,
+  "k_up": 0.3,
+  "ladder": {"round": "r14", "job": "k3", "control": {"epochs": 9.5, "mean_acc": 75.53, "mean_time": 5.08},
+             "points": [{"epochs": 9.0, "dacc_pp": -0.47, "se": 0.13, "dtime_s": -0.26},
+                        {"epochs": 10.0, "dacc_pp": -0.05, "se": 0.07, "dtime_s": 0.25},
+                        {"epochs": 10.5, "dacc_pp": 0.15, "se": 0.09, "dtime_s": 0.53}]},
   "previous": [
     {
       "k": 0.445,
@@ -21,5 +27,5 @@
       ]
     }
   ],
-  "time": "2026-10-03T19:30:00"
+  "time": "2026-10-03T20:50:00"
 }

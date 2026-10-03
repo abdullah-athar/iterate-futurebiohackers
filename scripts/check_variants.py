@@ -98,6 +98,18 @@ VARIANTS = {
     "stem_whiten3s2": {"stem": "whiten3s2"},
     "stem_conv1x1": {"stem": "conv1x1"},
     "stem_conv1x1_depths223": {"stem": "conv1x1", "depths": [2, 2, 3]},
+    # ours: cheaper inner convs, a strided first conv, a head learning rate
+    "conv_kernels_331": {"conv_kernels": [3, 3, 1]},
+    "conv_kernels_311": {"conv_kernels": [3, 1, 1]},
+    "conv1_stride2": {"conv1_stride": 2},
+    "conv1_stride2_s2d_res24": {
+        "conv1_stride": 2,
+        "stem": "space_to_depth_nopool",
+        "train_resolution": 24,
+        "resolution_switch": 0.5,
+    },
+    "head_lr_half": {"head_lr": 0.5},
+    "whiten_eps_4x": {"whiten_eps": 2e-3},
     # his (must keep running after the port)
     "indexed_crop": {"crop_mode": "indexed"},
     "depths233": {"depths": [2, 3, 3]},
@@ -307,6 +319,51 @@ def main() -> int:
             and net.whiten.bias.requires_grad,
         )
 
+    # Inner conv kernels, the strided first conv and the head learning rate.
+    for name, run in runs.items():
+        hyp, net = run.state.hyp, run.state.net
+        groups = net.layers[1:4]
+        if hyp["conv_kernels"] != [3, 3, 3]:
+            check(
+                f"{name}: conv2/conv3 kernels follow conv_kernels {hyp['conv_kernels']}",
+                all(
+                    g.conv2.kernel_size == (k, k)
+                    and (g.conv3 is None or g.conv3.kernel_size == (k, k))
+                    for g, k in zip(groups, hyp["conv_kernels"])
+                ),
+            )
+        if hyp["conv1_stride"] == 2:
+            g = groups[0]
+            with torch.inference_mode():
+                side = g(net.layers[0](net.stem(torch.zeros(1, 3, 32, 32)))).shape[-1]
+            expected = new._stem_sizes(hyp["stem"], 32, 2)[1]
+            check(
+                f"{name}: group 1's first conv has stride 2 and padding 0, the group has no "
+                f"pool, and a 32 px input leaves group 1 as {side}x{side} (expected {expected})",
+                g.conv1.stride == (2, 2)
+                and g.conv1.padding == (0, 0)
+                and isinstance(g.pool, torch.nn.Identity)
+                and side == expected,
+            )
+        if hyp["head_lr"] != 1.0:
+            opt_groups = run.state.optimizer.param_groups
+            head = [id(q) for q in net.head.parameters()]
+            check(
+                f"{name}: the head has its own optimizer group at {hyp['head_lr']}x the base lr "
+                "and is absent from the other group",
+                len(opt_groups) == 3
+                and [id(q) for q in opt_groups[2]["params"]] == head
+                and abs(opt_groups[2]["initial_lr"] - opt_groups[1]["initial_lr"] * hyp["head_lr"])
+                < 1e-12
+                and not any(id(q) in head for q in opt_groups[1]["params"]),
+            )
+    check(
+        "a stride-2 first conv keeps the stem's group sizes: conv [31, 15, 7, 3], "
+        "space_to_depth_nopool [15, 7, 3, 1]",
+        new._stem_sizes("conv", 32, 2) == [31, 15, 7, 3]
+        and new._stem_sizes("space_to_depth_nopool", 32, 2) == [15, 7, 3, 1],
+    )
+
     # Spatial sizes per stem and resolution (after the stem, then after each group), and the
     # combinations build must reject: no 2x2 pool may see a map smaller than 2x2.
     table = {}
@@ -347,6 +404,19 @@ def main() -> int:
             "pool_first": [True, False, False],
         },
         "an unknown stem": {"stem": "pool"},
+        "conv1_stride 2 with pool_first[0]": {
+            "conv1_stride": 2,
+            "pool_first": [True, False, False],
+        },
+        "conv1_stride 2 with the whiten4s2 stem (no first conv)": {
+            "conv1_stride": 2,
+            "stem": "whiten4s2",
+            "widths": [96, 64, 64],
+        },
+        "conv1_stride 3": {"conv1_stride": 3},
+        "conv_kernels with a 2": {"conv_kernels": [3, 3, 2]},
+        "head_lr 0": {"head_lr": 0},
+        "whiten_eps 0": {"whiten_eps": 0},
     }
     for name, delta in rejected.items():
         try:

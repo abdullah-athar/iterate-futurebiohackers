@@ -1,0 +1,68 @@
+{
+  "round": "r15",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "knobs-1",
+      "control_index": 1,
+      "variants": [
+        {"label": "lr13.2", "params": {"lr": 13.2},
+         "hypothesis": "ride the gradient: lr 10.8 -> 12 gave +0.16 pp on this network; one more 10% step"},
+        {"label": "wd0.0202", "params": {"weight_decay": 0.0202},
+         "hypothesis": "ride the gradient: wd x1.4 gave +0.19 pp; another x1.2"},
+        {"label": "bias12", "params": {"bias_scaler": 12.0},
+         "hypothesis": "ride the gradient: bias lr 32x -> 16x gave +0.14 pp; try 12x"}
+      ]
+    },
+    {
+      "name": "knobs-2",
+      "control_index": 1,
+      "variants": [
+        {"label": "ls0.3", "params": {"label_smoothing": 0.3},
+         "hypothesis": "label smoothing 0.2 was neutral on this network; the other direction is untested"},
+        {"label": "whiten4", "params": {"whiten_bias_epochs": 4},
+         "hypothesis": "whitening bias trained one epoch longer: -0.13 s adj on the old network (r1), untested here"},
+        {"label": "translate1", "params": {"translate": 1},
+         "hypothesis": "weaker translation: -0.12 s adj on the old network (r1), untested here; the knee at 9.5 ep suggests less augmentation may fit the short schedule"}
+      ]
+    },
+    {
+      "name": "knobs-3",
+      "control_index": 1,
+      "variants": [
+        {"label": "bn0.6", "params": {"bn_momentum": 0.6},
+         "hypothesis": "BatchNorm momentum 0.8 lost 0.11 s adj; 0.6 (airbench's value) untested on this network"},
+        {"label": "whiten-eps4x", "params": {"whiten_eps": 0.002},
+         "hypothesis": "larger eigenvalue floor in the whitening: damps the noisiest high-frequency patch components (untested knob)"},
+        {"label": "head-lr0.5", "params": {"head_lr": 0.5},
+         "hypothesis": "own learning rate for the linear head (ideas #9): half the base lr"}
+      ]
+    },
+    {
+      "name": "g3k1",
+      "control_index": 1,
+      "variants": [
+        {"label": "k331", "params": {"conv_kernels": [3, 3, 1]},
+         "hypothesis": "1x1 second and third conv in group 3 (3x3 maps, mostly padding for a 3x3 kernel): removes 28% of the FLOPs (ideas #7)"},
+        {"label": "k311", "params": {"conv_kernels": [3, 1, 1]},
+         "hypothesis": "1x1 inner convs in groups 2 and 3: removes ~45% of the FLOPs; accuracy risk from the 7x7 maps"},
+        {"label": "res24-28", "params": {"res_schedule": [[24, 0.25], [28, 0.5]]},
+         "hypothesis": "staged resizing 24 -> 28 -> 32 with the 28 px stage over the second quarter: ~5% fewer FLOPs than the default 24 -> 32"}
+      ]
+    },
+    {
+      "name": "s2conv",
+      "control_index": 1,
+      "variants": [
+        {"label": "conv1-s2", "params": {"conv1_stride": 2},
+         "hypothesis": "group 1's first conv with stride 2 and padding 0 replaces the pool: learned downsampling instead of max-pool-after-conv at 31x31 (ideas #8)"},
+        {"label": "head-lr2", "params": {"head_lr": 2.0},
+         "hypothesis": "own learning rate for the linear head: twice the base lr"},
+        {"label": "switch0.35", "params": {"resolution_switch": 0.35},
+         "hypothesis": "longer 24 px phase (35% of the steps): neutral at equal epochs on the old network (r6), untested here"}
+      ]
+    }
+  ]
+}
