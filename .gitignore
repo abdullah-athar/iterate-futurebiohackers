@@ -32,6 +32,6 @@ cifar-100-python/
 cifar-100-python.tar.gz
 # Keep run records (summary.json, trials.jsonl, config.json, LOG.md), not the copied source trees
 !/artifacts/speedrun_runs/
-/artifacts/speedrun_runs/*/source/
+/artifacts/speedrun_runs/**/source/
 # Modal credentials live in ~/.modal.toml, never in the repo
 .modal.toml
