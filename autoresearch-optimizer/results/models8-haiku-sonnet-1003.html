@@ -1,0 +1,573 @@
+<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>Haiku vs Sonnet — 8 agents, generation 1 (mid objective)</title><style>
+:root{--bg:#f8fafc;--card:#fff;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--accent:#2563eb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+main{max-width:1280px;margin:0 auto;padding:28px 20px 60px}
+h1{font-size:28px;margin:0 0 4px}h2{font-size:19px;margin:0 0 4px}h3{font-size:15px;margin:14px 0 6px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.sub{color:var(--muted);margin:0 0 22px}.muted{color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:0 0 20px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.card p.lead{margin:0 0 12px;color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpi .v{font-size:28px;font-weight:700;letter-spacing:-.02em}.kpi .k{color:var(--muted);font-size:13px}.kpi .d{font-size:12px;color:var(--muted);margin-top:2px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:6px 0 10px;font-size:13px}
+.legend span.sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px}
+.tabs{display:flex;gap:6px;margin:0 0 8px}.tabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted)}
+.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.panel{display:none}.panel.on{display:block}
+svg.chart{max-width:100%;height:auto;display:block}
+svg .grid{stroke:#eef2f7;stroke-width:1}svg .axis{stroke:#cbd5e1;stroke-width:1}
+svg .tick,svg .val,svg .seg{font-size:11px;fill:#64748b}svg .seg{fill:#fff;font-weight:600}svg .label{font-size:12px;fill:#334155}
+svg .ref{font-size:11px}svg .cat{font-size:12px;fill:#0f172a}
+svg [data-tip]{cursor:pointer}svg.chart circle[data-tip]:hover{r:7}
+.linbar{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;margin:0 0 4px}.linbar .tabs{margin:0;align-items:center}.linbar .tabs>span{font-size:13px;color:var(--muted);margin-right:2px}
+.linzoom button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 10px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted);margin-left:4px}
+.linbox{overflow:auto;max-height:860px;border:1px solid var(--line);border-radius:10px;margin-top:6px}
+svg.lin{display:block}svg.lin .le{fill:none;stroke-width:1;opacity:.4}svg.lin .le.em{stroke-width:2.6;opacity:.9}
+svg.lin .ln{stroke-width:1}svg.lin .ln[data-hollow]{stroke-width:1.4}svg.lin .ln.ring{stroke-width:2.4}svg.lin .ln:hover{stroke-width:3.5}
+svg.lin .nl{font-size:10.5px;fill:#0f172a;font-weight:600;pointer-events:none}
+svg.lin.dim .le{opacity:.05}svg.lin.dim .ln,svg.lin.dim .nl{opacity:.2}svg.lin.dim .ln.hl{opacity:1}svg.lin.dim .le.hl{stroke-width:2.2;opacity:.95}
+table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+th:first-child,td:first-child{text-align:left}td{white-space:nowrap}td:first-child{white-space:normal;min-width:240px}td:first-child .note{white-space:normal}th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+td.l,th.l{text-align:left}tr.best td{background:#f0fdf4}td .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.badge{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11.5px;font-weight:600;color:#fff;white-space:nowrap}
+.traj td.h{text-align:left;max-width:560px;white-space:normal}.traj tr.kept td{background:#f0fdf4}.traj tr.dup td{color:#94a3b8}.traj tr.fail td.h{color:#b91c1c}
+.traj .note{display:block;font-size:12px;color:var(--muted)}
+select{font:inherit;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:#fff}
+#tip{position:fixed;pointer-events:none;background:#0f172a;color:#fff;padding:6px 9px;border-radius:6px;font-size:12px;max-width:360px;display:none;z-index:9;white-space:pre-line}
+.note-syn{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:13.5px}
+footer{color:var(--muted);font-size:12px;margin-top:30px}
+.events{margin:0;padding-left:18px;font-size:12.5px;color:#334155}.events li{margin:2px 0}
+@media print{.tabs{display:none}.panel{display:block!important}}
+</style></head><body><main>
+<h1>Haiku vs Sonnet — 8 agents, generation 1 (mid objective)</h1><p class='sub'>problem: <b>median_string</b> · 2 runs · updated 2026-10-03 20:21:30 UTC</p>
+<section class='card'><h2>Now</h2><p class='lead'>Swarm progress from <code>events.jsonl</code> (newest first).</p><h3>Haiku</h3><div class='kpis'><div class='kpi'><div class='v'>gen 2</div><div class='k'>generation</div><div class='d'>finished</div></div><div class='kpi'><div class='v'>3:44</div><div class='k'>elapsed</div><div class='d'>budget 20 min</div></div><div class='kpi'><div class='v'>21,545</div><div class='k'>best objective</div><div class='d'>#7</div></div><div class='kpi'><div class='v'>8</div><div class='k'>proposals recorded</div><div class='d'>this generation: success 8</div></div><div class='kpi'><div class='v'>$2.04</div><div class='k'>agent cost</div><div class='d'>Claude Code reported cost</div></div></div><ul class='events'><li><code>run end: 2 generation(s), 8 proposals, best #7=21545</code></li><li><code>holdout: seed 22575 -&gt; best #7 21401 (baseline 23986)</code></li><li><code>gen 2 end: best #7=21545; 0 evaluated, 0 kept; 82s; cost so far $1.51</code></li><li><code>gen 2 evaluating 0 candidate(s) (0 duplicate, 0 guard, 0 hypothesis-gate, 8 empty skipped)</code></li><li><code>gen 2 w03 [new_family] success 82s $0.08 — </code></li><li><code>gen 2 w00 [tune] success 77s $0.09 — Increase local search iterations from 100 to 150: enables escaping shallower local optima </code></li><li><code>gen 2 w02 [fix_losers] success 75s $0.08 — </code></li><li><code>gen 2 w04 [new_family] success 47s $0.08 — </code></li><li><code>gen 2 w05 [new_family] success 38s $0.05 — </code></li><li><code>gen 2 w07 [merge] success 37s $0.06 — </code></li><li><code>gen 2 w01 [tune] success 33s $0.05 — </code></li><li><code>gen 2 w06 [merge] success 31s $0.06 — </code></li><li><code>gen 2 start: tune 2, fix_losers 1, new_family 3, merge 2; best #7=21545</code></li><li><code>gen 1 end: best #7=21545; 8 evaluated, 4 kept; 140s; cost so far $1.51</code></li></ul><h3>Sonnet</h3><div class='kpis'><div class='kpi'><div class='v'>gen 2</div><div class='k'>generation</div><div class='d'>finished</div></div><div class='kpi'><div class='v'>1:16</div><div class='k'>elapsed</div><div class='d'>budget 20 min</div></div><div class='kpi'><div class='v'>19,211</div><div class='k'>best objective</div><div class='d'>#3</div></div><div class='kpi'><div class='v'>8</div><div class='k'>proposals recorded</div><div class='d'>this generation: success 8</div></div><div class='kpi'><div class='v'>$0.83</div><div class='k'>agent cost</div><div class='d'>Claude Code reported cost</div></div></div><ul class='events'><li><code>run end: 2 generation(s), 8 proposals, best #3=19211</code></li><li><code>holdout: seed 22575 -&gt; best #3 19219 (baseline 23986)</code></li><li><code>gen 2 end: best #3=19211; 0 evaluated, 0 kept; 5s; cost so far $0.68</code></li><li><code>gen 2 evaluating 0 candidate(s) (0 duplicate, 0 guard, 0 hypothesis-gate, 8 empty skipped)</code></li><li><code>gen 2 w03 [tune] success 4s $0.02 — </code></li><li><code>gen 2 w04 [fix_losers] success 4s $0.02 — </code></li><li><code>gen 2 w05 [new_family] success 4s $0.02 — </code></li><li><code>gen 2 w01 [tune] success 4s $0.02 — </code></li><li><code>gen 2 w06 [merge] success 4s $0.02 — </code></li><li><code>gen 2 w02 [tune] success 4s $0.02 — </code></li><li><code>gen 2 w00 [tune] success 4s $0.02 — </code></li><li><code>gen 2 w07 [merge] success 4s $0.02 — </code></li><li><code>gen 2 start: tune 4, fix_losers 1, new_family 1, merge 2; best #3=19211</code></li><li><code>gen 1 end: best #3=19211; 8 evaluated, 4 kept; 68s; cost so far $0.68</code></li></ul></section>
+<div class="kpis"><div class="kpi"><div class="v">+20.6%</div><div class="k">best improvement vs set-median baseline</div><div class="d">Sonnet · validate split</div></div><div class="kpi"><div class="v">+16.8%</div><div class="k">vs strongest classical solver (template)</div><div class="d">23,085 → agents&#x27; best 19,211 · same CPU budget</div></div><div class="kpi"><div class="v">968.7k</div><div class="k">agent tokens used</div><div class="d">8 evaluations in 1.2m · $0.68</div></div><div class="kpi"><div class="v">61.3k</div><div class="k">tokens per 1% gained</div><div class="d">Sonnet · research efficiency</div></div><div class="kpi"><div class="v">+19.9%</div><div class="k">held-out improvement (unseen instances)</div><div class="d">Sonnet</div></div><div class="kpi"><div class="v">0</div><div class="k">duplicate proposals skipped</div><div class="d">evaluations saved by the novelty gate; their proposal tokens were still spent</div></div></div>
+<section class="card"><h2>Research progress</h2><p class="lead">Best objective found so far. Dots mark proposals that set a new global best; hover for the hypothesis.</p><div class="tabs" data-group="x"><button class="on" data-key="evals">vs evals</button><button class="" data-key="tokens">vs tokens</button><button class="" data-key="seconds">vs wall-clock</button></div><div class="legend"><span><span class="sw" style="background:#2563eb"></span>Haiku</span><span><span class="sw" style="background:#dc2626"></span>Sonnet</span></div><div class="panel on" data-group="x" data-key="evals"><svg class="chart" viewBox="0 0 920 380" width="920" height="380" role="img">
+<line class="grid" x1="64" x2="896" y1="349.7" y2="349.7"/>
+<text class="tick" x="56" y="353.7" text-anchor="end">18,000</text>
+<line class="grid" x1="64" x2="896" y1="249.7" y2="249.7"/>
+<text class="tick" x="56" y="253.7" text-anchor="end">20,000</text>
+<line class="grid" x1="64" x2="896" y1="149.7" y2="149.7"/>
+<text class="tick" x="56" y="153.7" text-anchor="end">22,000</text>
+<line class="grid" x1="64" x2="896" y1="49.8" y2="49.8"/>
+<text class="tick" x="56" y="53.8" text-anchor="end">24,000</text>
+<text class="tick" x="64.0" y="350" text-anchor="middle">0</text>
+<text class="tick" x="168.0" y="350" text-anchor="middle">1</text>
+<text class="tick" x="272.0" y="350" text-anchor="middle">2</text>
+<text class="tick" x="376.0" y="350" text-anchor="middle">3</text>
+<text class="tick" x="480.0" y="350" text-anchor="middle">4</text>
+<text class="tick" x="584.0" y="350" text-anchor="middle">5</text>
+<text class="tick" x="688.0" y="350" text-anchor="middle">6</text>
+<text class="tick" x="792.0" y="350" text-anchor="middle">7</text>
+<text class="tick" x="896.0" y="350" text-anchor="middle">8</text>
+<line class="axis" x1="64" x2="896" y1="332" y2="332"/>
+<line class="axis" x1="64" x2="64" y1="18" y2="332"/>
+<text class="label" x="480" y="372" text-anchor="middle">evaluations (duplicates skipped by the novelty gate don&#x27;t count)</text>
+<text class="label" transform="translate(14,175) rotate(-90)" text-anchor="middle">objective (total edit distance, lower is better)</text>
+<line x1="64" x2="896" y1="39.7" y2="39.7" stroke="#64748b" stroke-dasharray="6 4" stroke-width="1.5"/>
+<text class="ref" x="892" y="34.7" text-anchor="end" fill="#64748b">set-median baseline = 24,202</text>
+<line x1="64" x2="896" y1="310.3" y2="310.3" stroke="#16a34a" stroke-dasharray="2 4" stroke-width="1.5"/>
+<text class="ref" x="892" y="305.3" text-anchor="end" fill="#16a34a">planted reference (not proven optimal) = 18,787</text>
+<line x1="64" x2="896" y1="95.5" y2="95.5" stroke="#b45309" stroke-dasharray="4 3" stroke-width="1.5"/>
+<text class="ref" x="892" y="90.5" text-anchor="end" fill="#b45309">best classical solver (template) = 23,085</text>
+<path d="M64.0,108.9 H168.0 V149.6 H272.0 V149.6 H376.0 V149.6 H480.0 V149.6 H584.0 V149.6 H688.0 V149.6 H792.0 V172.5 H896.0 V172.5 H896.0" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="168.0" cy="149.6" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#1 [tune] → 22,003
+Multiple centers (set median + input samples + consensus) with local search + path relinking recombines solutions to escape local optima; expect improvement on all instances by exploring the solution space more broadly."/>
+<circle cx="792.0" cy="172.5" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#7 [new_family] → 21,545
+Expand local search neighborhood beyond single substitutions to include adjacent transpositions (pair edits) and character shifts: enables discovery of better alignments where reordering helps, especially on DNA/protein instances where edit distance benefits from position flexibility. Expect improvement on all instances."/>
+<path d="M64.0,108.9 H168.0 V251.0 H272.0 V256.0 H376.0 V289.1 H480.0 V289.1 H584.0 V289.1 H688.0 V289.1 H792.0 V289.1 H896.0 V289.1 H896.0" fill="none" stroke="#dc2626" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="168.0" cy="251.0" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#1 [tune] → 19,974
+Population of refined set-median centers (alignment-consensus voting) recombined by path relinking via edit scripts; expect lower scores on all instances, esp. noisy DNA and protein."/>
+<circle cx="272.0" cy="256.0" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,874
+Run local search to a full local optimum (remove 50-step cap) with insertion/deletion moves besides substitutions, continuing scan after each improvement; expect lower scores on all instances, esp. indel-heavy ones."/>
+<circle cx="376.0" cy="289.1" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#3 [tune] → 19,211
+Start from set median, refine by star-alignment (editops) majority consensus incl. indel votes, then sub/ins/del local search; expect lower scores on all, esp. high-k DNA and protein."/>
+</svg></div><div class="panel " data-group="x" data-key="tokens"><svg class="chart" viewBox="0 0 920 380" width="920" height="380" role="img">
+<line class="grid" x1="64" x2="896" y1="349.7" y2="349.7"/>
+<text class="tick" x="56" y="353.7" text-anchor="end">18,000</text>
+<line class="grid" x1="64" x2="896" y1="249.7" y2="249.7"/>
+<text class="tick" x="56" y="253.7" text-anchor="end">20,000</text>
+<line class="grid" x1="64" x2="896" y1="149.7" y2="149.7"/>
+<text class="tick" x="56" y="153.7" text-anchor="end">22,000</text>
+<line class="grid" x1="64" x2="896" y1="49.8" y2="49.8"/>
+<text class="tick" x="56" y="53.8" text-anchor="end">24,000</text>
+<text class="tick" x="64.0" y="350" text-anchor="middle">0</text>
+<text class="tick" x="174.6" y="350" text-anchor="middle">500.0k</text>
+<text class="tick" x="285.1" y="350" text-anchor="middle">1000.0k</text>
+<text class="tick" x="395.7" y="350" text-anchor="middle">1500.0k</text>
+<text class="tick" x="506.2" y="350" text-anchor="middle">2000.0k</text>
+<text class="tick" x="616.8" y="350" text-anchor="middle">2500.0k</text>
+<text class="tick" x="727.4" y="350" text-anchor="middle">3000.0k</text>
+<text class="tick" x="837.9" y="350" text-anchor="middle">3500.0k</text>
+<line class="axis" x1="64" x2="896" y1="332" y2="332"/>
+<line class="axis" x1="64" x2="64" y1="18" y2="332"/>
+<text class="label" x="480" y="372" text-anchor="middle">cumulative agent tokens (prompt + completion)</text>
+<text class="label" transform="translate(14,175) rotate(-90)" text-anchor="middle">objective (total edit distance, lower is better)</text>
+<line x1="64" x2="896" y1="39.7" y2="39.7" stroke="#64748b" stroke-dasharray="6 4" stroke-width="1.5"/>
+<text class="ref" x="892" y="34.7" text-anchor="end" fill="#64748b">set-median baseline = 24,202</text>
+<line x1="64" x2="896" y1="310.3" y2="310.3" stroke="#16a34a" stroke-dasharray="2 4" stroke-width="1.5"/>
+<text class="ref" x="892" y="305.3" text-anchor="end" fill="#16a34a">planted reference (not proven optimal) = 18,787</text>
+<line x1="64" x2="896" y1="95.5" y2="95.5" stroke="#b45309" stroke-dasharray="4 3" stroke-width="1.5"/>
+<text class="ref" x="892" y="90.5" text-anchor="end" fill="#b45309">best classical solver (template) = 23,085</text>
+<path d="M64.0,108.9 H246.5 V149.6 H312.4 V149.6 H380.1 V149.6 H391.3 V149.6 H621.6 V149.6 H702.1 V149.6 H794.4 V172.5 H896.0 V172.5 H896.0" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="246.5" cy="149.6" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#1 [tune] → 22,003
+Multiple centers (set median + input samples + consensus) with local search + path relinking recombines solutions to escape local optima; expect improvement on all instances by exploring the solution space more broadly."/>
+<circle cx="794.4" cy="172.5" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#7 [new_family] → 21,545
+Expand local search neighborhood beyond single substitutions to include adjacent transpositions (pair edits) and character shifts: enables discovery of better alignments where reordering helps, especially on DNA/protein instances where edit distance benefits from position flexibility. Expect improvement on all instances."/>
+<path d="M64.0,108.9 H92.9 V251.0 H106.6 V256.0 H125.6 V289.1 H144.5 V289.1 H173.3 V289.1 H202.0 V289.1 H231.1 V289.1 H278.2 V289.1 H896.0" fill="none" stroke="#dc2626" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="92.9" cy="251.0" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#1 [tune] → 19,974
+Population of refined set-median centers (alignment-consensus voting) recombined by path relinking via edit scripts; expect lower scores on all instances, esp. noisy DNA and protein."/>
+<circle cx="106.6" cy="256.0" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,874
+Run local search to a full local optimum (remove 50-step cap) with insertion/deletion moves besides substitutions, continuing scan after each improvement; expect lower scores on all instances, esp. indel-heavy ones."/>
+<circle cx="125.6" cy="289.1" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#3 [tune] → 19,211
+Start from set median, refine by star-alignment (editops) majority consensus incl. indel votes, then sub/ins/del local search; expect lower scores on all, esp. high-k DNA and protein."/>
+</svg></div><div class="panel " data-group="x" data-key="seconds"><svg class="chart" viewBox="0 0 920 380" width="920" height="380" role="img">
+<line class="grid" x1="64" x2="896" y1="349.7" y2="349.7"/>
+<text class="tick" x="56" y="353.7" text-anchor="end">18,000</text>
+<line class="grid" x1="64" x2="896" y1="249.7" y2="249.7"/>
+<text class="tick" x="56" y="253.7" text-anchor="end">20,000</text>
+<line class="grid" x1="64" x2="896" y1="149.7" y2="149.7"/>
+<text class="tick" x="56" y="153.7" text-anchor="end">22,000</text>
+<line class="grid" x1="64" x2="896" y1="49.8" y2="49.8"/>
+<text class="tick" x="56" y="53.8" text-anchor="end">24,000</text>
+<text class="tick" x="64.0" y="350" text-anchor="middle">0s</text>
+<text class="tick" x="179.9" y="350" text-anchor="middle">20s</text>
+<text class="tick" x="295.9" y="350" text-anchor="middle">40s</text>
+<text class="tick" x="411.8" y="350" text-anchor="middle">1.0m</text>
+<text class="tick" x="527.7" y="350" text-anchor="middle">1.3m</text>
+<text class="tick" x="643.6" y="350" text-anchor="middle">1.7m</text>
+<text class="tick" x="759.6" y="350" text-anchor="middle">2.0m</text>
+<text class="tick" x="875.5" y="350" text-anchor="middle">2.3m</text>
+<line class="axis" x1="64" x2="896" y1="332" y2="332"/>
+<line class="axis" x1="64" x2="64" y1="18" y2="332"/>
+<text class="label" x="480" y="372" text-anchor="middle">wall-clock</text>
+<text class="label" transform="translate(14,175) rotate(-90)" text-anchor="middle">objective (total edit distance, lower is better)</text>
+<line x1="64" x2="896" y1="39.7" y2="39.7" stroke="#64748b" stroke-dasharray="6 4" stroke-width="1.5"/>
+<text class="ref" x="892" y="34.7" text-anchor="end" fill="#64748b">set-median baseline = 24,202</text>
+<line x1="64" x2="896" y1="310.3" y2="310.3" stroke="#16a34a" stroke-dasharray="2 4" stroke-width="1.5"/>
+<text class="ref" x="892" y="305.3" text-anchor="end" fill="#16a34a">planted reference (not proven optimal) = 18,787</text>
+<line x1="64" x2="896" y1="95.5" y2="95.5" stroke="#b45309" stroke-dasharray="4 3" stroke-width="1.5"/>
+<text class="ref" x="892" y="90.5" text-anchor="end" fill="#b45309">best classical solver (template) = 23,085</text>
+<path d="M64.0,108.9 H896.0 V149.6 H896.0 V149.6 H896.0 V149.6 H896.0 V149.6 H896.0 V149.6 H896.0 V149.6 H896.0 V172.5 H896.0 V172.5 H896.0" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="896.0" cy="149.6" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#1 [tune] → 22,003
+Multiple centers (set median + input samples + consensus) with local search + path relinking recombines solutions to escape local optima; expect improvement on all instances by exploring the solution space more broadly."/>
+<circle cx="896.0" cy="172.5" r="5" fill="#2563eb" stroke="#fff" stroke-width="1.5" data-tip="#7 [new_family] → 21,545
+Expand local search neighborhood beyond single substitutions to include adjacent transpositions (pair edits) and character shifts: enables discovery of better alignments where reordering helps, especially on DNA/protein instances where edit distance benefits from position flexibility. Expect improvement on all instances."/>
+<path d="M64.0,108.9 H474.7 V251.0 H474.7 V256.0 H474.7 V289.1 H474.7 V289.1 H474.7 V289.1 H474.8 V289.1 H474.8 V289.1 H474.8 V289.1 H896.0" fill="none" stroke="#dc2626" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="474.7" cy="251.0" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#1 [tune] → 19,974
+Population of refined set-median centers (alignment-consensus voting) recombined by path relinking via edit scripts; expect lower scores on all instances, esp. noisy DNA and protein."/>
+<circle cx="474.7" cy="256.0" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#2 [tune] → 19,874
+Run local search to a full local optimum (remove 50-step cap) with insertion/deletion moves besides substitutions, continuing scan after each improvement; expect lower scores on all instances, esp. indel-heavy ones."/>
+<circle cx="474.7" cy="289.1" r="5" fill="#dc2626" stroke="#fff" stroke-width="1.5" data-tip="#3 [tune] → 19,211
+Start from set median, refine by star-alignment (editops) majority consensus incl. indel votes, then sub/ins/del local search; expect lower scores on all, esp. high-k DNA and protein."/>
+</svg></div></section>
+<section class='card'><h2>Flavour scoreboard</h2><p class='lead'>Lower objective is better. Δ is relative to the set-median baseline on the validate split; held-out Δ is on fresh instances the loop never saw. 'tokens / 1%' = total agent tokens per percentage point gained over the seed.</p><div style='overflow-x:auto'><table><tr><th class='l'>flavour</th><th>best objective (seed)</th><th>Δ vs baseline</th><th>gap closed</th><th>held-out Δ</th><th>proposals</th><th>evaluated</th><th>kept</th><th>dupes skipped</th><th>crashed</th><th>tokens</th><th>tokens / 1%</th><th>evals to 1st gain</th><th>wall-clock</th></tr><tr class=''><td class='l'><span class='sw' style='background:#2563eb'></span><b>Haiku</b><span class='note' style='display:block;font-size:12px;color:#64748b'>novelty_threshold=0.95, max_novelty_attempts=3, exploit=0.7, patience=4, patience_generations=1, ucb_c=0.8, time_budget_ms=1000, modes=None, evaluator_hash=7efbc910a1cf</span></td><td>21,545 <span class='muted'>(22,816)</span></td><td><b>+11.0%</b></td><td>49%</td><td>+10.8%</td><td>8</td><td>8</td><td>4</td><td>0</td><td>0</td><td>3762.7k</td><td>675.5k</td><td>1</td><td>2.4m</td></tr><tr class='best'><td class='l'><span class='sw' style='background:#dc2626'></span><b>Sonnet</b><span class='note' style='display:block;font-size:12px;color:#64748b'>novelty_threshold=0.95, max_novelty_attempts=3, exploit=0.7, patience=4, patience_generations=1, ucb_c=0.8, time_budget_ms=1000, modes=None, evaluator_hash=7efbc910a1cf</span></td><td>19,211 <span class='muted'>(22,816)</span></td><td><b>+20.6%</b></td><td>92%</td><td>+19.9%</td><td>8</td><td>8</td><td>4</td><td>0</td><td>0</td><td>968.7k</td><td>61.3k</td><td>1</td><td>1.2m</td></tr></table></div><h3>Prompt-mode hit rate (global wins + per-instance wins / tried)</h3><table><tr><th class='l'>flavour</th><th><span class="badge" style="background:#f97316">fix_losers</span></th><th><span class="badge" style="background:#8b5cf6">new_family</span></th><th><span class="badge" style="background:#0ea5e9">tune</span></th></tr><tr><td class='l'><span class='sw' style='background:#2563eb'></span>Haiku</td><td>0+1 / 3</td><td>1+0 / 2</td><td>1+1 / 3</td></tr><tr><td class='l'><span class='sw' style='background:#dc2626'></span>Sonnet</td><td>0+1 / 3</td><td>0+0 / 2</td><td>3+0 / 3</td></tr></table></section>
+<section class='card'><h2>Classical baselines</h2><p class='lead'>Non-agent solvers from <code>median_string/solvers</code>, scored once per run under the same CPU budget. Δ = how much worse each is than the agents' best.</p><table><tr><th class='l'>run</th><th class='l'>solver</th><th>objective</th><th>Δ vs agents' best</th><th>holdout</th></tr><tr><td class='l'>Haiku</td><td class='l'><b>template</b></td><td>23,085</td><td>+6.7%</td><td>22,723</td></tr><tr><td class='l'>Haiku</td><td class='l'><b>set_median</b></td><td>24,202</td><td>+11.0%</td><td>23,986</td></tr><tr><td class='l'>Haiku</td><td class='l'><b>frequency_consensus</b></td><td>26,835</td><td>+19.7%</td><td>26,677</td></tr><tr class='best'><td class='l'>Haiku</td><td class='l'><b>agents' best (#7)</b></td><td>21,545</td><td>—</td><td>21,401</td></tr><tr><td class='l'>Sonnet</td><td class='l'><b>template</b></td><td>23,085</td><td>+16.8%</td><td>22,723</td></tr><tr><td class='l'>Sonnet</td><td class='l'><b>set_median</b></td><td>24,202</td><td>+20.6%</td><td>23,986</td></tr><tr><td class='l'>Sonnet</td><td class='l'><b>frequency_consensus</b></td><td>26,835</td><td>+28.4%</td><td>26,677</td></tr><tr class='best'><td class='l'>Sonnet</td><td class='l'><b>agents' best (#3)</b></td><td>19,211</td><td>—</td><td>19,219</td></tr></table></section>
+<section class='card'><h2>Per-instance results</h2><p class='lead'>Best score each flavour reached on every benchmark instance. Shorter bars are better; the Pareto archive keeps solvers that win on any single instance, not just the total.</p><div class="legend"><span><span class="sw" style="background:#2563eb"></span>Haiku</span><span><span class="sw" style="background:#dc2626"></span>Sonnet</span><span><span class="sw" style="background:#64748b"></span>baseline (dashed grey)</span><span><span class="sw" style="background:#16a34a"></span>planted reference (dashed green; a feasible answer, not a proven optimum)</span></div><svg class="chart" viewBox="0 0 920 296" width="920" height="296" role="img">
+<line class="grid" x1="190.0" x2="190.0" y1="12" y2="252"/>
+<text class="tick" x="190.0" y="268" text-anchor="middle">0</text>
+<line class="grid" x1="290.1" x2="290.1" y1="12" y2="252"/>
+<text class="tick" x="290.1" y="268" text-anchor="middle">1,000</text>
+<line class="grid" x1="390.1" x2="390.1" y1="12" y2="252"/>
+<text class="tick" x="390.1" y="268" text-anchor="middle">2,000</text>
+<line class="grid" x1="490.2" x2="490.2" y1="12" y2="252"/>
+<text class="tick" x="490.2" y="268" text-anchor="middle">3,000</text>
+<line class="grid" x1="590.3" x2="590.3" y1="12" y2="252"/>
+<text class="tick" x="590.3" y="268" text-anchor="middle">4,000</text>
+<line class="grid" x1="690.3" x2="690.3" y1="12" y2="252"/>
+<text class="tick" x="690.3" y="268" text-anchor="middle">5,000</text>
+<line class="grid" x1="790.4" x2="790.4" y1="12" y2="252"/>
+<text class="tick" x="790.4" y="268" text-anchor="middle">6,000</text>
+<line class="grid" x1="890.5" x2="890.5" y1="12" y2="252"/>
+<text class="tick" x="890.5" y="268" text-anchor="middle">7,000</text>
+<text class="label" x="543" y="290" text-anchor="middle">edit distance (lower is better)</text>
+<text class="cat" x="180" y="39.0" text-anchor="end">dna_mid_480bp_k20</text>
+<rect x="190" y="18.0" width="373.2" height="14" fill="#2563eb" rx="2" data-tip="Haiku: 3,730 (entry #7), baseline 4,175, planted reference 3,216"/>
+<text class="val" x="568.2" y="29.0">3,730</text>
+<rect x="190" y="35.0" width="324.1" height="14" fill="#dc2626" rx="2" data-tip="Sonnet: 3,239 (entry #2), baseline 4,175, planted reference 3,216"/>
+<text class="val" x="519.1" y="46.0">3,239</text>
+<line x1="607.8" x2="607.8" y1="15.0" y2="52.0" stroke="#64748b" stroke-width="2" stroke-dasharray="4 3" data-tip="set-median baseline: 4,175"/>
+<line x1="511.8" x2="511.8" y1="15.0" y2="52.0" stroke="#16a34a" stroke-width="2" stroke-dasharray="4 3" data-tip="planted reference: 3,216"/>
+<text class="cat" x="180" y="87.0" text-anchor="end">dna_mid_640bp_k25</text>
+<line class="grid" x1="190" x2="896" y1="60" y2="60"/>
+<rect x="190" y="66.0" width="611.8" height="14" fill="#2563eb" rx="2" data-tip="Haiku: 6,114 (entry #7), baseline 6,656, planted reference 4,937"/>
+<text class="val" x="806.8" y="77.0">6,114</text>
+<rect x="190" y="83.0" width="524.2" height="14" fill="#dc2626" rx="2" data-tip="Sonnet: 5,239 (entry #4), baseline 6,656, planted reference 4,937"/>
+<text class="val" x="719.2" y="94.0">5,239</text>
+<line x1="856.0" x2="856.0" y1="63.0" y2="100.0" stroke="#64748b" stroke-width="2" stroke-dasharray="4 3" data-tip="set-median baseline: 6,656"/>
+<line x1="684.0" x2="684.0" y1="63.0" y2="100.0" stroke="#16a34a" stroke-width="2" stroke-dasharray="4 3" data-tip="planted reference: 4,937"/>
+<text class="cat" x="180" y="135.0" text-anchor="end">dna_mid_noisy_400bp</text>
+<line class="grid" x1="190" x2="896" y1="108" y2="108"/>
+<rect x="190" y="114.0" width="546.9" height="14" fill="#2563eb" rx="2" data-tip="Haiku: 5,465 (entry #6), baseline 5,819, planted reference 5,167"/>
+<text class="val" x="741.9" y="125.0">5,465</text>
+<rect x="190" y="131.0" width="510.8" height="14" fill="#dc2626" rx="2" data-tip="Sonnet: 5,105 (entry #4), baseline 5,819, planted reference 5,167"/>
+<text class="val" x="705.8" y="142.0">5,105</text>
+<line x1="772.3" x2="772.3" y1="111.0" y2="148.0" stroke="#64748b" stroke-width="2" stroke-dasharray="4 3" data-tip="set-median baseline: 5,819"/>
+<line x1="707.0" x2="707.0" y1="111.0" y2="148.0" stroke="#16a34a" stroke-width="2" stroke-dasharray="4 3" data-tip="planted reference: 5,167"/>
+<text class="cat" x="180" y="183.0" text-anchor="end">protein_mid_320aa</text>
+<line class="grid" x1="190" x2="896" y1="156" y2="156"/>
+<rect x="190" y="162.0" width="237.7" height="14" fill="#2563eb" rx="2" data-tip="Haiku: 2,375 (entry #7), baseline 2,869, planted reference 2,037"/>
+<text class="val" x="432.7" y="173.0">2,375</text>
+<rect x="190" y="179.0" width="204.6" height="14" fill="#dc2626" rx="2" data-tip="Sonnet: 2,045 (entry #3), baseline 2,869, planted reference 2,037"/>
+<text class="val" x="399.6" y="190.0">2,045</text>
+<line x1="477.1" x2="477.1" y1="159.0" y2="196.0" stroke="#64748b" stroke-width="2" stroke-dasharray="4 3" data-tip="set-median baseline: 2,869"/>
+<line x1="393.8" x2="393.8" y1="159.0" y2="196.0" stroke="#16a34a" stroke-width="2" stroke-dasharray="4 3" data-tip="planted reference: 2,037"/>
+<text class="cat" x="180" y="231.0" text-anchor="end">dna_mid_cohort_280bp</text>
+<line class="grid" x1="190" x2="896" y1="204" y2="204"/>
+<rect x="190" y="210.0" width="383.7" height="14" fill="#2563eb" rx="2" data-tip="Haiku: 3,834 (entry #7), baseline 4,683, planted reference 3,430"/>
+<text class="val" x="578.7" y="221.0">3,834</text>
+<rect x="190" y="227.0" width="342.9" height="14" fill="#dc2626" rx="2" data-tip="Sonnet: 3,427 (entry #2), baseline 4,683, planted reference 3,430"/>
+<text class="val" x="537.9" y="238.0">3,427</text>
+<line x1="658.6" x2="658.6" y1="207.0" y2="244.0" stroke="#64748b" stroke-width="2" stroke-dasharray="4 3" data-tip="set-median baseline: 4,683"/>
+<line x1="533.2" x2="533.2" y1="207.0" y2="244.0" stroke="#16a34a" stroke-width="2" stroke-dasharray="4 3" data-tip="planted reference: 3,430"/>
+</svg></section>
+<section class='card'><h2>What happened to each proposal</h2><p class='lead'>Duplicates caught by the novelty gate were never evaluated, so they cost only the proposal tokens. Screen rejections failed the cheap small-tier cascade and never ran the expensive split.</p><div class="legend"><span><span class="sw" style="background:#16a34a"></span>kept (improved)</span><span><span class="sw" style="background:#94a3b8"></span>evaluated, no gain</span><span><span class="sw" style="background:#f59e0b"></span>rejected at screen</span><span><span class="sw" style="background:#fbbf24"></span>duplicate (not evaluated)</span><span><span class="sw" style="background:#7c2d12"></span>disallowed import (not evaluated)</span><span><span class="sw" style="background:#a78bfa"></span>repeated idea (no code written)</span><span><span class="sw" style="background:#ef4444"></span>crashed / over budget</span></div><svg class="chart" viewBox="0 0 920 96" width="920" height="96" role="img">
+<text class="cat" x="180" y="27.0" text-anchor="end">Haiku</text>
+<rect x="190.0" y="10" width="310.0" height="26" fill="#16a34a" data-tip="kept (improved): 4 (50%)"/>
+<text class="seg" x="345.0" y="27.0" text-anchor="middle">4</text>
+<rect x="500.0" y="10" width="310.0" height="26" fill="#94a3b8" data-tip="evaluated, no gain: 4 (50%)"/>
+<text class="seg" x="655.0" y="27.0" text-anchor="middle">4</text>
+<text class="val" x="816.0" y="27.0">8 proposals</text>
+<text class="cat" x="180" y="65.0" text-anchor="end">Sonnet</text>
+<rect x="190.0" y="48" width="310.0" height="26" fill="#16a34a" data-tip="kept (improved): 4 (50%)"/>
+<text class="seg" x="345.0" y="65.0" text-anchor="middle">4</text>
+<rect x="500.0" y="48" width="310.0" height="26" fill="#94a3b8" data-tip="evaluated, no gain: 4 (50%)"/>
+<text class="seg" x="655.0" y="65.0" text-anchor="middle">4</text>
+<text class="val" x="816.0" y="65.0">8 proposals</text>
+</svg></section>
+<section class='card'><h2>Idea lineage</h2><p class='lead'>Every proposal as a node, with an edge from each parent it was built on (merges have several). Columns are generations. The seed is hidden by default, so ideas that started independently from it form separate trees. Hover a node for its hypothesis and to trace its ancestors and descendants.</p><div class="tabs" data-group="linrun"><button class="on" data-key="Haiku">Haiku</button><button class="" data-key="Sonnet">Sonnet</button></div><div class="linrun panel on" data-group="linrun" data-key="Haiku"><div class="linbar"><div class="tabs" data-group="linview0"><button class="on" data-key="ideas">ideas (seed hidden)</button><button class="" data-key="evaluated">evaluated only</button><button class="" data-key="seed">with seed</button></div><div class="tabs lincolor" data-group="lincolor0"><span>colour by</span><button class="on" data-key="status">outcome</button><button class="" data-key="verdict">verdict</button><button class="" data-key="mode">mode</button></div><div class="linzoom"><span class="muted" style="font-size:13px">zoom</span><button data-z="0.8">−</button><button data-z="1.25">+</button><button data-z="1">reset</button></div></div><div class="panel on" data-group="lincolor0" data-key="status"><div class="legend"><span><span class="sw" style="background:#16a34a"></span>kept (improved)</span><span><span class="sw" style="background:#94a3b8"></span>evaluated, no gain</span><span><span class="sw" style="background:#2563eb"></span>seed</span></div></div><div class="panel " data-group="lincolor0" data-key="verdict"><div class="legend"><span><span class="sw" style="background:#16a34a"></span>supported</span><span><span class="sw" style="background:#65a30d"></span>partial</span><span><span class="sw" style="background:#94a3b8"></span>falsified</span></div></div><div class="panel " data-group="lincolor0" data-key="mode"><div class="legend"><span><span class="sw" style="background:#0ea5e9"></span>tune</span><span><span class="sw" style="background:#f97316"></span>fix_losers</span><span><span class="sw" style="background:#8b5cf6"></span>new_family</span><span><span class="sw" style="background:#2563eb"></span>seed</span></div></div><div class="legend"><span><svg width="22" height="14" style="vertical-align:-3px;margin-right:6px"><circle cx="5" cy="7" r="3" fill="#94a3b8"/><circle cx="15" cy="7" r="6.5" fill="#94a3b8"/></svg>size = objective rank (bigger is better)</span><span><svg width="22" height="14" style="vertical-align:-3px;margin-right:6px"><circle cx="11" cy="7" r="4" fill="#fff" stroke="#fbbf24" stroke-width="1.5"/></svg>hollow = not evaluated</span><span><svg width="22" height="14" style="vertical-align:-3px;margin-right:6px"><circle cx="11" cy="7" r="5" fill="#16a34a" stroke="#0f172a" stroke-width="2.2"/></svg>new global best</span><span><svg width="22" height="14" style="vertical-align:-3px;margin-right:6px"><line x1="0" y1="7" x2="22" y2="7" stroke="#dc2626" stroke-width="3"/></svg>path to the final best (★)</span><span><svg width="22" height="14" style="vertical-align:-3px;margin-right:6px"><line x1="0" y1="7" x2="22" y2="7" stroke="#ec4899" stroke-width="2"/></svg>edge into a merge</span></div><div class="linbox"><div class="panel on" data-group="linview0" data-key="ideas"><svg class="lin" viewBox="0 0 1180 78" width="1180" height="78" data-w="1180" data-h="78" role="img">
+<line class="grid" x1="590.0" x2="590.0" y1="20" y2="66"/>
+<text class="tick" x="590.0" y="16" text-anchor="middle">gen 1</text>
+<text class="label" x="14" y="39.0">8 one-off ideas with no follow-ups</text>
+<circle class="ln" data-id="2" cx="38.0" cy="56.0" r="7.2" fill="#16a34a" stroke="#fff" data-cstatus="#16a34a" data-cverdict="#65a30d" data-cmode="#0ea5e9" data-tip="#2 · tune · gen 1
+objective 22,254 (-562 vs best parent)
+kept (improved) · verdict partial
+parents #0 · 0 follow-ups
+Multiple random restarts with adaptive iteration counts based on instance size; expect improvements on all instances, especially smaller ones (k&lt;=30), through more exhaustive exploration of the solution space."/>
+<circle class="ln" data-id="3" cx="54.0" cy="56.0" r="4.8" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#0ea5e9" data-tip="#3 · tune · gen 1
+objective 22,816 (+0 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Positional consensus (most common char per position) replaces set median as starting point; should improve all instances, especially DNA with aligned lengths, by providing better initial center than any single input string."/>
+<circle class="ln" data-id="4" cx="70.0" cy="56.0" r="6.0" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#f97316" data-tip="#4 · fix_losers · gen 1
+objective 22,597 (-219 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Instance-adaptive indel-awareness: detect high input length variance (&gt;5% of avg) as proxy for significant Levenshtein indel content, enable mixed substitution+indel local search on these instances with higher iteration count; expect improvement on high-variance DNA instances (dna_mid_480bp_k20, dna_mid_noisy_400bp, dna_mid_cohort_280bp) and protein_mid_320aa."/>
+<circle class="ln" data-id="5" cx="86.0" cy="56.0" r="3.5" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#f97316" data-tip="#5 · fix_losers · gen 1
+objective 24,020 (+1,204 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Replace greedy-only local search with late acceptance hill climbing: accept moves within a recent score window to escape local optima, plus plateau walks to cross equal-score regions. Expect improvement on all high-noise and large-alphabet instances where greedy gets stuck (all 5 objective instances)."/>
+<circle class="ln" data-id="6" cx="102.0" cy="56.0" r="6.6" fill="#16a34a" stroke="#fff" data-cstatus="#16a34a" data-cverdict="#65a30d" data-cmode="#f97316" data-tip="#6 · fix_losers · gen 1
+objective 22,325 (-491 vs best parent)
+kept (improved) · verdict partial
+parents #0 · 0 follow-ups
+Multiple restarts with adaptive budget allocation and early stagnation termination: Parent uses only 9% of budget due to quick local optima. Multiple diverse starts (set median + random inputs) explore solution space better. Remaining budget allocated adaptively across restarts (90% per restart to leave buffer). Expected improvement on high-noise instances (dna_mid_640bp_k25, dna_mid_cohort_280bp) where single start fails to find good solutions."/>
+<circle class="ln" data-id="8" cx="134.0" cy="56.0" r="4.1" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#8b5cf6" data-tip="#8 · new_family · gen 1
+objective 23,340 (+524 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Use levenshtein_editops to build alignment-based position statistics, then extract consensus characters instead of greedy single-position search; enables multi-position updates and better guidance. Expect lower score on high-noise instances (dna_mid_noisy_400bp, protein_mid_320aa) where alignment patterns are most informative."/>
+<circle class="ln ring" data-id="1" cx="22.0" cy="56.0" r="7.9" fill="#16a34a" stroke="#0f172a" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#0ea5e9" data-tip="#1 · tune · gen 1
+objective 22,003 (-813 vs best parent) · new global best
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Multiple centers (set median + input samples + consensus) with local search + path relinking recombines solutions to escape local optima; expect improvement on all instances by exploring the solution space more broadly."/>
+<text class="nl" x="31.9" y="48.1">#1</text>
+<circle class="ln ring" data-id="7" cx="118.0" cy="56.0" r="8.5" fill="#16a34a" stroke="#dc2626" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#8b5cf6" data-tip="#7 · new_family · gen 1
+objective 21,545 (-1,271 vs best parent) · FINAL BEST
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Expand local search neighborhood beyond single substitutions to include adjacent transpositions (pair edits) and character shifts: enables discovery of better alignments where reordering helps, especially on DNA/protein instances where edit distance benefits from position flexibility. Expect improvement on all instances."/>
+<text class="nl" x="128.5" y="47.5">★ #7 best</text>
+</svg></div><div class="panel " data-group="linview0" data-key="evaluated"><svg class="lin" viewBox="0 0 1180 78" width="1180" height="78" data-w="1180" data-h="78" role="img">
+<line class="grid" x1="590.0" x2="590.0" y1="20" y2="66"/>
+<text class="tick" x="590.0" y="16" text-anchor="middle">gen 1</text>
+<text class="label" x="14" y="39.0">8 one-off ideas with no follow-ups</text>
+<circle class="ln" data-id="2" cx="38.0" cy="56.0" r="7.2" fill="#16a34a" stroke="#fff" data-cstatus="#16a34a" data-cverdict="#65a30d" data-cmode="#0ea5e9" data-tip="#2 · tune · gen 1
+objective 22,254 (-562 vs best parent)
+kept (improved) · verdict partial
+parents #0 · 0 follow-ups
+Multiple random restarts with adaptive iteration counts based on instance size; expect improvements on all instances, especially smaller ones (k&lt;=30), through more exhaustive exploration of the solution space."/>
+<circle class="ln" data-id="3" cx="54.0" cy="56.0" r="4.8" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#0ea5e9" data-tip="#3 · tune · gen 1
+objective 22,816 (+0 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Positional consensus (most common char per position) replaces set median as starting point; should improve all instances, especially DNA with aligned lengths, by providing better initial center than any single input string."/>
+<circle class="ln" data-id="4" cx="70.0" cy="56.0" r="6.0" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#f97316" data-tip="#4 · fix_losers · gen 1
+objective 22,597 (-219 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Instance-adaptive indel-awareness: detect high input length variance (&gt;5% of avg) as proxy for significant Levenshtein indel content, enable mixed substitution+indel local search on these instances with higher iteration count; expect improvement on high-variance DNA instances (dna_mid_480bp_k20, dna_mid_noisy_400bp, dna_mid_cohort_280bp) and protein_mid_320aa."/>
+<circle class="ln" data-id="5" cx="86.0" cy="56.0" r="3.5" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#f97316" data-tip="#5 · fix_losers · gen 1
+objective 24,020 (+1,204 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Replace greedy-only local search with late acceptance hill climbing: accept moves within a recent score window to escape local optima, plus plateau walks to cross equal-score regions. Expect improvement on all high-noise and large-alphabet instances where greedy gets stuck (all 5 objective instances)."/>
+<circle class="ln" data-id="6" cx="102.0" cy="56.0" r="6.6" fill="#16a34a" stroke="#fff" data-cstatus="#16a34a" data-cverdict="#65a30d" data-cmode="#f97316" data-tip="#6 · fix_losers · gen 1
+objective 22,325 (-491 vs best parent)
+kept (improved) · verdict partial
+parents #0 · 0 follow-ups
+Multiple restarts with adaptive budget allocation and early stagnation termination: Parent uses only 9% of budget due to quick local optima. Multiple diverse starts (set median + random inputs) explore solution space better. Remaining budget allocated adaptively across restarts (90% per restart to leave buffer). Expected improvement on high-noise instances (dna_mid_640bp_k25, dna_mid_cohort_280bp) where single start fails to find good solutions."/>
+<circle class="ln" data-id="8" cx="134.0" cy="56.0" r="4.1" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#8b5cf6" data-tip="#8 · new_family · gen 1
+objective 23,340 (+524 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Use levenshtein_editops to build alignment-based position statistics, then extract consensus characters instead of greedy single-position search; enables multi-position updates and better guidance. Expect lower score on high-noise instances (dna_mid_noisy_400bp, protein_mid_320aa) where alignment patterns are most informative."/>
+<circle class="ln ring" data-id="1" cx="22.0" cy="56.0" r="7.9" fill="#16a34a" stroke="#0f172a" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#0ea5e9" data-tip="#1 · tune · gen 1
+objective 22,003 (-813 vs best parent) · new global best
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Multiple centers (set median + input samples + consensus) with local search + path relinking recombines solutions to escape local optima; expect improvement on all instances by exploring the solution space more broadly."/>
+<text class="nl" x="31.9" y="48.1">#1</text>
+<circle class="ln ring" data-id="7" cx="118.0" cy="56.0" r="8.5" fill="#16a34a" stroke="#dc2626" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#8b5cf6" data-tip="#7 · new_family · gen 1
+objective 21,545 (-1,271 vs best parent) · FINAL BEST
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Expand local search neighborhood beyond single substitutions to include adjacent transpositions (pair edits) and character shifts: enables discovery of better alignments where reordering helps, especially on DNA/protein instances where edit distance benefits from position flexibility. Expect improvement on all instances."/>
+<text class="nl" x="128.5" y="47.5">★ #7 best</text>
+</svg></div><div class="panel " data-group="linview0" data-key="seed"><svg class="lin" viewBox="0 0 1180 218" width="1180" height="218" data-w="1180" data-h="218" role="img">
+<line class="grid" x1="302.0" x2="302.0" y1="20" y2="206"/>
+<text class="tick" x="302.0" y="16" text-anchor="middle">gen 0</text>
+<line class="grid" x1="878.0" x2="878.0" y1="20" y2="206"/>
+<text class="tick" x="878.0" y="16" text-anchor="middle">gen 1</text>
+<text class="label" x="14" y="39.0">9 ideas from #0 · best 21,545 (#7) · contains the final best</text>
+<path class="le" data-s="0" data-t="1" stroke="#94a3b8" d="M302.0,56.0 C590.0,56.0 590.0,56.0 878.0,56.0"/>
+<path class="le" data-s="0" data-t="2" stroke="#94a3b8" d="M302.0,56.0 C590.0,56.0 590.0,76.0 878.0,76.0"/>
+<path class="le" data-s="0" data-t="3" stroke="#94a3b8" d="M302.0,56.0 C590.0,56.0 590.0,96.0 878.0,96.0"/>
+<path class="le" data-s="0" data-t="4" stroke="#94a3b8" d="M302.0,56.0 C590.0,56.0 590.0,116.0 878.0,116.0"/>
+<path class="le" data-s="0" data-t="5" stroke="#94a3b8" d="M302.0,56.0 C590.0,56.0 590.0,136.0 878.0,136.0"/>
+<path class="le" data-s="0" data-t="6" stroke="#94a3b8" d="M302.0,56.0 C590.0,56.0 590.0,156.0 878.0,156.0"/>
+<path class="le" data-s="0" data-t="8" stroke="#94a3b8" d="M302.0,56.0 C590.0,56.0 590.0,196.0 878.0,196.0"/>
+<path class="le em" data-s="0" data-t="7" stroke="#dc2626" d="M302.0,56.0 C590.0,56.0 590.0,176.0 878.0,176.0"/>
+<circle class="ln" data-id="0" cx="302.0" cy="56.0" r="5.4" fill="#2563eb" stroke="#fff" data-cstatus="#2563eb" data-cverdict="#2563eb" data-cmode="#2563eb" data-tip="#0 · seed
+objective 22,816
+seed
+root · 8 follow-ups
+Seed solver (starting point)"/>
+<circle class="ln" data-id="2" cx="878.0" cy="76.0" r="7.2" fill="#16a34a" stroke="#fff" data-cstatus="#16a34a" data-cverdict="#65a30d" data-cmode="#0ea5e9" data-tip="#2 · tune · gen 1
+objective 22,254 (-562 vs best parent)
+kept (improved) · verdict partial
+parents #0 · 0 follow-ups
+Multiple random restarts with adaptive iteration counts based on instance size; expect improvements on all instances, especially smaller ones (k&lt;=30), through more exhaustive exploration of the solution space."/>
+<circle class="ln" data-id="3" cx="878.0" cy="96.0" r="4.8" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#0ea5e9" data-tip="#3 · tune · gen 1
+objective 22,816 (+0 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Positional consensus (most common char per position) replaces set median as starting point; should improve all instances, especially DNA with aligned lengths, by providing better initial center than any single input string."/>
+<circle class="ln" data-id="4" cx="878.0" cy="116.0" r="6.0" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#f97316" data-tip="#4 · fix_losers · gen 1
+objective 22,597 (-219 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Instance-adaptive indel-awareness: detect high input length variance (&gt;5% of avg) as proxy for significant Levenshtein indel content, enable mixed substitution+indel local search on these instances with higher iteration count; expect improvement on high-variance DNA instances (dna_mid_480bp_k20, dna_mid_noisy_400bp, dna_mid_cohort_280bp) and protein_mid_320aa."/>
+<circle class="ln" data-id="5" cx="878.0" cy="136.0" r="3.5" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#f97316" data-tip="#5 · fix_losers · gen 1
+objective 24,020 (+1,204 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Replace greedy-only local search with late acceptance hill climbing: accept moves within a recent score window to escape local optima, plus plateau walks to cross equal-score regions. Expect improvement on all high-noise and large-alphabet instances where greedy gets stuck (all 5 objective instances)."/>
+<circle class="ln" data-id="6" cx="878.0" cy="156.0" r="6.6" fill="#16a34a" stroke="#fff" data-cstatus="#16a34a" data-cverdict="#65a30d" data-cmode="#f97316" data-tip="#6 · fix_losers · gen 1
+objective 22,325 (-491 vs best parent)
+kept (improved) · verdict partial
+parents #0 · 0 follow-ups
+Multiple restarts with adaptive budget allocation and early stagnation termination: Parent uses only 9% of budget due to quick local optima. Multiple diverse starts (set median + random inputs) explore solution space better. Remaining budget allocated adaptively across restarts (90% per restart to leave buffer). Expected improvement on high-noise instances (dna_mid_640bp_k25, dna_mid_cohort_280bp) where single start fails to find good solutions."/>
+<circle class="ln" data-id="8" cx="878.0" cy="196.0" r="4.1" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#8b5cf6" data-tip="#8 · new_family · gen 1
+objective 23,340 (+524 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Use levenshtein_editops to build alignment-based position statistics, then extract consensus characters instead of greedy single-position search; enables multi-position updates and better guidance. Expect lower score on high-noise instances (dna_mid_noisy_400bp, protein_mid_320aa) where alignment patterns are most informative."/>
+<circle class="ln ring" data-id="1" cx="878.0" cy="56.0" r="7.9" fill="#16a34a" stroke="#0f172a" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#0ea5e9" data-tip="#1 · tune · gen 1
+objective 22,003 (-813 vs best parent) · new global best
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Multiple centers (set median + input samples + consensus) with local search + path relinking recombines solutions to escape local optima; expect improvement on all instances by exploring the solution space more broadly."/>
+<text class="nl" x="887.9" y="48.1">#1</text>
+<circle class="ln ring" data-id="7" cx="878.0" cy="176.0" r="8.5" fill="#16a34a" stroke="#dc2626" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#8b5cf6" data-tip="#7 · new_family · gen 1
+objective 21,545 (-1,271 vs best parent) · FINAL BEST
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Expand local search neighborhood beyond single substitutions to include adjacent transpositions (pair edits) and character shifts: enables discovery of better alignments where reordering helps, especially on DNA/protein instances where edit distance benefits from position flexibility. Expect improvement on all instances."/>
+<text class="nl" x="888.5" y="167.5">★ #7 best</text>
+</svg></div></div></div><div class="linrun panel " data-group="linrun" data-key="Sonnet"><div class="linbar"><div class="tabs" data-group="linview1"><button class="on" data-key="ideas">ideas (seed hidden)</button><button class="" data-key="evaluated">evaluated only</button><button class="" data-key="seed">with seed</button></div><div class="tabs lincolor" data-group="lincolor1"><span>colour by</span><button class="on" data-key="status">outcome</button><button class="" data-key="verdict">verdict</button><button class="" data-key="mode">mode</button></div><div class="linzoom"><span class="muted" style="font-size:13px">zoom</span><button data-z="0.8">−</button><button data-z="1.25">+</button><button data-z="1">reset</button></div></div><div class="panel on" data-group="lincolor1" data-key="status"><div class="legend"><span><span class="sw" style="background:#16a34a"></span>kept (improved)</span><span><span class="sw" style="background:#94a3b8"></span>evaluated, no gain</span><span><span class="sw" style="background:#2563eb"></span>seed</span></div></div><div class="panel " data-group="lincolor1" data-key="verdict"><div class="legend"><span><span class="sw" style="background:#16a34a"></span>supported</span><span><span class="sw" style="background:#65a30d"></span>partial</span><span><span class="sw" style="background:#94a3b8"></span>falsified</span></div></div><div class="panel " data-group="lincolor1" data-key="mode"><div class="legend"><span><span class="sw" style="background:#0ea5e9"></span>tune</span><span><span class="sw" style="background:#f97316"></span>fix_losers</span><span><span class="sw" style="background:#8b5cf6"></span>new_family</span><span><span class="sw" style="background:#2563eb"></span>seed</span></div></div><div class="legend"><span><svg width="22" height="14" style="vertical-align:-3px;margin-right:6px"><circle cx="5" cy="7" r="3" fill="#94a3b8"/><circle cx="15" cy="7" r="6.5" fill="#94a3b8"/></svg>size = objective rank (bigger is better)</span><span><svg width="22" height="14" style="vertical-align:-3px;margin-right:6px"><circle cx="11" cy="7" r="4" fill="#fff" stroke="#fbbf24" stroke-width="1.5"/></svg>hollow = not evaluated</span><span><svg width="22" height="14" style="vertical-align:-3px;margin-right:6px"><circle cx="11" cy="7" r="5" fill="#16a34a" stroke="#0f172a" stroke-width="2.2"/></svg>new global best</span><span><svg width="22" height="14" style="vertical-align:-3px;margin-right:6px"><line x1="0" y1="7" x2="22" y2="7" stroke="#dc2626" stroke-width="3"/></svg>path to the final best (★)</span><span><svg width="22" height="14" style="vertical-align:-3px;margin-right:6px"><line x1="0" y1="7" x2="22" y2="7" stroke="#ec4899" stroke-width="2"/></svg>edge into a merge</span></div><div class="linbox"><div class="panel on" data-group="linview1" data-key="ideas"><svg class="lin" viewBox="0 0 1180 78" width="1180" height="78" data-w="1180" data-h="78" role="img">
+<line class="grid" x1="590.0" x2="590.0" y1="20" y2="66"/>
+<text class="tick" x="590.0" y="16" text-anchor="middle">gen 1</text>
+<text class="label" x="14" y="39.0">8 one-off ideas with no follow-ups</text>
+<circle class="ln" data-id="4" cx="70.0" cy="56.0" r="7.9" fill="#16a34a" stroke="#fff" data-cstatus="#16a34a" data-cverdict="#65a30d" data-cmode="#f97316" data-tip="#4 · fix_losers · gen 1
+objective 19,320 (-3,496 vs best parent)
+kept (improved) · verdict partial
+parents #0 · 0 follow-ups
+Replace single-substitution search with iterated alignment (editops) majority-vote refinement from top set medians (column majority for Hamming), then polish; expect lower scores on all Levenshtein instances, esp. indel-heavy dna_mid_noisy_400bp."/>
+<circle class="ln" data-id="5" cx="86.0" cy="56.0" r="5.4" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#f97316" data-tip="#5 · fix_losers · gen 1
+objective 19,951 (-2,865 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Replace single-substitution greedy with alignment-vote (editops consensus incl. indels) plus noisy-vote/perturbation escapes; expect lower scores on all Levenshtein instances, esp. noisy/indel-heavy ones."/>
+<circle class="ln" data-id="6" cx="102.0" cy="56.0" r="4.1" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#f97316" data-tip="#6 · fix_losers · gen 1
+objective 20,095 (-2,721 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Anytime: set-median seeds each get an equal share of the remaining CPU budget; per seed, alignment-vote consensus refinement (editops sub/del/ins majority) then sub/del/ins local search; expect big gains on all Levenshtein instances, esp. indel-heavy dna_mid_noisy_400bp."/>
+<circle class="ln" data-id="7" cx="118.0" cy="56.0" r="6.6" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#8b5cf6" data-tip="#7 · new_family · gen 1
+objective 19,606 (-3,210 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Alignment-vote consensus refinement (editops votes per center column/gap) from top set medians, then random block shift/delete/insert/pair-edit hill climbing; expect lower scores on all Levenshtein instances."/>
+<circle class="ln" data-id="8" cx="134.0" cy="56.0" r="7.2" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#8b5cf6" data-tip="#8 · new_family · gen 1
+objective 19,359 (-3,457 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Alignment-consensus: align all strings to center via editops, vote per position/gap (sub/del/ins), iterate from top-5 set medians, then indel polish; expect lower on all Levenshtein instances."/>
+<circle class="ln ring" data-id="1" cx="22.0" cy="56.0" r="4.8" fill="#16a34a" stroke="#0f172a" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#0ea5e9" data-tip="#1 · tune · gen 1
+objective 19,974 (-2,842 vs best parent) · new global best
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Population of refined set-median centers (alignment-consensus voting) recombined by path relinking via edit scripts; expect lower scores on all instances, esp. noisy DNA and protein."/>
+<text class="nl" x="28.8" y="51.2">#1</text>
+<circle class="ln ring" data-id="2" cx="38.0" cy="56.0" r="6.0" fill="#16a34a" stroke="#0f172a" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#0ea5e9" data-tip="#2 · tune · gen 1
+objective 19,874 (-2,942 vs best parent) · new global best
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Run local search to a full local optimum (remove 50-step cap) with insertion/deletion moves besides substitutions, continuing scan after each improvement; expect lower scores on all instances, esp. indel-heavy ones."/>
+<text class="nl" x="46.0" y="50.0">#2</text>
+<circle class="ln ring" data-id="3" cx="54.0" cy="56.0" r="8.5" fill="#16a34a" stroke="#dc2626" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#0ea5e9" data-tip="#3 · tune · gen 1
+objective 19,211 (-3,605 vs best parent) · FINAL BEST
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Start from set median, refine by star-alignment (editops) majority consensus incl. indel votes, then sub/ins/del local search; expect lower scores on all, esp. high-k DNA and protein."/>
+<text class="nl" x="64.5" y="47.5">★ #3 best</text>
+</svg></div><div class="panel " data-group="linview1" data-key="evaluated"><svg class="lin" viewBox="0 0 1180 78" width="1180" height="78" data-w="1180" data-h="78" role="img">
+<line class="grid" x1="590.0" x2="590.0" y1="20" y2="66"/>
+<text class="tick" x="590.0" y="16" text-anchor="middle">gen 1</text>
+<text class="label" x="14" y="39.0">8 one-off ideas with no follow-ups</text>
+<circle class="ln" data-id="4" cx="70.0" cy="56.0" r="7.9" fill="#16a34a" stroke="#fff" data-cstatus="#16a34a" data-cverdict="#65a30d" data-cmode="#f97316" data-tip="#4 · fix_losers · gen 1
+objective 19,320 (-3,496 vs best parent)
+kept (improved) · verdict partial
+parents #0 · 0 follow-ups
+Replace single-substitution search with iterated alignment (editops) majority-vote refinement from top set medians (column majority for Hamming), then polish; expect lower scores on all Levenshtein instances, esp. indel-heavy dna_mid_noisy_400bp."/>
+<circle class="ln" data-id="5" cx="86.0" cy="56.0" r="5.4" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#f97316" data-tip="#5 · fix_losers · gen 1
+objective 19,951 (-2,865 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Replace single-substitution greedy with alignment-vote (editops consensus incl. indels) plus noisy-vote/perturbation escapes; expect lower scores on all Levenshtein instances, esp. noisy/indel-heavy ones."/>
+<circle class="ln" data-id="6" cx="102.0" cy="56.0" r="4.1" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#f97316" data-tip="#6 · fix_losers · gen 1
+objective 20,095 (-2,721 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Anytime: set-median seeds each get an equal share of the remaining CPU budget; per seed, alignment-vote consensus refinement (editops sub/del/ins majority) then sub/del/ins local search; expect big gains on all Levenshtein instances, esp. indel-heavy dna_mid_noisy_400bp."/>
+<circle class="ln" data-id="7" cx="118.0" cy="56.0" r="6.6" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#8b5cf6" data-tip="#7 · new_family · gen 1
+objective 19,606 (-3,210 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Alignment-vote consensus refinement (editops votes per center column/gap) from top set medians, then random block shift/delete/insert/pair-edit hill climbing; expect lower scores on all Levenshtein instances."/>
+<circle class="ln" data-id="8" cx="134.0" cy="56.0" r="7.2" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#8b5cf6" data-tip="#8 · new_family · gen 1
+objective 19,359 (-3,457 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Alignment-consensus: align all strings to center via editops, vote per position/gap (sub/del/ins), iterate from top-5 set medians, then indel polish; expect lower on all Levenshtein instances."/>
+<circle class="ln ring" data-id="1" cx="22.0" cy="56.0" r="4.8" fill="#16a34a" stroke="#0f172a" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#0ea5e9" data-tip="#1 · tune · gen 1
+objective 19,974 (-2,842 vs best parent) · new global best
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Population of refined set-median centers (alignment-consensus voting) recombined by path relinking via edit scripts; expect lower scores on all instances, esp. noisy DNA and protein."/>
+<text class="nl" x="28.8" y="51.2">#1</text>
+<circle class="ln ring" data-id="2" cx="38.0" cy="56.0" r="6.0" fill="#16a34a" stroke="#0f172a" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#0ea5e9" data-tip="#2 · tune · gen 1
+objective 19,874 (-2,942 vs best parent) · new global best
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Run local search to a full local optimum (remove 50-step cap) with insertion/deletion moves besides substitutions, continuing scan after each improvement; expect lower scores on all instances, esp. indel-heavy ones."/>
+<text class="nl" x="46.0" y="50.0">#2</text>
+<circle class="ln ring" data-id="3" cx="54.0" cy="56.0" r="8.5" fill="#16a34a" stroke="#dc2626" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#0ea5e9" data-tip="#3 · tune · gen 1
+objective 19,211 (-3,605 vs best parent) · FINAL BEST
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Start from set median, refine by star-alignment (editops) majority consensus incl. indel votes, then sub/ins/del local search; expect lower scores on all, esp. high-k DNA and protein."/>
+<text class="nl" x="64.5" y="47.5">★ #3 best</text>
+</svg></div><div class="panel " data-group="linview1" data-key="seed"><svg class="lin" viewBox="0 0 1180 218" width="1180" height="218" data-w="1180" data-h="218" role="img">
+<line class="grid" x1="302.0" x2="302.0" y1="20" y2="206"/>
+<text class="tick" x="302.0" y="16" text-anchor="middle">gen 0</text>
+<line class="grid" x1="878.0" x2="878.0" y1="20" y2="206"/>
+<text class="tick" x="878.0" y="16" text-anchor="middle">gen 1</text>
+<text class="label" x="14" y="39.0">9 ideas from #0 · best 19,211 (#3) · contains the final best</text>
+<path class="le" data-s="0" data-t="1" stroke="#94a3b8" d="M302.0,56.0 C590.0,56.0 590.0,56.0 878.0,56.0"/>
+<path class="le" data-s="0" data-t="2" stroke="#94a3b8" d="M302.0,56.0 C590.0,56.0 590.0,76.0 878.0,76.0"/>
+<path class="le" data-s="0" data-t="4" stroke="#94a3b8" d="M302.0,56.0 C590.0,56.0 590.0,116.0 878.0,116.0"/>
+<path class="le" data-s="0" data-t="5" stroke="#94a3b8" d="M302.0,56.0 C590.0,56.0 590.0,136.0 878.0,136.0"/>
+<path class="le" data-s="0" data-t="6" stroke="#94a3b8" d="M302.0,56.0 C590.0,56.0 590.0,156.0 878.0,156.0"/>
+<path class="le" data-s="0" data-t="7" stroke="#94a3b8" d="M302.0,56.0 C590.0,56.0 590.0,176.0 878.0,176.0"/>
+<path class="le" data-s="0" data-t="8" stroke="#94a3b8" d="M302.0,56.0 C590.0,56.0 590.0,196.0 878.0,196.0"/>
+<path class="le em" data-s="0" data-t="3" stroke="#dc2626" d="M302.0,56.0 C590.0,56.0 590.0,96.0 878.0,96.0"/>
+<circle class="ln" data-id="0" cx="302.0" cy="56.0" r="3.5" fill="#2563eb" stroke="#fff" data-cstatus="#2563eb" data-cverdict="#2563eb" data-cmode="#2563eb" data-tip="#0 · seed
+objective 22,816
+seed
+root · 8 follow-ups
+Seed solver (starting point)"/>
+<circle class="ln" data-id="4" cx="878.0" cy="116.0" r="7.9" fill="#16a34a" stroke="#fff" data-cstatus="#16a34a" data-cverdict="#65a30d" data-cmode="#f97316" data-tip="#4 · fix_losers · gen 1
+objective 19,320 (-3,496 vs best parent)
+kept (improved) · verdict partial
+parents #0 · 0 follow-ups
+Replace single-substitution search with iterated alignment (editops) majority-vote refinement from top set medians (column majority for Hamming), then polish; expect lower scores on all Levenshtein instances, esp. indel-heavy dna_mid_noisy_400bp."/>
+<circle class="ln" data-id="5" cx="878.0" cy="136.0" r="5.4" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#f97316" data-tip="#5 · fix_losers · gen 1
+objective 19,951 (-2,865 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Replace single-substitution greedy with alignment-vote (editops consensus incl. indels) plus noisy-vote/perturbation escapes; expect lower scores on all Levenshtein instances, esp. noisy/indel-heavy ones."/>
+<circle class="ln" data-id="6" cx="878.0" cy="156.0" r="4.1" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#f97316" data-tip="#6 · fix_losers · gen 1
+objective 20,095 (-2,721 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Anytime: set-median seeds each get an equal share of the remaining CPU budget; per seed, alignment-vote consensus refinement (editops sub/del/ins majority) then sub/del/ins local search; expect big gains on all Levenshtein instances, esp. indel-heavy dna_mid_noisy_400bp."/>
+<circle class="ln" data-id="7" cx="878.0" cy="176.0" r="6.6" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#8b5cf6" data-tip="#7 · new_family · gen 1
+objective 19,606 (-3,210 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Alignment-vote consensus refinement (editops votes per center column/gap) from top set medians, then random block shift/delete/insert/pair-edit hill climbing; expect lower scores on all Levenshtein instances."/>
+<circle class="ln" data-id="8" cx="878.0" cy="196.0" r="7.2" fill="#94a3b8" stroke="#fff" data-cstatus="#94a3b8" data-cverdict="#94a3b8" data-cmode="#8b5cf6" data-tip="#8 · new_family · gen 1
+objective 19,359 (-3,457 vs best parent)
+evaluated, no gain · verdict falsified
+parents #0 · 0 follow-ups
+Alignment-consensus: align all strings to center via editops, vote per position/gap (sub/del/ins), iterate from top-5 set medians, then indel polish; expect lower on all Levenshtein instances."/>
+<circle class="ln ring" data-id="1" cx="878.0" cy="56.0" r="4.8" fill="#16a34a" stroke="#0f172a" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#0ea5e9" data-tip="#1 · tune · gen 1
+objective 19,974 (-2,842 vs best parent) · new global best
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Population of refined set-median centers (alignment-consensus voting) recombined by path relinking via edit scripts; expect lower scores on all instances, esp. noisy DNA and protein."/>
+<text class="nl" x="884.8" y="51.2">#1</text>
+<circle class="ln ring" data-id="2" cx="878.0" cy="76.0" r="6.0" fill="#16a34a" stroke="#0f172a" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#0ea5e9" data-tip="#2 · tune · gen 1
+objective 19,874 (-2,942 vs best parent) · new global best
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Run local search to a full local optimum (remove 50-step cap) with insertion/deletion moves besides substitutions, continuing scan after each improvement; expect lower scores on all instances, esp. indel-heavy ones."/>
+<text class="nl" x="886.0" y="70.0">#2</text>
+<circle class="ln ring" data-id="3" cx="878.0" cy="96.0" r="8.5" fill="#16a34a" stroke="#dc2626" data-cstatus="#16a34a" data-cverdict="#16a34a" data-cmode="#0ea5e9" data-tip="#3 · tune · gen 1
+objective 19,211 (-3,605 vs best parent) · FINAL BEST
+kept (improved) · verdict supported
+parents #0 · 0 follow-ups
+Start from set median, refine by star-alignment (editops) majority consensus incl. indel votes, then sub/ins/del local search; expect lower scores on all, esp. high-k DNA and protein."/>
+<text class="nl" x="888.5" y="87.5">★ #3 best</text>
+</svg></div></div></div></section>
+<section class='card'><h2>Research trajectory</h2><p class='lead'>The ledger as a lab notebook, newest first (last 80): each proposal's hypothesis, the prompt mode that produced it, and what the evaluation taught us. ↓ marks a per-instance improvement.</p><p><label>Flavour: <select id="runsel"><option value="Haiku">Haiku</option><option value="Sonnet">Sonnet</option></select></label></p><div class="traj panel on" data-key="Haiku"><div style="overflow-x:auto"><table><tr><th>#</th><th>parents</th><th>mode</th><th>outcome / verdict</th><th>objective</th><th>Δ best</th><th>tokens</th><th class='l'>hypothesis → what we learned</th></tr><tr class=''><td>8</td><td class='muted'>#0</td><td><span class="badge" style="background:#8b5cf6">new_family</span></td><td><span class="badge" style="background:#94a3b8">evaluated, no gain</span><br><span class="badge" style="background:#94a3b8">falsified</span><br><span class='muted'>gen 1 · ok · $0.16</span></td><td>23,340</td><td>+1795</td><td>459.4k</td><td class='h'>Use levenshtein_editops to build alignment-based position statistics, then extract consensus characters instead of greedy single-position search; enables multi-position updates and better guidance. Expect lower score on high-noise instances (dna_mid_noisy_400bp, protein_mid_320aa) where alignment patterns are most informative.<span class='note'>mid_480bp_k20: 4,033  ·  mid_640bp_k25: 6,505  ·  mid_noisy_400bp: 5,741  ·  prot_mid_320aa: 2,742  ·  mid_cohort_280bp: 4,319</span></td></tr><tr class='kept'><td>7</td><td class='muted'>#0</td><td><span class="badge" style="background:#8b5cf6">new_family</span></td><td><span class="badge" style="background:#16a34a">kept (improved)</span><br><span class="badge" style="background:#16a34a">supported</span><br><span class='muted'>gen 1 · ok · $0.18</span></td><td>21,545</td><td>-458</td><td>417.3k</td><td class='h'>Expand local search neighborhood beyond single substitutions to include adjacent transpositions (pair edits) and character shifts: enables discovery of better alignments where reordering helps, especially on DNA/protein instances where edit distance benefits from position flexibility. Expect improvement on all instances.<span class='note'>mid_480bp_k20: 3,730↓  ·  mid_640bp_k25: 6,114↓  ·  mid_noisy_400bp: 5,492  ·  prot_mid_320aa: 2,375↓  ·  mid_cohort_280bp: 3,834↓</span></td></tr><tr class='kept'><td>6</td><td class='muted'>#0</td><td><span class="badge" style="background:#f97316">fix_losers</span></td><td><span class="badge" style="background:#16a34a">kept (improved)</span><br><span class="badge" style="background:#65a30d">partial</span><br><span class='muted'>gen 1 · ok · $0.16</span></td><td>22,325</td><td>+322</td><td>364.5k</td><td class='h'>Multiple restarts with adaptive budget allocation and early stagnation termination: Parent uses only 9% of budget due to quick local optima. Multiple diverse starts (set median + random inputs) explore solution space better. Remaining budget allocated adaptively across restarts (90% per restart to leave buffer). Expected improvement on high-noise instances (dna_mid_640bp_k25, dna_mid_cohort_280bp) where single start fails to find good solutions.<span class='note'>mid_480bp_k20: 3,840  ·  mid_640bp_k25: 6,353  ·  mid_noisy_400bp: 5,465↓  ·  prot_mid_320aa: 2,618  ·  mid_cohort_280bp: 4,049</span></td></tr><tr class=''><td>5</td><td class='muted'>#0</td><td><span class="badge" style="background:#f97316">fix_losers</span></td><td><span class="badge" style="background:#94a3b8">evaluated, no gain</span><br><span class="badge" style="background:#94a3b8">falsified</span><br><span class='muted'>gen 1 · ok · $0.26</span></td><td>24,020</td><td>+2017</td><td>1041.3k</td><td class='h'>Replace greedy-only local search with late acceptance hill climbing: accept moves within a recent score window to escape local optima, plus plateau walks to cross equal-score regions. Expect improvement on all high-noise and large-alphabet instances where greedy gets stuck (all 5 objective instances).<span class='note'>mid_480bp_k20: 4,141  ·  mid_640bp_k25: 6,610  ·  mid_noisy_400bp: 5,790  ·  prot_mid_320aa: 2,849  ·  mid_cohort_280bp: 4,630</span></td></tr><tr class=''><td>4</td><td class='muted'>#0</td><td><span class="badge" style="background:#f97316">fix_losers</span></td><td><span class="badge" style="background:#94a3b8">evaluated, no gain</span><br><span class="badge" style="background:#94a3b8">falsified</span><br><span class='muted'>gen 1 · ok · $0.24</span></td><td>22,597</td><td>+594</td><td>50.8k</td><td class='h'>Instance-adaptive indel-awareness: detect high input length variance (&gt;5% of avg) as proxy for significant Levenshtein indel content, enable mixed substitution+indel local search on these instances with higher iteration count; expect improvement on high-variance DNA instances (dna_mid_480bp_k20, dna_mid_noisy_400bp, dna_mid_cohort_280bp) and protein_mid_320aa.<span class='note'>mid_480bp_k20: 3,918  ·  mid_640bp_k25: 6,296  ·  mid_noisy_400bp: 5,613  ·  prot_mid_320aa: 2,572  ·  mid_cohort_280bp: 4,198</span></td></tr><tr class=''><td>3</td><td class='muted'>#0</td><td><span class="badge" style="background:#0ea5e9">tune</span></td><td><span class="badge" style="background:#94a3b8">evaluated, no gain</span><br><span class="badge" style="background:#94a3b8">falsified</span><br><span class='muted'>gen 1 · ok · $0.14</span></td><td>22,816</td><td>+813</td><td>306.2k</td><td class='h'>Positional consensus (most common char per position) replaces set median as starting point; should improve all instances, especially DNA with aligned lengths, by providing better initial center than any single input string.<span class='note'>mid_480bp_k20: 3,962  ·  mid_640bp_k25: 6,343  ·  mid_noisy_400bp: 5,643  ·  prot_mid_320aa: 2,619  ·  mid_cohort_280bp: 4,249</span></td></tr><tr class='kept'><td>2</td><td class='muted'>#0</td><td><span class="badge" style="background:#0ea5e9">tune</span></td><td><span class="badge" style="background:#16a34a">kept (improved)</span><br><span class="badge" style="background:#65a30d">partial</span><br><span class='muted'>gen 1 · ok · $0.13</span></td><td>22,254</td><td>+251</td><td>298.2k</td><td class='h'>Multiple random restarts with adaptive iteration counts based on instance size; expect improvements on all instances, especially smaller ones (k&lt;=30), through more exhaustive exploration of the solution space.<span class='note'>mid_480bp_k20: 3,777↓  ·  mid_640bp_k25: 6,308  ·  mid_noisy_400bp: 5,625  ·  prot_mid_320aa: 2,380↓  ·  mid_cohort_280bp: 4,164</span></td></tr><tr class='kept'><td>1</td><td class='muted'>#0</td><td><span class="badge" style="background:#0ea5e9">tune</span></td><td><span class="badge" style="background:#16a34a">kept (improved)</span><br><span class="badge" style="background:#16a34a">supported</span><br><span class='muted'>gen 1 · ok · $0.24</span></td><td>22,003</td><td>-813</td><td>825.2k</td><td class='h'>Multiple centers (set median + input samples + consensus) with local search + path relinking recombines solutions to escape local optima; expect improvement on all instances by exploring the solution space more broadly.<span class='note'>mid_480bp_k20: 3,792↓  ·  mid_640bp_k25: 6,256↓  ·  mid_noisy_400bp: 5,535↓  ·  prot_mid_320aa: 2,556↓  ·  mid_cohort_280bp: 3,864↓</span></td></tr><tr class='kept'><td>0</td><td class='muted'>—</td><td><span class="badge" style="background:#2563eb">seed</span></td><td><span class="badge" style="background:#2563eb">seed</span></td><td>22,816</td><td>seed</td><td>—</td><td class='h'>Seed solver (starting point)<span class='note'>mid_480bp_k20: 3,962  ·  mid_640bp_k25: 6,343  ·  mid_noisy_400bp: 5,643  ·  prot_mid_320aa: 2,619  ·  mid_cohort_280bp: 4,249</span></td></tr></table></div></div><div class="traj panel " data-key="Sonnet"><div style="overflow-x:auto"><table><tr><th>#</th><th>parents</th><th>mode</th><th>outcome / verdict</th><th>objective</th><th>Δ best</th><th>tokens</th><th class='l'>hypothesis → what we learned</th></tr><tr class=''><td>8</td><td class='muted'>#0</td><td><span class="badge" style="background:#8b5cf6">new_family</span></td><td><span class="badge" style="background:#94a3b8">evaluated, no gain</span><br><span class="badge" style="background:#94a3b8">falsified</span><br><span class='muted'>gen 1 · ok · $0.12</span></td><td>19,359</td><td>+148</td><td>213.0k</td><td class='h'>Alignment-consensus: align all strings to center via editops, vote per position/gap (sub/del/ins), iterate from top-5 set medians, then indel polish; expect lower on all Levenshtein instances.<span class='note'>mid_480bp_k20: 3,344  ·  mid_640bp_k25: 5,322  ·  mid_noisy_400bp: 5,174  ·  prot_mid_320aa: 2,061  ·  mid_cohort_280bp: 3,458</span></td></tr><tr class=''><td>7</td><td class='muted'>#0</td><td><span class="badge" style="background:#8b5cf6">new_family</span></td><td><span class="badge" style="background:#94a3b8">evaluated, no gain</span><br><span class="badge" style="background:#94a3b8">falsified</span><br><span class='muted'>gen 1 · ok · $0.09</span></td><td>19,606</td><td>+395</td><td>131.6k</td><td class='h'>Alignment-vote consensus refinement (editops votes per center column/gap) from top set medians, then random block shift/delete/insert/pair-edit hill climbing; expect lower scores on all Levenshtein instances.<span class='note'>mid_480bp_k20: 3,418  ·  mid_640bp_k25: 5,353  ·  mid_noisy_400bp: 5,196  ·  prot_mid_320aa: 2,086  ·  mid_cohort_280bp: 3,553</span></td></tr><tr class=''><td>6</td><td class='muted'>#0</td><td><span class="badge" style="background:#f97316">fix_losers</span></td><td><span class="badge" style="background:#94a3b8">evaluated, no gain</span><br><span class="badge" style="background:#94a3b8">falsified</span><br><span class='muted'>gen 1 · ok · $0.09</span></td><td>20,095</td><td>+884</td><td>129.9k</td><td class='h'>Anytime: set-median seeds each get an equal share of the remaining CPU budget; per seed, alignment-vote consensus refinement (editops sub/del/ins majority) then sub/del/ins local search; expect big gains on all Levenshtein instances, esp. indel-heavy dna_mid_noisy_400bp.<span class='note'>mid_480bp_k20: 3,511  ·  mid_640bp_k25: 5,468  ·  mid_noisy_400bp: 5,457  ·  prot_mid_320aa: 2,061  ·  mid_cohort_280bp: 3,598</span></td></tr><tr class=''><td>5</td><td class='muted'>#0</td><td><span class="badge" style="background:#f97316">fix_losers</span></td><td><span class="badge" style="background:#94a3b8">evaluated, no gain</span><br><span class="badge" style="background:#94a3b8">falsified</span><br><span class='muted'>gen 1 · ok · $0.09</span></td><td>19,951</td><td>+740</td><td>130.2k</td><td class='h'>Replace single-substitution greedy with alignment-vote (editops consensus incl. indels) plus noisy-vote/perturbation escapes; expect lower scores on all Levenshtein instances, esp. noisy/indel-heavy ones.<span class='note'>mid_480bp_k20: 3,496  ·  mid_640bp_k25: 5,263  ·  mid_noisy_400bp: 5,558  ·  prot_mid_320aa: 2,067  ·  mid_cohort_280bp: 3,567</span></td></tr><tr class='kept'><td>4</td><td class='muted'>#0</td><td><span class="badge" style="background:#f97316">fix_losers</span></td><td><span class="badge" style="background:#16a34a">kept (improved)</span><br><span class="badge" style="background:#65a30d">partial</span><br><span class='muted'>gen 1 · ok · $0.07</span></td><td>19,320</td><td>+109</td><td>85.5k</td><td class='h'>Replace single-substitution search with iterated alignment (editops) majority-vote refinement from top set medians (column majority for Hamming), then polish; expect lower scores on all Levenshtein instances, esp. indel-heavy dna_mid_noisy_400bp.<span class='note'>mid_480bp_k20: 3,345  ·  mid_640bp_k25: 5,239↓  ·  mid_noisy_400bp: 5,105↓  ·  prot_mid_320aa: 2,080  ·  mid_cohort_280bp: 3,551</span></td></tr><tr class='kept'><td>3</td><td class='muted'>#0</td><td><span class="badge" style="background:#0ea5e9">tune</span></td><td><span class="badge" style="background:#16a34a">kept (improved)</span><br><span class="badge" style="background:#16a34a">supported</span><br><span class='muted'>gen 1 · ok · $0.07</span></td><td>19,211</td><td>-663</td><td>86.1k</td><td class='h'>Start from set median, refine by star-alignment (editops) majority consensus incl. indel votes, then sub/ins/del local search; expect lower scores on all, esp. high-k DNA and protein.<span class='note'>mid_480bp_k20: 3,292  ·  mid_640bp_k25: 5,316↓  ·  mid_noisy_400bp: 5,116↓  ·  prot_mid_320aa: 2,045↓  ·  mid_cohort_280bp: 3,442</span></td></tr><tr class='kept'><td>2</td><td class='muted'>#0</td><td><span class="badge" style="background:#0ea5e9">tune</span></td><td><span class="badge" style="background:#16a34a">kept (improved)</span><br><span class="badge" style="background:#16a34a">supported</span><br><span class='muted'>gen 1 · ok · $0.05</span></td><td>19,874</td><td>-100</td><td>61.7k</td><td class='h'>Run local search to a full local optimum (remove 50-step cap) with insertion/deletion moves besides substitutions, continuing scan after each improvement; expect lower scores on all instances, esp. indel-heavy ones.<span class='note'>mid_480bp_k20: 3,239↓  ·  mid_640bp_k25: 5,963  ·  mid_noisy_400bp: 5,135↓  ·  prot_mid_320aa: 2,110  ·  mid_cohort_280bp: 3,427↓</span></td></tr><tr class='kept'><td>1</td><td class='muted'>#0</td><td><span class="badge" style="background:#0ea5e9">tune</span></td><td><span class="badge" style="background:#16a34a">kept (improved)</span><br><span class="badge" style="background:#16a34a">supported</span><br><span class='muted'>gen 1 · ok · $0.09</span></td><td>19,974</td><td>-2842</td><td>130.8k</td><td class='h'>Population of refined set-median centers (alignment-consensus voting) recombined by path relinking via edit scripts; expect lower scores on all instances, esp. noisy DNA and protein.<span class='note'>mid_480bp_k20: 3,443↓  ·  mid_640bp_k25: 5,393↓  ·  mid_noisy_400bp: 5,565↓  ·  prot_mid_320aa: 2,054↓  ·  mid_cohort_280bp: 3,519↓</span></td></tr><tr class='kept'><td>0</td><td class='muted'>—</td><td><span class="badge" style="background:#2563eb">seed</span></td><td><span class="badge" style="background:#2563eb">seed</span></td><td>22,816</td><td>seed</td><td>—</td><td class='h'>Seed solver (starting point)<span class='note'>mid_480bp_k20: 3,962  ·  mid_640bp_k25: 6,343  ·  mid_noisy_400bp: 5,643  ·  prot_mid_320aa: 2,619  ·  mid_cohort_280bp: 4,249</span></td></tr></table></div></div></section>
+<footer>Rendered by <code>python -m autoresearch_viz</code> from <code>artifacts/runs/models8-haiku-1003-2059</code>, <code>artifacts/runs/models8-sonnet-1003-2059</code></footer>
+</main><div id='tip'></div><script>
+function bind(){
+document.querySelectorAll('.tabs').forEach(t=>{t.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+ t.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+ const grp=t.dataset.group;document.querySelectorAll('.panel[data-group="'+grp+'"]').forEach(p=>p.classList.toggle('on',p.dataset.key===b.dataset.key));})); });
+const tip=document.getElementById('tip');
+document.querySelectorAll('[data-tip]').forEach(el=>{el.addEventListener('mousemove',e=>{tip.textContent=el.dataset.tip;tip.style.display='block';
+ tip.style.left=Math.min(e.clientX+14,window.innerWidth-380)+'px';tip.style.top=(e.clientY+14)+'px';});el.addEventListener('mouseleave',()=>tip.style.display='none');});
+const sel=document.getElementById('runsel');if(sel){sel.addEventListener('change',()=>{document.querySelectorAll('.traj').forEach(p=>p.classList.toggle('on',p.dataset.key===sel.value));});}
+document.querySelectorAll('.lincolor button').forEach(b=>b.addEventListener('click',()=>{b.closest('.linrun').querySelectorAll('.ln').forEach(n=>{
+ n.setAttribute(n.dataset.hollow?'stroke':'fill',n.dataset['c'+b.dataset.key]);});}));
+document.querySelectorAll('.linzoom button').forEach(b=>b.addEventListener('click',()=>{const box=b.closest('.linrun');
+ const z=b.dataset.z==='1'?1:Math.max(.3,Math.min(5,(+box.dataset.z||1)*(+b.dataset.z)));box.dataset.z=z;
+ box.querySelectorAll('svg.lin').forEach(s=>{s.setAttribute('width',s.dataset.w*z);s.setAttribute('height',s.dataset.h*z);});}));
+document.querySelectorAll('svg.lin').forEach(svg=>{const up={},dn={},nodes={};
+ svg.querySelectorAll('.le').forEach(p=>{(up[p.dataset.t]=up[p.dataset.t]||[]).push(p);(dn[p.dataset.s]=dn[p.dataset.s]||[]).push(p);});
+ svg.querySelectorAll('.ln').forEach(n=>nodes[n.dataset.id]=n);
+ const walk=(id,m,k,seen)=>{(m[id]||[]).forEach(p=>{p.classList.add('hl');const o=p.dataset[k];if(!seen.has(o)){seen.add(o);if(nodes[o])nodes[o].classList.add('hl');walk(o,m,k,seen);}});};
+ svg.querySelectorAll('.ln').forEach(n=>{n.addEventListener('mouseenter',()=>{svg.classList.add('dim');n.classList.add('hl');walk(n.dataset.id,up,'s',new Set());walk(n.dataset.id,dn,'t',new Set());});
+  n.addEventListener('mouseleave',()=>{svg.classList.remove('dim');svg.querySelectorAll('.hl').forEach(x=>x.classList.remove('hl'));});});});
+}
+bind();
+</script></body></html>
