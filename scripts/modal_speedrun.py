@@ -211,6 +211,37 @@ def _safe(tag: str) -> str:
 # --------------------------------------------------------------------------- remote
 
 
+def _cgroup_cpu_quota() -> str | None:
+    """This container's CPU quota: cgroup v2 'cpu.max' ("400000 100000" = 4 CPUs, "max 100000" =
+    unlimited) or the cgroup v1 cfs quota in microseconds (-1 = unlimited)."""
+    for path in ("/sys/fs/cgroup/cpu.max", "/sys/fs/cgroup/cpu/cpu.cfs_quota_us"):
+        try:
+            return Path(path).read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+    return None
+
+
+def _apply_cpu_limit(limit: int) -> dict:
+    """Emulate the judges' four-CPU container (RULES.md: `docker run --cpus 4`, four PyTorch
+    threads) inside a Modal container that already has a hard CPU limit: pin this process
+    tree to `limit` cores and cap Inductor's compile workers and the OpenMP/MKL pools at the
+    same number. The harness sets PyTorch's own thread count (4 by default)."""
+    cores = sorted(os.sched_getaffinity(0))[:limit]
+    os.sched_setaffinity(0, set(cores))
+    for key in ("TORCHINDUCTOR_COMPILE_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
+        os.environ[key] = str(limit)
+    applied = {
+        "cpu_limit": limit,
+        "cores": cores,
+        "affinity_cpus": len(os.sched_getaffinity(0)),
+        "cgroup_cpu_max": _cgroup_cpu_quota(),
+        "compile_threads": limit,
+    }
+    print(f"CPU limit emulation: {applied}", flush=True)
+    return applied
+
+
 def _environment() -> dict:
     """GPU name/power, container identity (task id, region, cloud); runs inside the container."""
     info: dict = {
@@ -219,10 +250,14 @@ def _environment() -> dict:
         "region": os.environ.get("MODAL_REGION"),
         "cloud": os.environ.get("MODAL_CLOUD_PROVIDER"),
         "cpu_count": os.cpu_count(),
+        "affinity_cpus": len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None,
+        "cgroup_cpu_max": _cgroup_cpu_quota(),
+        "compile_threads_env": os.environ.get("TORCHINDUCTOR_COMPILE_THREADS"),
     }
     print(
         f"=== container task={info['task_id']} region={info['region']} cloud={info['cloud']} "
-        f"cpus={info['cpu_count']}",
+        f"cpus={info['cpu_count']} affinity={info['affinity_cpus']} "
+        f"cgroup_cpu={info['cgroup_cpu_max']!r} compile_threads_env={info['compile_threads_env']}",
         flush=True,
     )
     try:
@@ -428,15 +463,9 @@ def gpu_environment() -> dict:
     return info
 
 
-@app.function(
-    gpu=GPU,
-    cpu=4,
-    memory=16384,
-    timeout=RUN_TIMEOUT,
-    single_use_containers=True,
-    volumes={DATA_ROOT: data, RESULTS_ROOT: results, CACHE_ROOT: cache},
-)
-def run_benchmarks(specs: list, require: dict, budget_s: float, warm: bool = False) -> dict:
+def _run_benchmarks(
+    specs: list, require: dict, budget_s: float, warm: bool = False, cpu_limit: int | None = None
+) -> dict:
     """Run each spec sequentially in THIS container (one card), each a fresh harness run.
 
     `require` ({"gpu": sxm|pcie|any, "power": watts|any}) is checked against nvidia-smi
@@ -447,12 +476,20 @@ def run_benchmarks(specs: list, require: dict, budget_s: float, warm: bool = Fal
     started = time.time()
     deadline = started + budget_s - DEADLINE_MARGIN_S
     environment = _environment()
-    payload: dict = {"environment": environment, "gpu_mismatch": False, "runs": [], "warm": warm}
+    payload: dict = {
+        "environment": environment,
+        "gpu_mismatch": False,
+        "runs": [],
+        "warm": warm,
+        "cpu_limit": None,
+    }
     mismatch = _gpu_mismatch(environment, require)
     if mismatch:
         payload["gpu_mismatch"] = True
         print(f"GPU guard: {mismatch}; aborting before build.", flush=True)
     else:
+        if cpu_limit:
+            payload["cpu_limit"] = _apply_cpu_limit(cpu_limit)
         _ensure_data()
         if warm:
             _warm_cache_start()
@@ -483,6 +520,34 @@ def run_benchmarks(specs: list, require: dict, budget_s: float, warm: bool = Fal
             _warm_cache_commit()
     payload["container_seconds"] = round(time.time() - started, 1)
     return payload
+
+
+@app.function(
+    gpu=GPU,
+    cpu=4,
+    memory=16384,
+    timeout=RUN_TIMEOUT,
+    single_use_containers=True,
+    volumes={DATA_ROOT: data, RESULTS_ROOT: results, CACHE_ROOT: cache},
+)
+def run_benchmarks(specs: list, require: dict, budget_s: float, warm: bool = False) -> dict:
+    """Modal entry: requests 4 CPUs but may burst to the host's cores (screening default)."""
+    return _run_benchmarks(specs, require, budget_s, warm)
+
+
+@app.function(
+    gpu=GPU,
+    cpu=(4.0, 4.0),
+    memory=16384,
+    timeout=RUN_TIMEOUT,
+    single_use_containers=True,
+    volumes={DATA_ROOT: data, RESULTS_ROOT: results, CACHE_ROOT: cache},
+)
+def run_benchmarks_cpu4(specs: list, require: dict, budget_s: float, warm: bool = False) -> dict:
+    """Modal entry with a HARD 4-CPU limit (the judges' `docker run --cpus 4` quota), plus
+    affinity pinning and 4 Inductor compile threads inside (_apply_cpu_limit). Used by
+    `::main --cpus 4` to measure cold builds under the official CPU limit."""
+    return _run_benchmarks(specs, require, budget_s, warm, cpu_limit=4)
 
 
 # --------------------------------------------------------------------------- local: budget
@@ -601,18 +666,32 @@ def _estimate_job_minutes(
     return (seconds + CONTAINER_START_S) / 60
 
 
-def _call_gpu(specs: list[dict], require: dict, label: str, warm: bool = False, say=print) -> dict:
-    """run_benchmarks.remote with the GPU-guard retry loop and ledger accounting."""
+def _call_gpu(
+    specs: list[dict],
+    require: dict,
+    label: str,
+    warm: bool = False,
+    say=print,
+    cpu_limit: int | None = None,
+) -> dict:
+    """run_benchmarks.remote with the GPU-guard retry loop and ledger accounting. With
+    `cpu_limit` (4 = the judges' quota) the hard-limited container function is used."""
     guarded = require.get("gpu", "any") != "any" or str(require.get("power", "any")) != "any"
     attempts = GPU_ATTEMPTS if guarded else 1
+    if cpu_limit and cpu_limit != 4:
+        raise ValueError("only the judges' 4-CPU limit is defined (run_benchmarks_cpu4)")
+    function = run_benchmarks_cpu4 if cpu_limit else run_benchmarks
+    if cpu_limit:
+        label = f"{label} @{cpu_limit}cpu"
     say(
         f"container cap {RUN_TIMEOUT} s; GPU guard {require} ({attempts} attempts, no fallback); "
         f"{'warm' if warm else 'cold'} compile cache"
+        + (f"; HARD CPU LIMIT {cpu_limit} (affinity + compile threads)" if cpu_limit else "")
     )
     landed: list[str] = []
     for attempt in range(1, attempts + 1):
         t0 = time.time()
-        call = run_benchmarks.spawn(specs, require, float(RUN_TIMEOUT), warm)
+        call = function.spawn(specs, require, float(RUN_TIMEOUT), warm)
         try:
             payload = call.get(timeout=RUN_TIMEOUT + SCHEDULE_WAIT_S)
         except modal.exception.FunctionTimeoutError:
@@ -1246,12 +1325,14 @@ def _split_launcher_flags(argv: tuple[str, ...]) -> tuple[dict, list[str]]:
         "warm": False,
         "count_nonfinite": False,
         "round": "single",
+        "cpus": "0",  # --cpus 4: emulate the judges' four-CPU quota (hard limit + affinity)
     }
     valued = {
         "--tag": "tag",
         "--require-gpu": "require_gpu",
         "--require-power": "require_power",
         "--round": "round",
+        "--cpus": "cpus",
     }
     rest: list[str] = []
     args = list(argv)
@@ -1266,6 +1347,7 @@ def _split_launcher_flags(argv: tuple[str, ...]) -> tuple[dict, list[str]]:
             opts["count_nonfinite"] = True
         else:
             rest.append(arg)
+    opts["cpus"] = int(opts["cpus"])
     return opts, rest
 
 
@@ -1324,19 +1406,25 @@ def main(*argv: str):
         "args": args,
         "params": json.dumps(params, sort_keys=True),
         "delta": params,
-        "config": f"{TEAM} {' '.join(harness)}".strip(),
+        "config": f"{TEAM} {' '.join(harness)}".strip()
+        + (f" [cpus {opts['cpus']}]" if opts["cpus"] else ""),
     }
     require = _parse_require(opts["require_gpu"], opts["require_power"])
     estimate = _estimate_job_minutes([spec], opts["warm"])
+    if opts["cpus"]:
+        estimate *= 1.5  # compile runs on 4 cores instead of ~20
     print(f"estimate: ~{estimate:.1f} GPU-min (job limit {JOB_LIMIT_MIN:.0f} min)", flush=True)
     if estimate > JOB_LIMIT_MIN and not os.environ.get("MODAL_ALLOW_BIG"):
         raise SystemExit("this job is over the per-job limit: ask first, then MODAL_ALLOW_BIG=1")
     _check_budget(estimate)
-    payload = _call_gpu([spec], require, opts["tag"], opts["warm"])
+    payload = _call_gpu([spec], require, opts["tag"], opts["warm"], cpu_limit=opts["cpus"] or None)
     run = payload["runs"][0]
     out = _stamp(opts["tag"])
     _save_run(run, out)
     row = _stats(run, out, payload["environment"])
+    row["cpu_limit"] = payload.get("cpu_limit")
+    if payload.get("cpu_limit"):
+        print(f"CPU limit emulation: {payload['cpu_limit']}")
     _print_row(row)
     print(f"GPU guard attempts: {payload['gpu_attempts']}")
     print(f"Results copied to {SPEEDRUN / 'results' / (run.get('result_rel') or '')}")
