@@ -94,8 +94,24 @@ def timeline(run, aux: list[dict], seed_obj: float) -> list[dict]:
     return pts
 
 
-def run_row(d: Path, target_gain: float | None, top_k: int = 10) -> dict:
-    meta = json.loads((d / "bench.json").read_text())
+def run_meta(d: Path, tag: str) -> dict:
+    """bench.json of a finished run; for a run still in progress, what its directory name says
+    (<tag>-<problem>-<arm>-s<seed>) plus the model from its first agent session."""
+    if (d / "bench.json").exists():
+        return {**json.loads((d / "bench.json").read_text()), "status": "finished"}
+    rest = d.name[len(tag) + 1:]
+    head, _, seed = rest.rpartition("-s")
+    problem, _, arm = head.rpartition("-")
+    cfg = json.loads((d / "config.json").read_text()) if (d / "config.json").exists() else {}
+    model = next((e.get("usage", {}).get("model") for e in map(json.loads, (d / "ledger.jsonl").read_text().splitlines())
+                  if e.get("usage", {}).get("model")), "?") if (d / "ledger.jsonl").exists() else "?"
+    return {"tag": tag, "arm": arm, "sha": "running", "flags": "", "problem": cfg.get("problem", problem),
+            "seed": int(seed) if seed.isdigit() else seed, "model": model, "agents": "?", "generations": "?",
+            "status": "running"}
+
+
+def run_row(d: Path, target_gain: float | None, top_k: int = 10, tag: str = "") -> dict:
+    meta = run_meta(d, tag)
     run = load_run(d)
     s = summarize(run)
     hold = json.loads((d / "holdout.json").read_text()) if (d / "holdout.json").exists() else {}
@@ -138,7 +154,8 @@ def run_row(d: Path, target_gain: float | None, top_k: int = 10) -> dict:
             "agent_usd": agent_usd, "describe_usd": aux_usd, "usd": agent_usd + aux_usd,
             "usd_by_function": {"agent": round(agent_usd, 4), **{k: round(v, 4) for k, v in by_fn.items()}},
             "unknown_cost": agent_unknown + sum(1 for r in aux if r.get("cost_usd") is None),
-            "minutes": (ts["run_end"] - ts["run_start"]) / 60 if len(ts) == 2 else math.nan,
+            "minutes": ((ts["run_end"] if "run_end" in ts else max((e["t"] for e in run.events), default=math.nan))
+                        - ts["run_start"]) / 60 if "run_start" in ts else math.nan,
             "evaluated": sum(1 for e in run.proposals if e.evals), "proposals": len(run.proposals),
             "gated": sum(1 for e in run.proposals if e.note.startswith("not selected by max-min")),
             "exact_repeats": sum(1 for e in run.proposals if e.status == "rejected_duplicate"
@@ -249,12 +266,15 @@ def html_page(rows, groups, args, calibration: dict | None) -> str:
     legend = _legend([(a, color[a]) for a in arms])
     synthetic = any(r.get("synthetic") for r in rows)
     parts = [f"<h1>Benchmark {escape(args.tag)}</h1>"
+             + (f"<p class='muted'>Live: this page reloads every {args.live} s (runs in progress are included, "
+                f"marked <i>running</i>); generated {__import__('time').strftime('%H:%M:%S')}.</p>" if args.live else "")
              + ("<p style='background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:10px'><b>Synthetic runs</b>"
                 " (scripts/offline_world.py): a functional check of the machinery, not measurements of the benchmark.</p>"
                 if synthetic else "")
              + "<p class='muted'>Each line is one run (one seed); color = arm. "
              "The best score kept so far is drawn, not every candidate. Held-out scores are measured once, at the end, "
              "and are in the tables only.</p>"]
+    parts.append(interactive_card(rows, arms, color, args))
     for problem in sorted({p for p, _ in groups}):
         runs = [r for r in rows if r["problem"] == problem]
         refs = [RefLine(args.target_gain, f"target {args.target_gain:g}%")] if args.target_gain is not None else []
@@ -303,9 +323,109 @@ def html_page(rows, groups, args, calibration: dict | None) -> str:
     tables = markdown(rows, groups, args)
     parts.append("<div class='card'><h2>Tables</h2><pre style='white-space:pre-wrap;font-size:12px'>"
                  + escape(tables) + "</pre></div>")
-    return (f"<!doctype html><html><head><meta charset='utf-8'><title>Benchmark {escape(args.tag)}</title><style>{CSS}"
+    refresh = f"<meta http-equiv='refresh' content='{args.live}'>" if args.live else ""
+    return (f"<!doctype html><html><head><meta charset='utf-8'>{refresh}<title>Benchmark {escape(args.tag)}</title><style>{CSS}"
             "</style></head><body><main class='wrap' style='max-width:1000px;margin:0 auto;padding:24px'>"
             + "".join(parts) + f"</main><script>{JS}</script></body></html>")
+
+
+ARM_LABELS = {"A": "A · reference", "B": "B · distance", "C": "C · entropy + grace", "D": "D · B + C",
+              "J": "J · Johann's layer", "C1": "C1 · grace only", "C2": "C2 · controller only",
+              "initial": "initial framework", "johann": "Johann (original)"}
+
+
+def interactive_card(rows: list[dict], arms: list[str], color: dict, args) -> str:
+    """One chart for performance against cost OR time OR proposals (one x-axis at a time, switchable), a hover
+    read-out that gives gain, $ and minutes together, an end-state scatter (total $ vs final gain, labelled
+    with minutes) and a table, all driven by the same per-arm show/hide buttons (remembered across reloads)."""
+    data = []
+    for r in rows:
+        pts = [[0.0, 0.0, 0, 0.0]] + [[round(p["usd"], 4), round(p["min"], 2), i + 1, round(p["gain"], 3)]
+                                      for i, p in enumerate(r["timeline"])]
+        data.append({"name": r["name"], "arm": r["arm"], "seed": r["seed"], "problem": r["problem"],
+                     "color": color[r["arm"]], "status": r.get("status", "finished"), "pts": pts,
+                     "gain": round(r["gain"], 3), "held": None if math.isnan(r["held"]) else round(r["held"], 3),
+                     "usd": round(r["usd"], 3), "min": None if math.isnan(r["minutes"]) else round(r["minutes"], 1),
+                     "n": r["proposals"], "unknown": r["unknown_cost"]})
+    chips = "".join(f"<button class='armchip on' data-arm='{escape(a)}' style='--c:{color[a]}'><span></span>"
+                    f"{escape(ARM_LABELS.get(a, a))}</button>" for a in arms)
+    return ("<div class='card' id='cmp'><h2>Compare the arms: performance against cost, time or proposals</h2>"
+            "<p class='muted'>Y = best gain over the seed kept so far (higher is better). Pick the X axis; hover to read "
+            "gain, spend and minutes of every visible run at that point. Buttons show or hide an arm everywhere on this "
+            "card.</p>"
+            f"<div class='ctl'>{chips}</div>"
+            "<div class='ctl'><b>X axis:</b> <button class='xbtn on' data-x='0'>cost ($)</button>"
+            "<button class='xbtn' data-x='1'>time (minutes)</button><button class='xbtn' data-x='2'>proposals</button></div>"
+            "<div id='cmpchart' style='position:relative'></div>"
+            "<h3>Where each run ended</h3><p class='muted'>X = total spend, Y = final best gain; label = arm, seed and "
+            "wall-clock minutes. Up and to the left is better.</p><div id='cmpscatter' style='position:relative'></div>"
+            "<div id='cmptable'></div></div>"
+            + CMP_STYLE + f"<script>const CMP={json.dumps(data)};const CMPKEY='bench-{escape(args.tag)}';</script>"
+            + CMP_JS)
+
+
+CMP_STYLE = """<style>
+#cmp .ctl{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+#cmp button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 11px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
+#cmp .armchip span{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c);margin-right:6px}
+#cmp .armchip:not(.on){opacity:.4;text-decoration:line-through}
+#cmp .xbtn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+#cmp .tip{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12px;box-shadow:0 2px 8px rgba(15,23,42,.12);white-space:nowrap;display:none}
+#cmp table{border-collapse:collapse;width:100%;font-size:13px;margin-top:10px}#cmp td,#cmp th{border-bottom:1px solid var(--line);padding:4px 6px;text-align:right}
+#cmp td:first-child,#cmp th:first-child{text-align:left}
+</style>"""
+
+CMP_JS = r"""<script>
+(function(){
+const XL=['cumulative spend ($)','minutes since start','proposals made'];
+let st=JSON.parse(localStorage.getItem(CMPKEY)||'{}');st.hidden=st.hidden||[];st.x=st.x||0;
+const save=()=>localStorage.setItem(CMPKEY,JSON.stringify(st));
+const vis=()=>CMP.filter(r=>!st.hidden.includes(r.arm));
+const W=920,H=380,ml=64,mr=150,mt=16,mb=46,pw=W-ml-mr,ph=H-mt-mb;
+function ticks(lo,hi,n){const span=hi-lo||1,raw=span/n,mag=Math.pow(10,Math.floor(Math.log10(raw)));
+ const step=[1,2,2.5,5,10].map(s=>s*mag).find(s=>s>=raw);const out=[];for(let t=Math.ceil(lo/step)*step;t<=hi+1e-9;t+=step)out.push(+t.toFixed(6));return out;}
+const fmt=v=>Math.abs(v)>=100?v.toFixed(0):Math.abs(v)>=10?v.toFixed(1):v.toFixed(2);
+function axes(xlo,xhi,ylo,yhi,xl,yl){const X=v=>ml+pw*(v-xlo)/((xhi-xlo)||1),Y=v=>mt+ph*(1-(v-ylo)/((yhi-ylo)||1));
+ let s='';for(const t of ticks(ylo,yhi,5)){s+=`<line class="grid" x1="${ml}" x2="${ml+pw}" y1="${Y(t)}" y2="${Y(t)}"/><text class="tick" x="${ml-8}" y="${Y(t)+4}" text-anchor="end">${fmt(t)}</text>`;}
+ for(const t of ticks(xlo,xhi,6)){s+=`<text class="tick" x="${X(t)}" y="${mt+ph+18}" text-anchor="middle">${fmt(t)}</text>`;}
+ s+=`<text class="tick" x="${ml+pw/2}" y="${H-6}" text-anchor="middle">${xl}</text><text class="tick" transform="translate(14 ${mt+ph/2}) rotate(-90)" text-anchor="middle">${yl}</text>`;
+ return [s,X,Y];}
+function line(){const runs=vis(),k=st.x,el=document.getElementById('cmpchart');
+ if(!runs.length){el.innerHTML='<p class="muted">Every arm is hidden.</p>';return;}
+ const xs=runs.flatMap(r=>r.pts.map(p=>p[k])),ys=runs.flatMap(r=>r.pts.map(p=>p[3]));
+ const xhi=Math.max(...xs)||1,ylo=Math.min(0,...ys),yhi=Math.max(...ys)*1.08||1;
+ const [ax,X,Y]=axes(0,xhi,ylo,yhi,XL[k],'best gain over the seed (%)');let s=ax;
+ for(const r of runs){let d='';r.pts.forEach((p,i)=>{d+=(i?`H${X(p[k])}V${Y(p[3])}`:`M${X(p[k])},${Y(p[3])}`);});
+  const last=r.pts[r.pts.length-1];
+  s+=`<path d="${d}" fill="none" stroke="${r.color}" stroke-width="2" ${r.status==='running'?'stroke-dasharray="5 3"':''}/>`;
+  s+=`<circle cx="${X(last[k])}" cy="${Y(last[3])}" r="4" fill="${r.color}" stroke="#fff" stroke-width="2"/>`;
+  s+=`<text class="tick" x="${X(last[k])+6}" y="${Y(last[3])-6}">${r.arm}${runs.filter(q=>q.arm===r.arm).length>1?' s'+r.seed:''}</text>`;}
+ s+=`<line id="cmpx" class="grid" x1="0" x2="0" y1="${mt}" y2="${mt+ph}" style="display:none;stroke:#64748b"/><rect id="cmphit" x="${ml}" y="${mt}" width="${pw}" height="${ph}" fill="transparent"/>`;
+ el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%">${s}</svg><div class="tip"></div>`;
+ const svg=el.querySelector('svg'),tip=el.querySelector('.tip'),cx=el.querySelector('#cmpx');
+ el.querySelector('#cmphit').addEventListener('mousemove',ev=>{const b=svg.getBoundingClientRect(),sx=(ev.clientX-b.left)*W/b.width;
+  const xv=(sx-ml)/pw*xhi;cx.setAttribute('x1',sx);cx.setAttribute('x2',sx);cx.style.display='';
+  let rowsH=runs.map(r=>{let p=r.pts[0];for(const q of r.pts){if(q[k]<=xv)p=q;else break;}
+   return `<div><b style="color:${r.color}">${r.arm} s${r.seed}</b> gain ${p[3].toFixed(2)}% · $${p[0].toFixed(2)} · ${p[1].toFixed(1)} min · #${p[2]}</div>`;}).join('');
+  tip.innerHTML=`<div class="muted">${XL[k]} ≈ ${fmt(xv)}</div>${rowsH}`;tip.style.display='block';
+  const left=(ev.clientX-b.left)+14;tip.style.left=Math.min(left,b.width-tip.offsetWidth-4)+'px';tip.style.top=((ev.clientY-b.top)+10)+'px';});
+ el.querySelector('#cmphit').addEventListener('mouseleave',()=>{tip.style.display='none';cx.style.display='none';});}
+function scatter(){const runs=vis().filter(r=>r.usd!=null),el=document.getElementById('cmpscatter');
+ if(!runs.length){el.innerHTML='';return;}
+ const xhi=Math.max(...runs.map(r=>r.usd))*1.15||1,ys=runs.map(r=>r.gain),ylo=Math.min(0,...ys),yhi=Math.max(...ys)*1.12||1;
+ const [ax,X,Y]=axes(0,xhi,ylo,yhi,'total spend ($, agents + describe/plan)','final best gain (%)');let s=ax;
+ for(const r of runs){s+=`<circle cx="${X(r.usd)}" cy="${Y(r.gain)}" r="7" fill="${r.color}" stroke="#fff" stroke-width="2"><title>${r.name}: gain ${r.gain}% · held-out ${r.held??'n/a'}% · $${r.usd} · ${r.min??'?'} min · ${r.n} proposals${r.unknown?' · '+r.unknown+' unknown cost(s)':''}</title></circle>`;
+  s+=`<text class="tick" x="${X(r.usd)+10}" y="${Y(r.gain)+4}">${r.arm} s${r.seed} · ${r.min??'?'} min${r.status==='running'?' (running)':''}</text>`;}
+ el.innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%">${s}</svg>`;}
+function table(){const runs=vis(),el=document.getElementById('cmptable');
+ el.innerHTML='<table><tr><th>run</th><th>status</th><th>best gain %</th><th>held-out gain %</th><th>total $</th><th>minutes</th><th>proposals</th><th>gain per $</th><th>unknown costs</th></tr>'
+  +runs.map(r=>`<tr><td><b style="color:${r.color}">■</b> ${r.name}</td><td>${r.status}</td><td>${r.gain.toFixed(2)}</td><td>${r.held==null?'—':r.held.toFixed(2)}</td><td>${r.usd.toFixed(2)}</td><td>${r.min??'—'}</td><td>${r.n}</td><td>${r.usd?(r.gain/r.usd).toFixed(2):'—'}</td><td>${r.unknown}</td></tr>`).join('')+'</table>';}
+function draw(){document.querySelectorAll('#cmp .armchip').forEach(b=>b.classList.toggle('on',!st.hidden.includes(b.dataset.arm)));
+ document.querySelectorAll('#cmp .xbtn').forEach(b=>b.classList.toggle('on',+b.dataset.x===st.x));line();scatter();table();}
+document.querySelectorAll('#cmp .armchip').forEach(b=>b.onclick=()=>{const a=b.dataset.arm;st.hidden=st.hidden.includes(a)?st.hidden.filter(x=>x!==a):st.hidden.concat([a]);save();draw();});
+document.querySelectorAll('#cmp .xbtn').forEach(b=>b.onclick=()=>{st.x=+b.dataset.x;save();draw();});
+draw();})();
+</script>"""
 
 
 def family_progress_card(r: dict, fcol: dict) -> str:
@@ -401,13 +521,16 @@ def main() -> None:
     ap.add_argument("--calibration", type=Path, help="calibration JSON from scripts/calibrate_distance.py")
     ap.add_argument("--runs-dir", type=Path, default=ROOT / "artifacts" / "runs")
     ap.add_argument("--out", type=Path, help="output directory (default artifacts/bench)")
+    ap.add_argument("--live", type=int, metavar="SECONDS",
+                    help="include runs still in progress and make the page reload itself every SECONDS")
     args = ap.parse_args()
-    dirs = sorted(d for d in args.runs_dir.glob(f"{args.tag}-*") if (d / "bench.json").exists())
+    dirs = sorted(d for d in args.runs_dir.glob(f"{args.tag}-*") if d.is_dir() and (
+        (d / "bench.json").exists() or (args.live and (d / "events.jsonl").exists() and ".unfinished" not in d.name)))
     if not dirs:
         sys.exit(f"no finished benchmark runs for tag {args.tag!r} ({args.runs_dir}/{args.tag}-*/bench.json)")
     rows = []
     for d in dirs:
-        r = run_row(d, args.target_gain, args.top_k)
+        r = run_row(d, args.target_gain, args.top_k, args.tag)
         r["name"], r["path"] = d.name, str(d)
         rows.append(r)
     arms = {r["arm"] for r in rows}
