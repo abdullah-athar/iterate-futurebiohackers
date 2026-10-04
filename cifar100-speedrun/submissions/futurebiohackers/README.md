@@ -71,9 +71,9 @@ carries over.
 
 Paired differences against PR #27 on the same seeds and card: seeds 0-39 +0.12 +- 0.06 points,
 -0.14 s; seeds 40-79 +0.16 +- 0.06 points, -0.19 s (+0.14 +- 0.04 points over the 80 pairs). At
-11.25 epochs: +0.17 +- 0.07 / +0.16 +- 0.07 points for -0.05 / -0.06 s. All 160 trials of the four
-containers finished and qualified, none below 74.67%, so none diverged (this file carries no
-device-side non-finite counter).
+11.25 epochs: +0.17 +- 0.07 / +0.16 +- 0.07 points for -0.05 / -0.06 s. All 320 trials of the four
+containers (this recipe and PR #27) finished and qualified; this recipe's 160 trials never fell below
+74.67%, so none diverged (this file carries no device-side non-finite counter).
 
 Why this recipe: two changes on PR #27 and one more epoch, every comparison made with both recipes
 compiled cold in one container (which removes the one-to-two-percent speed differences between cards
@@ -82,8 +82,8 @@ and any kernel choice inherited from a warm compile cache). (1) The first resolu
 place of the 28 px phase: at 10 epochs this saves 0.40 s for -0.23 +- 0.07 points (8 paired trials);
 one more epoch buys the points back at a net gain, since the epoch ladder is linear at about 1.05
 points per second. Schedules that keep a 28 px phase (20 -> 24 -> 28 -> 32) save less (-0.19 / -0.29 s
-at -0.31 / -0.10 points) and need eight compiled graphs, which pushed the four-CPU cold build to
-441 s. (2) Group 1's residual pair becomes a 3x3 followed by a 1x1 like group 2's: -0.13 s at
+at -0.31 / -0.10 points) and need eight compiled graphs, whose four-CPU cold build measured 441 s on
+a sibling schedule ([[20, 0.15], [24, 0.3], [28, 0.5]]). (2) Group 1's residual pair becomes a 3x3 followed by a 1x1 like group 2's: -0.13 s at
 +0.02 +- 0.13 points (8 paired trials); the 1x1 first and the 3x3 second saves only 0.06 s. Stacked
 at 11 epochs the two changes measured -0.16 s for -0.05 +- 0.08 points over 16 paired trials before
 the 40-trial confirmation above (-0.14 / -0.19 s at +0.12 / +0.16 points); at 10.75 epochs -0.24 s
@@ -164,7 +164,7 @@ Tested in same-GPU comparisons against a control (8 to 40 paired trials each):
 | `widths: [64, 256, 896]` | more accurate, slower; on the same accuracy/time line |
 | `widths: [48, 256, 768]` or `[64, 192, 768]` | less accurate at equal time |
 | `g2_pair: "inner192"` (PR #24, PR #26) | -0.13 s for about 0.05 points; group 3 pairs at 448 / 384 sit on the accuracy/time line; a 1x1-3x3-1x1 bottleneck in group 3 loses 1.4 points for 0.7 s |
-| `resolution_schedule: [[20, 0.15], [24, 0.5]]` (this PR) | 20 px for the first 15% of the examples, 24 px to the half, 32 px after: -0.40 s at -0.23 points at 10 epochs (8 paired trials, cold); 20 -> 24 -> 28 -> 32 (eight graphs): -0.19 / -0.29 s at -0.31 / -0.10 points and a 441 s four-CPU build; epoch ladder on the schedule: 10.5 ep -0.24 s / +0.05, 10.75 ep -0.14 s / -0.06, 11 ep -0.08 s / +0.09 points (8 trials each) |
+| `resolution_schedule: [[20, 0.15], [24, 0.5]]` (this PR) | 20 px for the first 15% of the examples, 24 px to the half, 32 px after: -0.40 s at -0.23 points at 10 epochs (8 paired trials, cold); 20 -> 24 -> 28 -> 32 (eight graphs): -0.19 / -0.29 s at -0.31 / -0.10 points, with a 441 s four-CPU build on a sibling schedule; epoch ladder on the schedule: 10.5 ep -0.24 s / +0.05, 10.75 ep -0.14 s / -0.06, 11 ep -0.08 s / +0.09 points (8 trials each) |
 | `inner_kernels: [[3, 1], [3, 1], 3]` (this PR) | group 1's pair as 3x3 then 1x1, on top of group 2's: -0.13 s at +0.02 points (8 paired trials, cold); `[[1, 3], [3, 1], 3]`: -0.06 s at +0.05 |
 | `inner_kernels: [3, [3, 1], 3]` (PR #27) | group 2's pair as 3x3 then 1x1: -0.21 s at +0.05 / -0.08 points over 40 paired trials per seed set vs PR #26 (warm cache; -0.19 / -0.22 s cold at 4 CPUs); 1x1 then 3x3: -0.09 points for the same time; the same in group 3: -0.37 points for -0.30 s |
 | `global_pool: "fullpool_avgsum"` (PR #25, PR #26), `"maxmean_sum"` (PR #24), `"maxmean_cat"` | the same max + mean through `F.max_pool2d` / `F.avg_pool2d`: -0.13 s at identical results; the summed max + mean measured +0.3 points in an 8-trial screen (+0.2 for the concatenated one) and about +0.06 at 40 trials |
