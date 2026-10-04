@@ -48,8 +48,8 @@ kernels; 11 epochs), 4 October: 40 trials per seed set, the 75% target enforced,
 A100-SXM4-80GB at the 400 W power limit ("A100 SXM 400 W"). Cards at the same power limit differ by
 one to two percent in speed, so each seed set ran this recipe and the previous one (PR #29) back to
 back in one container, both compiled cold (fresh Inductor cache) under a hard four-CPU limit, the
-judges' quota; the build times of the first four rows are those real cold builds (the older rows'
-cold builds ran in 20-CPU containers). Official judging runs on an A100 80GB PCIe, where times are
+judges' quota; the build times of the first four rows are those real cold builds. The PR #29, PR #27
+and PR #28 rows are also 4-CPU cold containers; the older rows ran in 20-CPU containers. Official judging runs on an A100 80GB PCIe, where times are
 higher (about 8-9% on the earlier recipe); the ranking between recipes carries over.
 
 | Seeds | Recipe | Mean accuracy | Min / max trial | Mean preparation + training | Qualified |
@@ -67,8 +67,8 @@ higher (about 8-9% on the earlier recipe); the ranking between recipes carries o
 
 Paired differences against PR #29 on the same seeds and card: seeds 0-39 -0.01 +- 0.06 points,
 -0.10 s; seeds 40-79 -0.02 +- 0.06 points, -0.09 s (-0.01 +- 0.04 points over the 80
-pairs). All 160 trials of the two containers (this recipe and PR #29) finished and qualified; this
-recipe's 80 trials never fell below 74.69%, so none diverged (this file carries no device-side
+pairs). All 160 trials of the two containers (this recipe and PR #29) finished and every run qualified on
+its mean; this recipe's 80 trials never fell below 74.69%, so none diverged (this file carries no device-side
 non-finite counter).
 
 Why this recipe: one change on PR #29, group 1's residual pair as two 1x1 convolutions instead of a
@@ -77,8 +77,8 @@ the 3x3 at 64 channels is memory-bound, and the 3x3 -> 1x1 change of PR #29 had 
 accuracy. Screened cold at 16 paired trials: +0.08 +- 0.08 points for -0.08 s; confirmed above at 40
 trials per seed set (-0.01 / -0.02 points, -0.10 / -0.09 s). The alternatives screened in the same
 round lose accuracy for their time: no group 1 pair at all (depths [2, 3, 3]) -0.15 +- 0.11 points
-for -0.15 s, the 24 px phase to 60% -0.15 +- 0.10 for -0.24 s, the 20 px phase to 25% -0.15 +- 0.08
-for -0.02 s, 10.75 epochs -0.07 +- 0.09 for -0.09 s.
+for -0.15 s, the 24 px phase to 60% -0.15 +- 0.10 for -0.24 s (at 11.25 epochs -0.15 +- 0.09 for
+-0.14 s), the 20 px phase to 25% -0.15 +- 0.08 for -0.02 s, 10.75 epochs -0.07 +- 0.09 for -0.09 s.
 
 The rest is PR #29, two changes on PR #27 and one more epoch, every comparison made with both recipes
 compiled cold in one container (which removes the one-to-two-percent speed differences between cards
@@ -123,7 +123,8 @@ learning rate, momentum, BatchNorm momentum, label smoothing, warmup, final lear
 lookahead period, translation, jitter, cutout, batch 512/768, batch schedules, logit scale): all
 flat or worse. Under the four-CPU container quota (the official judging limit) the cold build of exactly this
 configuration took 365 and 419 s in the two confirmation containers (limit 600 s; PR #29's folder
-built in 374 and 429 s in the same containers, in 355-416 s in its own verification containers). The six compiled graphs are the same as PR #27's
+built in 374 and 429 s in the same containers, in 355 and 364 s in its own verification containers
+and in 324 / 416 s in the two 11.25-epoch containers of the same round). The six compiled graphs are the same as PR #27's
 (three resolutions, two whitening-bias flags); the 20 px phase and the 1x1 change the kernels inside
 them, not their number.
 
