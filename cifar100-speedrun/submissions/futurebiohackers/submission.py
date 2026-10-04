@@ -100,6 +100,10 @@ DEFAULTS = {
     "muon_wd": 1.04e-6,  # per example
     "bias_lr": 0.0573,
     "head_lr": 0.5415,
+    # "muon_airbench" (devin/ recipe, Keller Jordan's airbench94_muon): Nesterov momentum then a
+    # Newton-Schulz orthogonalisation of each conv filter bank's update, filters renormalised
+    # every step; BatchNorm biases, the whitening bias and the head stay on the SGD groups above.
+    "muon_ns_steps": 3,
     # Diagnostic (off by default): count training steps whose loss was not finite on the
     # device and print "NONFINITE_LOSSES n" to stderr after train. One sync per trial.
     "count_nonfinite": False,
@@ -262,6 +266,8 @@ def pool_features(x, mode):
         return torch.cat((x.max(2).values, x.mean(2)), 1)
     if mode == "maxmean_sum":
         return x.max(2).values + x.mean(2)
+    if mode == "fullpool":  # devin/ recipe: one max_pool2d over the whole map
+        return F.max_pool2d(x.view(x.shape[0], x.shape[1], -1, 1), (x.shape[2], 1)).flatten(1)
     return x.max(2).values
 
 
@@ -592,8 +598,9 @@ def build(context: BuildContext):
         raise ValueError("stem must be patch2 or patch4s2")
     if any(b <= 0 or not 0 <= f <= 1 for b, f in hyp["batch_schedule"]):
         raise ValueError("batch_schedule entries must be [positive batch, fraction]")
-    if hyp["global_pool"] not in ("adaptive", "amax", "max", "maxmean_cat", "maxmean_sum"):
-        raise ValueError("global_pool must be adaptive, amax, max, maxmean_cat, or maxmean_sum")
+    pools = ("adaptive", "amax", "max", "maxmean_cat", "maxmean_sum", "fullpool")
+    if hyp["global_pool"] not in pools:
+        raise ValueError(f"global_pool must be one of {pools}")
     if type(hyp["multiscale_head"]) is not bool:
         raise ValueError("multiscale_head must be a boolean")
     se_groups, se_ratio = hyp["se_groups"], hyp["se_ratio"]
@@ -609,8 +616,12 @@ def build(context: BuildContext):
         or any(hyp["widths"][g] % se_ratio for g in se_groups)
     ):
         raise ValueError("se_ratio must be a positive integer dividing the width of every SE group")
-    if hyp["optimizer"] not in ("sgd", "muon") or len(hyp["color_jitter"]) != 2:
-        raise ValueError("optimizer must be sgd or muon; color_jitter needs two ranges")
+    if hyp["optimizer"] not in ("sgd", "muon", "muon_airbench") or len(hyp["color_jitter"]) != 2:
+        raise ValueError(
+            "optimizer must be sgd, muon or muon_airbench; color_jitter needs two ranges"
+        )
+    if type(hyp["muon_ns_steps"]) is not int or hyp["muon_ns_steps"] < 1:
+        raise ValueError("muon_ns_steps must be a positive int")
     if type(hyp["count_nonfinite"]) is not bool:
         raise ValueError("count_nonfinite must be a boolean")
     if not 0 <= hyp["aug_off_last"] < hyp["epochs"]:
@@ -837,6 +848,9 @@ def prepare(state, data: TrainingData, seed: int) -> None:
     state.whiten_bias_steps = math.ceil(hyp["whiten_bias_epochs"] * state.steps_per_epoch)
     if hyp["optimizer"] == "muon":
         state.optimizers = _make_muon(net, batch_size, state.total_steps, hyp, state)
+    elif hyp["optimizer"] == "muon_airbench":
+        sgd_wd = wd * hyp["hard_fraction"]
+        state.optimizers = _make_muon_airbench(net, lr, lr_biases, sgd_wd, hyp, device)
     else:
         sgd_wd = wd * hyp["hard_fraction"]
         state.optimizers = [_make_optimizer(net, lr, lr_biases, sgd_wd, hyp, device)]
@@ -860,6 +874,71 @@ def _make_optimizer(net, lr, lr_biases, wd, hyp, device):
         group["initial_lr"] = group["lr"]
         group["initial_weight_decay"] = group["weight_decay"]
     return optimizer
+
+
+def _newton_schulz_airbench(g, steps, eps=1e-7):
+    """airbench94_muon: orthogonalise one [out, rest] matrix with a quintic Newton-Schulz
+    iteration in bfloat16 (the devin/ recipe's constants)."""
+    a, b, c = 3.4445, -4.7750, 2.0315
+    x = g.bfloat16()
+    x = x / (x.norm() + eps)
+    transpose = g.size(0) > g.size(1)
+    if transpose:
+        x = x.T
+    for _ in range(steps):
+        m = x @ x.T
+        x = a * x + (b * m + c * m @ m) @ x
+    return x.T if transpose else x
+
+
+class MuonAirbench(torch.optim.Optimizer):
+    """Keller Jordan's Muon as in the devin/ recipe (airbench94_muon): Nesterov momentum, then each
+    filter bank's update is orthogonalised by Newton-Schulz; weights are renormalised every step
+    to sqrt(out_channels). Only the conv filters go through it (off by default)."""
+
+    def __init__(self, params, lr, momentum, ns_steps):
+        super().__init__(params, dict(lr=lr, momentum=momentum, ns_steps=ns_steps))
+
+    @torch.no_grad()
+    def step(self):
+        for group in self.param_groups:
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                buf = self.state[p].get("momentum_buffer")
+                if buf is None:
+                    buf = self.state[p]["momentum_buffer"] = torch.zeros_like(p.grad)
+                buf.mul_(group["momentum"]).add_(p.grad)
+                g = p.grad.add(buf, alpha=group["momentum"])
+                p.mul_(len(p) ** 0.5 / p.float().norm())
+                update = _newton_schulz_airbench(g.reshape(len(g), -1), group["ns_steps"])
+                p.add_(update.view(g.shape).to(p.dtype), alpha=-group["lr"])
+
+
+def _make_muon_airbench(net, lr, lr_biases, wd, hyp, device):
+    """devin/ recipe's split: conv filters (4-D, trainable) on MuonAirbench, everything else on
+    the usual two SGD groups (BatchNorm biases at the bias lr, the rest at the base lr)."""
+    trainable = [(n, p) for n, p in net.named_parameters() if p.requires_grad]
+    filters = [p for _, p in trainable if p.ndim == 4]
+    filter_ids = {id(p) for p in filters}
+    norm_biases = [p for n, p in trainable if "norm" in n]
+    others = [p for n, p in trainable if "norm" not in n and id(p) not in filter_ids]
+    sgd = torch.optim.SGD(
+        [
+            dict(params=norm_biases, lr=lr_biases, weight_decay=wd / lr_biases),
+            dict(params=others, lr=lr, weight_decay=wd / lr),
+        ],
+        momentum=hyp["momentum"],
+        nesterov=True,
+        fused=hyp["fused_sgd"] and device.type == "cuda",
+    )
+    muon = MuonAirbench(filters, hyp["muon_lr"], hyp["muon_momentum"], hyp["muon_ns_steps"])
+    for optimizer in (sgd, muon):
+        for group in optimizer.param_groups:
+            group["initial_lr"] = group["lr"]
+            if "weight_decay" in group:
+                group["initial_weight_decay"] = group["weight_decay"]
+    return [sgd, muon]
 
 
 def _make_muon(net, batch_size, total_steps, hyp, state):

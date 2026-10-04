@@ -127,6 +127,9 @@ VARIANTS = {
 # may not): name -> delta. count_nonfinite reports "NONFINITE_LOSSES n" on stderr after train.
 OWN_SWITCHES = {
     "count_nonfinite": {"count_nonfinite": True},
+    # devin/ ports
+    "muon_airbench": {"optimizer": "muon_airbench", "muon_lr": 0.24, "muon_momentum": 0.6},
+    "fullpool": {"global_pool": "fullpool"},
     # cheaper residual pair in group 3 (residual and output stay at widths[2])
     "g3_pair_inner512": {"g3_pair": "inner512"},
     "g3_pair_inner640": {"g3_pair": "inner640"},
@@ -1039,7 +1042,43 @@ def main() -> int:
     )
 
     # 7. Combinations build must reject.
+    # devin/ ports: muon_airbench (filters on Muon, the rest on SGD) and fullpool (== max).
+    for name, run in runs.items():
+        hyp, net = run.state.hyp, run.state.net
+        if hyp["optimizer"] == "muon_airbench":
+            opts = run.state.optimizers
+            muon = [o for o in opts if o.__class__.__name__ == "MuonAirbench"]
+            sgd = [o for o in opts if isinstance(o, torch.optim.SGD)]
+            muon_ids = {id(p) for o in muon for g in o.param_groups for p in g["params"]}
+            sgd_ids = {id(p) for o in sgd for g in o.param_groups for p in g["params"]}
+            filters = {id(p) for p in net.parameters() if p.ndim == 4 and p.requires_grad}
+            rest = {id(p) for p in net.parameters() if p.ndim < 4 and p.requires_grad}
+            check(
+                f"{name}: conv filters on MuonAirbench, every other trainable tensor on SGD, "
+                "no overlap, momentum buffers created",
+                len(muon) == 1
+                and len(sgd) == 1
+                and muon_ids == filters
+                and sgd_ids == rest
+                and all(
+                    "momentum_buffer" in muon[0].state[p]
+                    for g in muon[0].param_groups
+                    for p in g["params"]
+                ),
+            )
+        if hyp["global_pool"] == "fullpool":
+            probe = torch.randn(3, 8, 5, 5)
+            check(
+                f"{name}: fullpool equals the per-channel max over positions",
+                torch.equal(new.pool_features(probe, "fullpool"), new.pool_features(probe, "max")),
+            )
+
     rejected = {
+        "optimizer muon_airbench with muon_ns_steps 0": {
+            "optimizer": "muon_airbench",
+            "muon_ns_steps": 0,
+        },
+        "global_pool fullpool2 (unknown)": {"global_pool": "fullpool2"},
         "g3_pair inner128 (unknown variant)": {"g3_pair": "inner128"},
         "g3_pair inner512 with 1x1 inner kernels in group 3": {
             "g3_pair": "inner512",
