@@ -2,9 +2,11 @@
 
 Adapted from Keller Jordan's airbench (https://github.com/KellerJordan/cifar10-airbench),
 Copyright (c) 2024 Keller Jordan, released under the MIT License. Changes: 100-class
-head with widths 128/256/768 and a two-conv first group, label smoothing 0.3, an
-8.25-epoch schedule, half-precision BatchNorm, a compiled forward+loss step, the
-harness build/prepare/train split, and no test-time augmentation. The optional
+head, widths 64/256/768 with three convolutions per group and residual pairs through 192
+(group 2) and 512 (group 3) channels, max + mean global pooling, label smoothing 0.25, a
+10-epoch schedule with 24 px and 28 px phases, half-precision BatchNorm, a compiled
+forward+loss step, the harness build/prepare/train split, and no test-time augmentation.
+The optional
 Muon optimizer follows hiverge/cifar10-speedrun (MIT); see LICENSE.hiverge.
 
 Untimed build() compiles the network and warms up every kernel on synthetic data.
@@ -77,8 +79,10 @@ DEFAULTS = {
     "g2_pair": "inner192",
     # "max" is max(dim).values; adaptive_max_pool2d's backward uses slow atomics and
     # "amax" trains to NaN under torch.compile in torch 2.4.
-    # "maxmean_sum": per-channel max plus mean over positions (same width as "max").
-    "global_pool": "maxmean_sum",
+    # "maxmean_sum": per-channel max plus mean over positions (same width as "max");
+    # "fullpool_avgsum": the same max + mean through the pooling kernels (F.max_pool2d /
+    # F.avg_pool2d over the whole map), 0.13 s per trial faster than the compiled reductions.
+    "global_pool": "fullpool_avgsum",
     # "muon" follows hiverge/cifar10-speedrun: Muon on conv filters, SGD on biases and head.
     "optimizer": "sgd",
     "muon_lr": 0.205,
@@ -270,6 +274,12 @@ class Net(nn.Module):
         elif self.global_pool == "maxmean_sum":
             flat = x.flatten(2)
             x = flat.max(2).values + flat.mean(2)
+        elif self.global_pool == "fullpool_avgsum":
+            # max and mean through the pooling kernels: 0.13 s per trial faster than the
+            # reduction kernels torch.compile generates for max(dim).values and mean.
+            flat = x.flatten(2)
+            x4, kernel = flat.view(flat.shape[0], flat.shape[1], -1, 1), (flat.shape[2], 1)
+            x = (F.max_pool2d(x4, kernel) + F.avg_pool2d(x4, kernel)).flatten(1)
         else:
             x = x.flatten(2).max(2).values
         if self.muon_head:
@@ -475,8 +485,8 @@ def build(context: BuildContext):
         raise ValueError("stem must be patch2 or patch4s2")
     if any(b <= 0 or not 0 <= f <= 1 for b, f in hyp["batch_schedule"]):
         raise ValueError("batch_schedule entries must be [positive batch, fraction]")
-    if hyp["global_pool"] not in ("adaptive", "amax", "max", "maxmean_sum"):
-        raise ValueError("global_pool must be adaptive, amax, max, or maxmean_sum")
+    if hyp["global_pool"] not in ("adaptive", "amax", "max", "maxmean_sum", "fullpool_avgsum"):
+        raise ValueError("global_pool must be adaptive, amax, max, maxmean_sum, or fullpool_avgsum")
     if hyp["optimizer"] not in ("sgd", "muon") or len(hyp["color_jitter"]) != 2:
         raise ValueError("optimizer must be sgd or muon; color_jitter needs two ranges")
     device = context.device

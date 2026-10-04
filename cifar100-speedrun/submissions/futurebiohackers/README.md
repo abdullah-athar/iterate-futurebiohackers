@@ -28,18 +28,21 @@ Implementation details that change the time but not the model:
   pair gets its own graph, warmed in `build`.
 - Random crops use one gather per epoch (`crop_mode: "indexed"`) instead of 25
   masked copies, which also avoids host syncs.
-- The global pool's maximum is `max(dim).values`. `adaptive_max_pool2d` backward uses an
-  atomic kernel (about 0.3 s per trial in the profile), and `amax` trains to NaN under
-  `torch.compile` in torch 2.4.
-- `prepare` takes 28 ms instead of 170 ms: the dirac part of the conv init is
+- The global pooling (max + mean, described above) is written with `F.max_pool2d` and
+  `F.avg_pool2d` over the whole map (`global_pool: "fullpool_avgsum"`), which `torch.compile`
+  lowers to pointwise kernels; the reduction kernels it generates for `max(dim).values` and
+  `mean` (PR #24) cost 0.13 s more per trial at identical results. `adaptive_max_pool2d`
+  backward uses an atomic kernel (about 0.3 s per trial in the profile), and `amax` trains to
+  NaN under `torch.compile` in torch 2.4.
+- `prepare` takes 35-85 ms instead of 170 ms: the dirac part of the conv init is
   vectorized (`nn.init.dirac_` launches one kernel per channel), and the 28 px
   resize is two matmuls instead of `F.interpolate` (65 ms on fp16 channels-last).
 
 ## Development results
 
 Confirmation runs for the submitted defaults (192-channel residual pair in the second group,
-512-channel pair in the last, max + mean pooling, 24 px first quarter, 28 px second quarter, 10
-epochs), 4 October: 40 trials per seed set, the 75% target enforced, Modal NVIDIA A100-SXM4-80GB
+512-channel pair in the last, max + mean pooling through the pooling kernels, 24 px first
+quarter, 28 px second quarter, 10 epochs), 4 October: 40 trials per seed set, the 75% target enforced, Modal NVIDIA A100-SXM4-80GB
 at the 400 W power limit ("A100 SXM 400 W"). Cards at the same power limit differ by one to two
 percent in speed, so each seed set ran this recipe and the previous one (PR #23) back to back in
 one container with a warm compile cache; the cold build is reported separately below. Official
@@ -48,26 +51,32 @@ ranking between recipes carries over.
 
 | Seeds | Recipe | Mean accuracy | Min / max trial | Mean preparation + training | Qualified |
 | --- | --- | ---: | ---: | ---: | --- |
-| 0-39 | **submitted defaults** | **75.13% (sd 0.24)** | 74.56% / 75.74% | **4.34 s** (sd 0.01) | yes |
-| 0-39 | previous recipe (PR #23), same container | 75.20% | | 4.46 s | yes |
-| 40-79 | **submitted defaults** | **75.20% (sd 0.25)** | 74.52% / 75.74% | **4.33 s** (sd 0.01) | yes |
-| 40-79 | previous recipe (PR #23), same container | 75.22% | | 4.46 s | yes |
+| 0-39 | **submitted defaults** | **75.16% (sd 0.23)** | 74.52% / 75.60% | **4.23 s** (sd 0.02) | yes |
+| 0-39 | previous recipe (PR #23), same container | 75.20% (sd 0.27) | | 4.50 s | yes |
+| 40-79 | **submitted defaults** | **75.19% (sd 0.28)** | 74.64% / 76.16% | **4.15 s** (sd 0.01) | yes |
+| 40-79 | previous recipe (PR #23), same container | 75.22% (sd 0.25) | | 4.42 s | yes |
+| 0-39 / 40-79 | PR #24 (same pair, max + mean through the compiled reductions), paired vs PR #23 | 75.13% / 75.20% | | 4.34 / 4.33 s (-0.12 / -0.14 s) | yes |
 | 0-39 / 40-79 | PR #23 standalone, cold build 381 / 278 s | 75.19% / 75.25% | | 4.56 / 4.49 s | yes |
 | 0-39 / 40-79 | 768-wide pair, 9.5 epochs (PR #22), cold build 275 / 287 s | 75.18% / 75.25% | | 4.51 / 4.55 s | yes |
 | 0-39 | 9.0 epochs, 28 px first half (PR #14 defaults), cold build 193 s | 75.12% (sd 0.26) | | 4.72 s (sd 0.01) | yes |
 | 0-39 / 40-79 | 9.5 epochs, 28 px first half (PR #21), cold build 196 / 259 s | 75.28% / 75.32% | | 4.96 / 4.94 s | yes |
 
-Paired differences against PR #23 on the same seeds and card: seeds 0-39 -0.07 +- 0.06 points, -0.12 s; seeds
-40-79 -0.02 +- 0.06 points, -0.14 s. No trial produced a non-finite loss (counted on the device in every run).
+Paired differences against PR #23 on the same seeds and card: seeds 0-39 -0.05 +- 0.06 points,
+-0.26 s; seeds 40-79 -0.02 +- 0.06 points, -0.27 s. No trial produced a non-finite loss (counted
+on the device in every run).
 
-Why this recipe: the two changes together (the 192-channel pair in the second group and the
-max + mean pooling) save 0.12 to 0.14 s for about 0.05 points on average (0.02 to 0.07 across
-the two seed sets; 16 paired trials: +0.04 +- 0.08 points, -0.13 s). The pair alone was screened
-at 8 trials (+0.07 +- 0.15 points, -0.13 s) and is the source of the time gain; the pooling costs
-no time and measured +0.30 +- 0.14 points in an 8-trial screen, but the combination is within
-noise of PR #23's accuracy at 16 and 40 trials, so its own gain is small. Fewer epochs do not
-pay: against these defaults in the same container, 9.875 epochs lose 0.10 points for 0.03 s, and
-9.75 epochs about 0.20 points for about 0.09 s. The residual pair of the last group is about a
+Why this recipe: three changes on PR #23. The residual pair of the second group through 192
+channels, together with the max + mean pooling, saves 0.13 s for about 0.05 points (PR #24: 40
+paired trials per seed set, -0.07 +- 0.06 and -0.02 +- 0.06 points, -0.12 and -0.14 s; the pair
+alone was screened at 8 trials: +0.07 +- 0.15 points, -0.13 s). The final pooling's max and mean
+are written as `F.max_pool2d` / `F.avg_pool2d`, which `torch.compile` lowers to pointwise kernels
+instead of the reduction kernels it generates for `max(dim).values` and `mean`: identical
+results and another 0.13 s (the max alone through `F.max_pool2d`: -0.03 +- 0.08 points, -0.14 s
+over 16 paired trials). The per-channel mean added to the max costs no time; it measured +0.30 +- 0.14
+points in an 8-trial screen and about +0.06 points over 80 paired trials on PR #23. Together:
+-0.26 / -0.27 s for -0.05 +- 0.06 / -0.02 +- 0.06 points on the two seed sets (16 paired trials:
+-0.06 +- 0.11 points, -0.24 s). Fewer epochs do not pay: with the compiled pooling, 9.875 epochs
+lost 0.10 points for 0.03 s and 9.75 epochs about 0.20 points for about 0.09 s. The residual pair of the last group is about a
 third of the network's FLOPs, and running it through 512 channels saves 0.31 s for 0.35 points
 (paired 8-trial screens at 400 W); half an epoch more buys the points back at a net gain of
 about 0.1 s (PR #23). The 24x24 first quarter in front of the 28x28 phase saves 0.38 s at equal
@@ -76,7 +85,7 @@ augmentation knob was re-screened on this schedule (learning rate, weight decay,
 learning rate, momentum, BatchNorm momentum, label smoothing, warmup, final learning rate,
 lookahead period, translation, jitter, cutout, batch 512/768, batch schedules, logit scale): all
 flat or worse. Under an emulated four-CPU container quota (the official judging limit) the cold
-build of exactly this configuration took 280 s (limit 600 s; PR #23's took 268 s).
+build of exactly this configuration took 289 s (limit 600 s; PR #24's took 280 s, PR #23's 268 s).
 
 Earlier results for the 9-epoch recipe:
 
@@ -105,7 +114,7 @@ Run the defaults with the harness from `cifar100-speedrun/`:
 
 ## Experiments and progress
 
-Tested in same-GPU comparisons against a control (4-10 trials each):
+Tested in same-GPU comparisons against a control (8 to 40 paired trials each):
 
 | Option | Result |
 | --- | --- |
@@ -119,7 +128,7 @@ Tested in same-GPU comparisons against a control (4-10 trials each):
 | `widths: [64, 256, 896]` | more accurate, slower; on the same accuracy/time line |
 | `widths: [48, 256, 768]` or `[64, 192, 768]` | less accurate at equal time |
 | `g2_pair: "inner192"` (this PR) | -0.13 s for about 0.05 points; group 3 pairs at 448 / 384 sit on the accuracy/time line; a 1x1-3x3-1x1 bottleneck in group 3 loses 1.4 points for 0.7 s |
-| `global_pool: "maxmean_sum"` (this PR), `"maxmean_cat"` | +0.3 / +0.2 points in 8-trial screens at no time cost; the summed variant stacked with the 192 pair is within noise of PR #23 at 16 and 40 trials; the concatenated one was only screened at 8 |
+| `global_pool: "fullpool_avgsum"` (this PR), `"maxmean_sum"` (PR #24), `"maxmean_cat"` | the same max + mean through `F.max_pool2d` / `F.avg_pool2d`: -0.13 s at identical results; the summed max + mean measured +0.3 points in an 8-trial screen (+0.2 for the concatenated one) and about +0.06 at 40 trials |
 | squeeze-and-excitation on groups 2-3, multi-scale head | break-even and -0.3 points |
 | wider group 1 (`widths: [128, 256, 768]`) | on or below the accuracy/time line |
 | `inductor_tuning` | coordinate-descent tuning: 0.5% faster, within noise |
@@ -132,9 +141,10 @@ Tested in same-GPU comparisons against a control (4-10 trials each):
 | `ema_every: 0` | 0.6 points less accurate |
 | Vision transformer (patch 4, dim 256, 6 layers) | 37% at 9 epochs, 58% at 30 epochs (39 s) |
 
-Convolutions are about 65% of GPU time and Inductor's BatchNorm/activation kernels
-about 22%. Inductor's CUDA graphs are on and worth about 1.5%; a whole-run graph
-would add little since the GPU is already busy for the whole step.
+Convolutions are about 75% of GPU time and Inductor's BatchNorm/activation kernels about
+20% (profile of this recipe: GPU busy 99%, no host synchronisation inside the step, about
+180 kernels per step). Inductor's CUDA graphs are on; a whole-run graph would add little
+since the GPU is already busy for the whole step.
 
 `--params` exposes other resolution schedules, block widths/depths and residual-pair widths,
 proxy-based hard-example selection, other pooling and optimizer settings, and an optional
