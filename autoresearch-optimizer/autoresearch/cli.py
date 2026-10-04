@@ -129,7 +129,8 @@ def cmd_swarm(args) -> None:
     evaluate = (swarm.modal_evaluator(run.problem_name, budget_ms) if args.eval == "modal"
                 else swarm.local_evaluator(run.problem_name, budget_ms))
     from .budget import RunBudget
-    budget = RunBudget(store, max_usd=args.max_run_usd, max_calls=args.max_run_calls, max_tokens=args.max_run_tokens)
+    budget = RunBudget(store, max_usd=args.max_run_usd, max_calls=args.max_run_calls, max_tokens=args.max_run_tokens,
+                       unknown_session_usd=args.max_budget_usd)
     swarm.run_swarm(run, args.agents, args.turn_s, args.budget_min * 60, propose, evaluate, emit,
                     seed=args.seed, max_generations=args.generations, eval_name=args.eval,
                     budget=budget if budget.capped else None, per_agent_usd_cap=args.max_budget_usd)

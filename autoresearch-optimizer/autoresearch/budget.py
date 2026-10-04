@@ -94,8 +94,11 @@ class CallBudget:
 
 class RunBudget:
     def __init__(self, store: RunStore, max_usd: float | None = None, max_calls: int | None = None,
-                 max_tokens: int | None = None) -> None:
+                 max_tokens: int | None = None, unknown_session_usd: float | None = None) -> None:
         self.store, self.max_usd, self.max_calls, self.max_tokens = store, max_usd, max_calls, max_tokens
+        # an unreported cost (session killed at the turn limit) is charged at this value for the cap: the per-session
+        # cap when one is set, else the mean known session cost — never silently 0
+        self.unknown_session_usd = unknown_session_usd
         self._lock = threading.Lock()
         self._reserved_usd = 0.0
         self._reserved_calls = 0
@@ -112,7 +115,7 @@ class RunBudget:
         """None if `usd`/`calls` more (on top of spend and reservations) stay within every cap."""
         # diagnostic describe calls only measure a reference arm: excluded from its cap so they cannot shrink
         # the arm's search budget (they stay visible in the report)
-        capped = s.usd - s.diagnostic_usd
+        capped = s.usd - s.diagnostic_usd + s.unknown_cost * self._unknown_charge(s)
         if self.max_usd is not None and capped + self._reserved_usd + usd > self.max_usd + 1e-9:
             return f"cost cap ${self.max_usd:g} (spent ${capped:.2f}, in flight ${self._reserved_usd:.2f}, next ${usd:.2f})"
         if self.max_calls is not None and s.calls + self._reserved_calls + calls > self.max_calls:
@@ -120,6 +123,12 @@ class RunBudget:
         if self.max_tokens is not None and s.tokens >= self.max_tokens:
             return f"token cap {self.max_tokens} (used {s.tokens})"
         return None
+
+    def _unknown_charge(self, s: Spend) -> float:
+        if self.unknown_session_usd is not None:
+            return self.unknown_session_usd
+        known = s.calls - s.unknown_cost
+        return s.usd / known if known > 0 else DEFAULT_AUX_USD
 
     def aux_estimate(self, kind: str) -> float:
         costs = [r["cost_usd"] for r in read_usage(self.store.root)

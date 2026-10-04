@@ -159,6 +159,13 @@ def test_budget_caps_with_calls_in_flight():
         ok, why = b.reserve_generation(3, 0.40)   # 1.10 + 1.20 > 2.0
         assert not ok and "cost cap" in why, why
         assert RunBudget(store, max_calls=3).reserve_generation(1, None)[0] is False  # call cap
+        # a session killed before reporting its cost is charged at the per-session cap, not at 0
+        store.append(Entry(id=4, parent_ids=[0], mode="tune", hypothesis="", status="evaluated",
+                           proposer="claude-code:x", generation=2, usage={"cost_usd": None, "outcome": "timeout"}))
+        b2 = RunBudget(store, max_usd=2.0, unknown_session_usd=0.5)
+        assert b2.spent().unknown_cost == 1
+        assert b2.reserve_generation(1, 0.40)[0] is True     # 1.10 + 0.50 (unknown) + 0.40 = 2.0
+        assert b2.reserve_generation(1, 0.10)[0] is False    # one more would pass the cap
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("  budget: caps hold with generation and auxiliary calls in flight")
