@@ -77,8 +77,8 @@ place of the 28 px phase; on this recipe at 10.5 epochs the schedule alone measu
 points for -0.11 s (16 paired trials), and on the 192-channel recipe of PR #27 at 10 epochs
 -0.23 +- 0.07 points for -0.40 s (8 trials): the lost accuracy is bought back with more epochs at a
 net gain, since the epoch ladder is linear at about 1.05 points per second. Schedules that keep a
-28 px phase (20 -> 24 -> 28 -> 32) save less and need eight compiled graphs, which pushed the
-four-CPU cold build to 441 s. (2) The residual pairs of groups 1 and 2 become a 3x3 followed by a
+28 px phase (20 -> 24 -> 28 -> 32) save less and need eight compiled graphs, whose four-CPU cold
+build measured 441 s on a sibling schedule ([[20, 0.15], [24, 0.3], [28, 0.5]]). (2) The residual pairs of groups 1 and 2 become a 3x3 followed by a
 1x1 at full width: group 1's pair on PR #27 -0.13 s at +0.02 +- 0.13 points (8 paired trials), group
 2's on this recipe about -0.25 s for roughly -0.05 points (10.5 epochs: +0.02 +- 0.10 points /
 -0.07 s; 10.75 epochs: +0.19 +- 0.06 / +0.04 s, 16 trials each, against the 10-epoch control).
