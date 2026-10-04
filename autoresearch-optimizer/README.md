@@ -248,6 +248,12 @@ it would also drop some genuine `new_family` children. The improving pairs all f
 "useful improvements blocked" on test is still unknown; the sample is small. The defaults stay `None`;
 pass `--archive-threshold 0.56` deliberately for soft/strict runs with the canonical backend.
 
+**Running on an API key** (another account or workspace): `scripts/with_api_key.sh <command>` (or `--check` for a
+one-call test). With a claude.ai login present, `claude -p` ignores `ANTHROPIC_API_KEY` and keeps the login; the
+wrapper uses an isolated config dir (`~/.claude-apikey`, no login) whose only setting is an `apiKeyHelper` that
+prints `$AR_ANTHROPIC_KEY`, so every agent, describe and plan call uses the key, which is never written to disk.
+Use a key scoped to a workspace (an organisation-level key needs an `anthropic-workspace-id` header).
+
 Limits: thresholds come from one small calibration (above), so B uses distances for selection and
 logging, not rejection, unless a threshold is passed; the savings of `--plan-first` are not demonstrated (it costs one call
 per task); the vocabulary is fixed per version (`median_string-v1`) and coarse; families come from an LLM
