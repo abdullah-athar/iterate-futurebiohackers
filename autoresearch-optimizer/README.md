@@ -231,8 +231,25 @@ MAX_RUN_USD=3 SEEDS="0 1 2" scripts/bench_policies.sh div1      # paid benchmark
 uv run python scripts/bench_report.py div1 --html --target-gain 17
 ```
 
-Limits: thresholds are uncalibrated until `calibrate_distance.py` has run (so B uses distances for
-selection and logging, not rejection); the savings of `--plan-first` are not demonstrated (it costs one call
+**First calibration (2026-10-04, Sonnet describer, vocabulary v1, $1.88 for 198 calls; JSON/MD under
+`artifacts/calibration/`, local only).** 133-149 pairs, dev/test split by source program:
+
+| metric | redescription max (dev / test) | same family (curated) | paradigm change min (dev / test) | suggested repeat threshold | test: missed repeats / distinct rejected |
+|---|---|---|---|---|---|
+| canonical + weighted Jaccard | 0.25 / 0.125 | 0.00-0.41 | 0.71 / 0.62 | **0.56** | 0/21, 0/42 |
+| Johann's descriptor + MiniLM | 0.02 / 0.35 | 0.11-0.34 | 0.50 / 0.41 | 0.32 | 4/21, 0/42 |
+| Johann's descriptor mapped to ids + weighted Jaccard | 0.05 / 1.00 | 0.18-1.00 | 0.70 / 0.66 | 0.51 | 5/21, 0/42 |
+
+The closed vocabulary makes re-descriptions far more stable than free terms. Real parent/child pairs
+from the smoke run (canonical): improving `tune` children 0.17-0.36, other `tune` 0.10-0.61, `new_family`
+children 0.49-0.71, merges 0.39-0.71 — so 0.56 separates "same algorithm, other mechanisms" from "another
+paradigm", it would block every improving tune (which is why `tune` is never rejected on descriptors) and
+it would also drop some genuine `new_family` children. The improving pairs all fell on the dev side, so
+"useful improvements blocked" on test is still unknown; the sample is small. The defaults stay `None`;
+pass `--archive-threshold 0.56` deliberately for soft/strict runs with the canonical backend.
+
+Limits: thresholds come from one small calibration (above), so B uses distances for selection and
+logging, not rejection, unless a threshold is passed; the savings of `--plan-first` are not demonstrated (it costs one call
 per task); the vocabulary is fixed per version (`median_string-v1`) and coarse; families come from an LLM
 reading the code and are not ground truth; with 3-5 seeds results are a first signal, not significance.
 
