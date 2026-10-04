@@ -1,0 +1,41 @@
+{
+  "round": "r31",
+  "n": 16,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "confirm16-stack",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "stack-e10.0-n16",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "maxmean_sum",
+            "epochs": 10.0
+          },
+          "hypothesis": "n=16 paired confirmation of the stack (g2 pair 192 + summed max+mean pooling) at 10.0 epochs vs the record"
+        },
+        {
+          "label": "stack-e9.875-n16",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "maxmean_sum",
+            "epochs": 9.875
+          },
+          "hypothesis": "n=16 paired confirmation of the stack (g2 pair 192 + summed max+mean pooling) at 9.875 epochs vs the record"
+        },
+        {
+          "label": "stack-e9.75-n16",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "maxmean_sum",
+            "epochs": 9.75
+          },
+          "hypothesis": "n=16 paired confirmation of the stack (g2 pair 192 + summed max+mean pooling) at 9.75 epochs vs the record"
+        }
+      ]
+    }
+  ]
+}

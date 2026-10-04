@@ -1,0 +1,34 @@
+{
+  "returncode": 1,
+  "wall_seconds": 185.5,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T002114Z-f169e607",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 9.5, \"g2_pair\": \"inner192\", \"global_pool\": \"maxmean_cat\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "g2-192+maxmeancat-e9.5",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 9.5, \"g2_pair\": \"inner192\", \"global_pool\": \"maxmean_cat\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 9.5, \"g2_pair\": \"inner192\", \"global_pool\": \"maxmean_cat\"}",
+    "delta": {
+      "g2_pair": "inner192",
+      "global_pool": "maxmean_cat",
+      "epochs": 9.5
+    },
+    "hypothesis": "the stack with the concatenated pooling instead of the sum, half an epoch trimmed",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 9.5, \"g2_pair\": \"inner192\", \"global_pool\": \"maxmean_cat\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

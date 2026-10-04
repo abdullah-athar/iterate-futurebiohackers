@@ -339,3 +339,6 @@
 {"time": "2026-10-04T01:13:08", "label": "r30/stack-b (gpu-guard miss 4)", "gpu": "NVIDIA A100 80GB PCIe", "power": "300.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: GPU 'NVIDIA A100 80GB PCIe' is not 'NVIDIA A100-SXM4-80GB'"}
 {"time": "2026-10-04T01:13:13", "label": "r30/stack-b (gpu-guard miss 5)", "gpu": "NVIDIA A100 80GB PCIe", "power": "300.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: GPU 'NVIDIA A100 80GB PCIe' is not 'NVIDIA A100-SXM4-80GB'"}
 {"time": "2026-10-04T01:13:38", "label": "r27/b1-a", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 858.1, "gpu_minutes": 14.55, "note": ""}
+{"time": "2026-10-04T01:23:33", "label": "r30/stack-a", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 623.9, "gpu_minutes": 10.65, "note": ""}
+{"time": "2026-10-04T01:24:52", "label": "r30/stack-b", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 695.6, "gpu_minutes": 11.84, "note": ""}
+{"time": "2026-10-04T01:25:27", "label": "r29/muon-a (gpu-guard miss 1)", "gpu": "NVIDIA A100-SXM4-80GB", "power": "500.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: power limit 500.00 W is not 400 W"}

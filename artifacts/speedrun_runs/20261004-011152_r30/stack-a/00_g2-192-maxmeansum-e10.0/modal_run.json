@@ -1,0 +1,33 @@
+{
+  "returncode": 0,
+  "wall_seconds": 265.8,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T001345Z-047ae7b6",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"g2_pair\": \"inner192\", \"global_pool\": \"maxmean_sum\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "g2-192+maxmeansum-e10.0",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"g2_pair\": \"inner192\", \"global_pool\": \"maxmean_sum\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"g2_pair\": \"inner192\", \"global_pool\": \"maxmean_sum\"}",
+    "delta": {
+      "g2_pair": "inner192",
+      "global_pool": "maxmean_sum"
+    },
+    "hypothesis": "stack: group 2 pair at 192 (-0.13 s free) + max+mean summed pooling (+0.30 pp free) at the record's 10 epochs: accuracy read",
+    "env": {},
+    "config": "futurebiohackers {\"g2_pair\": \"inner192\", \"global_pool\": \"maxmean_sum\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
