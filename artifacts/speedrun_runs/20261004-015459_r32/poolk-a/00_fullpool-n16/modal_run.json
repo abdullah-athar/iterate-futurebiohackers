@@ -1,0 +1,32 @@
+{
+  "returncode": 0,
+  "wall_seconds": 211.1,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T005603Z-ed42d4df",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 16 --params '{\"count_nonfinite\": true, \"global_pool\": \"fullpool\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "fullpool-n16",
+    "n": 16,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "16",
+      "--params",
+      "{\"count_nonfinite\": true, \"global_pool\": \"fullpool\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"global_pool\": \"fullpool\"}",
+    "delta": {
+      "global_pool": "fullpool"
+    },
+    "hypothesis": "replicate Round 29 at n=16: the same per-channel max through ATen max_pool2d instead of Inductor's max(dim) reduction (forward + scatter backward) was -0.13 s at equal accuracy",
+    "env": {},
+    "config": "futurebiohackers {\"global_pool\": \"fullpool\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

@@ -81,6 +81,9 @@ DEFAULTS = {
     # "max" is max(dim).values; adaptive_max_pool2d's backward uses slow atomics and
     # "amax" trains to NaN under torch.compile in torch 2.4. "maxmean_cat" feeds the head the
     # per-channel max and mean concatenated (twice the channels); "maxmean_sum" adds them.
+    # "fullpool" is the same max through F.max_pool2d over the whole map (devin/ recipe; faster
+    # kernels than the compiled reduction), "fullpool_sum" / "fullpool_avgsum" are maxmean_sum
+    # with the max (and the mean) through the pooling kernels.
     "global_pool": "max",
     # Multi-scale head (off): the head also reads group 2's output (widths[1] channels), pooled
     # by the global_pool rule and concatenated in front of group 3's pooled features, so it has
@@ -104,6 +107,8 @@ DEFAULTS = {
     # Newton-Schulz orthogonalisation of each conv filter bank's update, filters renormalised
     # every step; BatchNorm biases, the whitening bias and the head stay on the SGD groups above.
     "muon_ns_steps": 3,
+    # muon_airbench only: the groups whose conv filters go on Muon; the others stay on SGD.
+    "muon_groups": [0, 1, 2],
     # Diagnostic (off by default): count training steps whose loss was not finite on the
     # device and print "NONFINITE_LOSSES n" to stderr after train. One sync per trial.
     "count_nonfinite": False,
@@ -254,9 +259,10 @@ class ConvGroup(nn.Module):
 
 
 def pool_features(x, mode):
-    """Global pooling of [N, C, H, W] features: "max" (max(dim).values), "adaptive" and "amax"
-    give [N, C]; "maxmean_cat" concatenates the per-channel max and mean into [N, 2C];
-    "maxmean_sum" adds them."""
+    """Global pooling of [N, C, H, W] features: "max" (max(dim).values), "adaptive", "amax" and
+    "fullpool" (max_pool2d over the whole map) give [N, C]; "maxmean_cat" concatenates the
+    per-channel max and mean into [N, 2C]; "maxmean_sum" adds them, "fullpool_sum" and
+    "fullpool_avgsum" too but with the max (and the mean) computed by the pooling kernels."""
     if mode == "adaptive":
         return F.adaptive_max_pool2d(x, 1).flatten(1)
     x = x.flatten(2)
@@ -268,6 +274,12 @@ def pool_features(x, mode):
         return x.max(2).values + x.mean(2)
     if mode == "fullpool":  # devin/ recipe: one max_pool2d over the whole map
         return F.max_pool2d(x.view(x.shape[0], x.shape[1], -1, 1), (x.shape[2], 1)).flatten(1)
+    if mode == "fullpool_sum":  # maxmean_sum with the max through max_pool2d
+        x4 = x.view(x.shape[0], x.shape[1], -1, 1)
+        return F.max_pool2d(x4, (x.shape[2], 1)).flatten(1) + x.mean(2)
+    if mode == "fullpool_avgsum":  # maxmean_sum with both terms through the pooling kernels
+        x4, kernel = x.view(x.shape[0], x.shape[1], -1, 1), (x.shape[2], 1)
+        return (F.max_pool2d(x4, kernel) + F.avg_pool2d(x4, kernel)).flatten(1)
     return x.max(2).values
 
 
@@ -598,7 +610,16 @@ def build(context: BuildContext):
         raise ValueError("stem must be patch2 or patch4s2")
     if any(b <= 0 or not 0 <= f <= 1 for b, f in hyp["batch_schedule"]):
         raise ValueError("batch_schedule entries must be [positive batch, fraction]")
-    pools = ("adaptive", "amax", "max", "maxmean_cat", "maxmean_sum", "fullpool")
+    pools = (
+        "adaptive",
+        "amax",
+        "max",
+        "maxmean_cat",
+        "maxmean_sum",
+        "fullpool",
+        "fullpool_sum",
+        "fullpool_avgsum",
+    )
     if hyp["global_pool"] not in pools:
         raise ValueError(f"global_pool must be one of {pools}")
     if type(hyp["multiscale_head"]) is not bool:
@@ -622,6 +643,14 @@ def build(context: BuildContext):
         )
     if type(hyp["muon_ns_steps"]) is not int or hyp["muon_ns_steps"] < 1:
         raise ValueError("muon_ns_steps must be a positive int")
+    groups = hyp["muon_groups"]
+    if (
+        not isinstance(groups, list)
+        or not groups
+        or any(type(g) is not int or g not in (0, 1, 2) for g in groups)
+        or len(set(groups)) != len(groups)
+    ):
+        raise ValueError("muon_groups must be a non-empty list of distinct group indices 0-2")
     if type(hyp["count_nonfinite"]) is not bool:
         raise ValueError("count_nonfinite must be a boolean")
     if not 0 <= hyp["aug_off_last"] < hyp["epochs"]:
@@ -916,10 +945,12 @@ class MuonAirbench(torch.optim.Optimizer):
 
 
 def _make_muon_airbench(net, lr, lr_biases, wd, hyp, device):
-    """devin/ recipe's split: conv filters (4-D, trainable) on MuonAirbench, everything else on
-    the usual two SGD groups (BatchNorm biases at the bias lr, the rest at the base lr)."""
+    """devin/ recipe's split: the conv filters (4-D, trainable) of the groups in muon_groups on
+    MuonAirbench, everything else on the usual two SGD groups (BatchNorm biases at the bias lr,
+    the rest, including the other groups' filters, at the base lr)."""
     trainable = [(n, p) for n, p in net.named_parameters() if p.requires_grad]
-    filters = [p for _, p in trainable if p.ndim == 4]
+    prefixes = tuple(f"layers.{g}." for g in hyp["muon_groups"])
+    filters = [p for n, p in trainable if p.ndim == 4 and n.startswith(prefixes)]
     filter_ids = {id(p) for p in filters}
     norm_biases = [p for n, p in trainable if "norm" in n]
     others = [p for n, p in trainable if "norm" not in n and id(p) not in filter_ids]

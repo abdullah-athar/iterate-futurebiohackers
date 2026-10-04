@@ -1,0 +1,32 @@
+{
+  "returncode": 0,
+  "wall_seconds": 180.3,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T002555Z-bea13c12",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"global_pool\": \"fullpool\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "fullpool",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"global_pool\": \"fullpool\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"global_pool\": \"fullpool\"}",
+    "delta": {
+      "global_pool": "fullpool"
+    },
+    "hypothesis": "systems: Devin's full-map F.max_pool2d instead of max over the flattened positions (same values; kernel speed check)",
+    "env": {},
+    "config": "futurebiohackers {\"global_pool\": \"fullpool\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

@@ -1,0 +1,34 @@
+{
+  "returncode": 0,
+  "wall_seconds": 122.7,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T002719Z-6db9f727",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 16 --params '{\"count_nonfinite\": true, \"epochs\": 10.0, \"g2_pair\": \"inner192\", \"global_pool\": \"maxmean_sum\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "stack-e10.0-n16",
+    "n": 16,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "16",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 10.0, \"g2_pair\": \"inner192\", \"global_pool\": \"maxmean_sum\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 10.0, \"g2_pair\": \"inner192\", \"global_pool\": \"maxmean_sum\"}",
+    "delta": {
+      "g2_pair": "inner192",
+      "global_pool": "maxmean_sum",
+      "epochs": 10.0
+    },
+    "hypothesis": "n=16 paired confirmation of the stack (g2 pair 192 + summed max+mean pooling) at 10.0 epochs vs the record",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 10.0, \"g2_pair\": \"inner192\", \"global_pool\": \"maxmean_sum\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

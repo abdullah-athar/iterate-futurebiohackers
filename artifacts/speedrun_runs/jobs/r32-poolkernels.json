@@ -1,0 +1,98 @@
+{
+  "round": "r32",
+  "n": 16,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "poolk-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "fullpool-n16",
+          "params": {
+            "global_pool": "fullpool"
+          },
+          "hypothesis": "replicate Round 29 at n=16: the same per-channel max through ATen max_pool2d instead of Inductor's max(dim) reduction (forward + scatter backward) was -0.13 s at equal accuracy"
+        },
+        {
+          "label": "fullpool-sum-n16",
+          "params": {
+            "global_pool": "fullpool_sum"
+          },
+          "hypothesis": "max via max_pool2d plus the per-position mean: the maxmean_sum head input at fullpool's kernel cost"
+        }
+      ]
+    },
+    {
+      "name": "poolk-b",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "g2-192-fullpool-e10.0",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool",
+            "epochs": 10.0
+          },
+          "hypothesis": "stack: group 2 pair through 192 + the max_pool2d-based pooling; expected -0.13 s (g2) -0.13 s (kernel) at the stack's accuracy"
+        },
+        {
+          "label": "g2-192-fullpool-sum-e10.0",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_sum",
+            "epochs": 10.0
+          },
+          "hypothesis": "stack: group 2 pair through 192 + the max_pool2d-based pooling; expected -0.13 s (g2) -0.13 s (kernel) at the stack's accuracy"
+        }
+      ]
+    },
+    {
+      "name": "poolk-c",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "g2-192-fullpool-sum-e9.75",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_sum",
+            "epochs": 9.75
+          },
+          "hypothesis": "stack: group 2 pair through 192 + the max_pool2d-based pooling; expected -0.13 s (g2) -0.13 s (kernel) at the stack's accuracy; epoch trim"
+        },
+        {
+          "label": "g2-192-fullpool-e9.75",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool",
+            "epochs": 9.75
+          },
+          "hypothesis": "stack: group 2 pair through 192 + the max_pool2d-based pooling; expected -0.13 s (g2) -0.13 s (kernel) at the stack's accuracy; epoch trim"
+        }
+      ]
+    },
+    {
+      "name": "poolk-d",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "fullpool-avgsum-n16",
+          "params": {
+            "global_pool": "fullpool_avgsum"
+          },
+          "hypothesis": "max and mean both through the pooling kernels (max_pool2d + avg_pool2d): tells whether the compiled mean reduction costs time"
+        },
+        {
+          "label": "g2-192-fullpool-avgsum-e10.0",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "epochs": 10.0
+          },
+          "hypothesis": "stack: group 2 pair through 192 + the max_pool2d-based pooling; expected -0.13 s (g2) -0.13 s (kernel) at the stack's accuracy (avg_pool2d mean)"
+        }
+      ]
+    }
+  ]
+}

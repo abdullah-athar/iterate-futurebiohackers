@@ -1,0 +1,36 @@
+{
+  "returncode": 1,
+  "wall_seconds": 96.8,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T010057Z-5beb3cc5",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 7.5, \"muon_lr\": 0.24, \"muon_momentum\": 0.6, \"muon_ns_steps\": 3, \"optimizer\": \"muon_airbench\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "muon-lr0.24-e7.5",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 7.5, \"muon_lr\": 0.24, \"muon_momentum\": 0.6, \"muon_ns_steps\": 3, \"optimizer\": \"muon_airbench\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 7.5, \"muon_lr\": 0.24, \"muon_momentum\": 0.6, \"muon_ns_steps\": 3, \"optimizer\": \"muon_airbench\"}",
+    "delta": {
+      "optimizer": "muon_airbench",
+      "muon_lr": 0.24,
+      "muon_momentum": 0.6,
+      "muon_ns_steps": 3,
+      "epochs": 7.5
+    },
+    "hypothesis": "user request: does Devin's Muon (+0.93 pp at 10 ep, +1.07 s of per-step overhead) pay at far fewer epochs? lr 0.24, paired vs the record at 10 ep; report dtime_adj",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 7.5, \"muon_lr\": 0.24, \"muon_momentum\": 0.6, \"muon_ns_steps\": 3, \"optimizer\": \"muon_airbench\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

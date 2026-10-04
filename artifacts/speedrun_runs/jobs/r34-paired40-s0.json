@@ -1,0 +1,36 @@
+{
+  "round": "r34",
+  "n": 40,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "paired40-s0-pool",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "avgsum-e10.0-s0",
+          "params": {
+            "global_pool": "fullpool_avgsum"
+          },
+          "hypothesis": "SAFE finalist: the record with max + mean pooling through ATen max_pool2d / avg_pool2d (Round 32 n=16: +0.11 +- 0.09 pp, -0.12 s); paired n=40 in one container vs the record"
+        }
+      ]
+    },
+    {
+      "name": "paired40-s0-stack",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "g2-192-avgsum-e10.0-s0",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "epochs": 10.0
+          },
+          "hypothesis": "AGGRESSIVE finalist: group 2 pair through 192 + the kernel-based max + mean pooling (Round 32 n=16: -0.06 +- 0.11 pp, -0.24 s); paired n=40 in one container vs the record"
+        }
+      ]
+    }
+  ]
+}

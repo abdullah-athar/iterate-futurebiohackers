@@ -1,0 +1,39 @@
+{
+  "returncode": 0,
+  "wall_seconds": 86.6,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T005720Z-c43d9415",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 10.0, \"muon_groups\": [2], \"muon_lr\": 0.24, \"muon_momentum\": 0.6, \"muon_ns_steps\": 2, \"optimizer\": \"muon_airbench\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "muon-g3only-ns2-e10.0",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 10.0, \"muon_groups\": [2], \"muon_lr\": 0.24, \"muon_momentum\": 0.6, \"muon_ns_steps\": 2, \"optimizer\": \"muon_airbench\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 10.0, \"muon_groups\": [2], \"muon_lr\": 0.24, \"muon_momentum\": 0.6, \"muon_ns_steps\": 2, \"optimizer\": \"muon_airbench\"}",
+    "delta": {
+      "optimizer": "muon_airbench",
+      "muon_lr": 0.24,
+      "muon_momentum": 0.6,
+      "muon_ns_steps": 2,
+      "muon_groups": [
+        2
+      ],
+      "epochs": 10.0
+    },
+    "hypothesis": "user request: cut Muon's per-step overhead: both cuts together",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 10.0, \"muon_groups\": [2], \"muon_lr\": 0.24, \"muon_momentum\": 0.6, \"muon_ns_steps\": 2, \"optimizer\": \"muon_airbench\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

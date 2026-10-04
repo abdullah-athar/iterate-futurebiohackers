@@ -1,0 +1,32 @@
+{
+  "returncode": 0,
+  "wall_seconds": 217.5,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T005535Z-c428ac03",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 16 --params '{\"count_nonfinite\": true, \"global_pool\": \"fullpool_avgsum\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "fullpool-avgsum-n16",
+    "n": 16,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "16",
+      "--params",
+      "{\"count_nonfinite\": true, \"global_pool\": \"fullpool_avgsum\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"global_pool\": \"fullpool_avgsum\"}",
+    "delta": {
+      "global_pool": "fullpool_avgsum"
+    },
+    "hypothesis": "max and mean both through the pooling kernels (max_pool2d + avg_pool2d): tells whether the compiled mean reduction costs time",
+    "env": {},
+    "config": "futurebiohackers {\"global_pool\": \"fullpool_avgsum\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

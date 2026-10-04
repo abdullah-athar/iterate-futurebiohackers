@@ -1,0 +1,140 @@
+{
+  "round": "r33",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "muon-ep-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "muon-lr0.24-e7.0",
+          "params": {
+            "optimizer": "muon_airbench",
+            "muon_lr": 0.24,
+            "muon_momentum": 0.6,
+            "muon_ns_steps": 3,
+            "epochs": 7.0
+          },
+          "hypothesis": "user request: does Devin's Muon (+0.93 pp at 10 ep, +1.07 s of per-step overhead) pay at far fewer epochs? lr 0.24, paired vs the record at 10 ep; report dtime_adj"
+        },
+        {
+          "label": "muon-lr0.24-e7.5",
+          "params": {
+            "optimizer": "muon_airbench",
+            "muon_lr": 0.24,
+            "muon_momentum": 0.6,
+            "muon_ns_steps": 3,
+            "epochs": 7.5
+          },
+          "hypothesis": "user request: does Devin's Muon (+0.93 pp at 10 ep, +1.07 s of per-step overhead) pay at far fewer epochs? lr 0.24, paired vs the record at 10 ep; report dtime_adj"
+        }
+      ]
+    },
+    {
+      "name": "muon-ep-b",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "muon-lr0.24-e8.0",
+          "params": {
+            "optimizer": "muon_airbench",
+            "muon_lr": 0.24,
+            "muon_momentum": 0.6,
+            "muon_ns_steps": 3,
+            "epochs": 8.0
+          },
+          "hypothesis": "user request: does Devin's Muon (+0.93 pp at 10 ep, +1.07 s of per-step overhead) pay at far fewer epochs? lr 0.24, paired vs the record at 10 ep; report dtime_adj"
+        },
+        {
+          "label": "muon-lr0.24-e8.5",
+          "params": {
+            "optimizer": "muon_airbench",
+            "muon_lr": 0.24,
+            "muon_momentum": 0.6,
+            "muon_ns_steps": 3,
+            "epochs": 8.5
+          },
+          "hypothesis": "user request: does Devin's Muon (+0.93 pp at 10 ep, +1.07 s of per-step overhead) pay at far fewer epochs? lr 0.24, paired vs the record at 10 ep; report dtime_adj"
+        }
+      ]
+    },
+    {
+      "name": "muon-ov-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "muon-ns2-e10.0",
+          "params": {
+            "optimizer": "muon_airbench",
+            "muon_lr": 0.24,
+            "muon_momentum": 0.6,
+            "muon_ns_steps": 2,
+            "epochs": 10.0
+          },
+          "hypothesis": "user request: cut Muon's per-step overhead: 2 Newton-Schulz steps instead of 3 (a third fewer matmuls)"
+        },
+        {
+          "label": "muon-g3only-e10.0",
+          "params": {
+            "optimizer": "muon_airbench",
+            "muon_lr": 0.24,
+            "muon_momentum": 0.6,
+            "muon_ns_steps": 3,
+            "muon_groups": [
+              2
+            ],
+            "epochs": 10.0
+          },
+          "hypothesis": "user request: cut Muon's per-step overhead: Muon only on group 3's three convs (SGD for groups 1-2): two thirds fewer per-filter kernel sequences"
+        },
+        {
+          "label": "muon-ns3-e10.0-ref",
+          "params": {
+            "optimizer": "muon_airbench",
+            "muon_lr": 0.24,
+            "muon_momentum": 0.6,
+            "muon_ns_steps": 3,
+            "epochs": 10.0
+          },
+          "hypothesis": "same-container reference for the overhead cuts (Round 29: +0.93 pp, +1.07 s)"
+        }
+      ]
+    },
+    {
+      "name": "muon-ov-b",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "muon-g3only-ns2-e10.0",
+          "params": {
+            "optimizer": "muon_airbench",
+            "muon_lr": 0.24,
+            "muon_momentum": 0.6,
+            "muon_ns_steps": 2,
+            "muon_groups": [
+              2
+            ],
+            "epochs": 10.0
+          },
+          "hypothesis": "user request: cut Muon's per-step overhead: both cuts together"
+        },
+        {
+          "label": "muon-g3only-ns2-e8.0",
+          "params": {
+            "optimizer": "muon_airbench",
+            "muon_lr": 0.24,
+            "muon_momentum": 0.6,
+            "muon_ns_steps": 2,
+            "muon_groups": [
+              2
+            ],
+            "epochs": 8.0
+          },
+          "hypothesis": "user request: cut Muon's per-step overhead: both cuts at 8 epochs"
+        }
+      ]
+    }
+  ]
+}

@@ -129,7 +129,15 @@ OWN_SWITCHES = {
     "count_nonfinite": {"count_nonfinite": True},
     # devin/ ports
     "muon_airbench": {"optimizer": "muon_airbench", "muon_lr": 0.24, "muon_momentum": 0.6},
+    "muon_airbench_g3": {
+        "optimizer": "muon_airbench",
+        "muon_groups": [2],
+        "muon_lr": 0.24,
+        "muon_momentum": 0.6,
+    },
     "fullpool": {"global_pool": "fullpool"},
+    "fullpool_sum": {"global_pool": "fullpool_sum"},
+    "fullpool_avgsum": {"global_pool": "fullpool_avgsum"},
     # cheaper residual pair in group 3 (residual and output stay at widths[2])
     "g3_pair_inner512": {"g3_pair": "inner512"},
     "g3_pair_inner640": {"g3_pair": "inner640"},
@@ -932,9 +940,9 @@ def main() -> int:
         flat = x.flatten(2)
         if mode == "maxmean_cat":
             return torch.cat((flat.max(2).values, flat.mean(2)), 1)
-        if mode == "maxmean_sum":
+        if mode in ("maxmean_sum", "fullpool_sum", "fullpool_avgsum"):
             return flat.max(2).values + flat.mean(2)
-        return flat.max(2).values  # "max" (no run here uses adaptive or amax)
+        return flat.max(2).values  # "max" / "fullpool" (no run here uses adaptive or amax)
 
     probe_images = synthetic_split(train=False).images[:4].float().div(255)
 
@@ -966,13 +974,17 @@ def main() -> int:
         return (
             run.state.net.head.in_features == width
             and tuple(taken["head"].shape) == (len(probe_images), width)
-            and torch.equal(taken["head"], expected)
+            and (
+                torch.allclose(taken["head"], expected, atol=1e-5, rtol=1e-5)
+                if mode == "fullpool_avgsum"  # avg_pool2d rounds differently from mean
+                else torch.equal(taken["head"], expected)
+            )
         )
 
     check_all(
         "every run: the head has pooled(w3) inputs (+ pooled(w2) in front with multiscale_head) "
         "and on a probe batch it is fed exactly max / cat(max, mean) / max + mean over the "
-        "positions of group 3's output (and group 2's), bit for bit",
+        "positions of group 3's output (and group 2's), bit for bit (fullpool_avgsum within 1e-5)",
         every,
         head_ok,
     )
@@ -1051,8 +1063,18 @@ def main() -> int:
             sgd = [o for o in opts if isinstance(o, torch.optim.SGD)]
             muon_ids = {id(p) for o in muon for g in o.param_groups for p in g["params"]}
             sgd_ids = {id(p) for o in sgd for g in o.param_groups for p in g["params"]}
-            filters = {id(p) for p in net.parameters() if p.ndim == 4 and p.requires_grad}
-            rest = {id(p) for p in net.parameters() if p.ndim < 4 and p.requires_grad}
+            prefixes = tuple(f"layers.{g}." for g in hyp["muon_groups"])
+            named = [(n, p) for n, p in net.named_parameters() if p.requires_grad]
+            filters = {id(p) for n, p in named if p.ndim == 4 and n.startswith(prefixes)}
+            rest = {id(p) for n, p in named if id(p) not in filters}
+            if hyp["muon_groups"] != [0, 1, 2]:
+                check(
+                    f"{name}: Muon holds exactly the convs of groups {hyp['muon_groups']} "
+                    "and the other groups' filters are on SGD",
+                    len(filters)
+                    == sum(1 for n, p in named if p.ndim == 4 and n.startswith(prefixes))
+                    and any(p.ndim == 4 and id(p) in rest for _, p in named),
+                )
             check(
                 f"{name}: conv filters on MuonAirbench, every other trainable tensor on SGD, "
                 "no overlap, momentum buffers created",
@@ -1072,6 +1094,16 @@ def main() -> int:
                 f"{name}: fullpool equals the per-channel max over positions",
                 torch.equal(new.pool_features(probe, "fullpool"), new.pool_features(probe, "max")),
             )
+        if hyp["global_pool"] in ("fullpool_sum", "fullpool_avgsum"):
+            probe = torch.randn(3, 8, 5, 5)
+            check(
+                f"{name}: {hyp['global_pool']} equals max + mean over positions (maxmean_sum)",
+                torch.allclose(
+                    new.pool_features(probe, hyp["global_pool"]),
+                    new.pool_features(probe, "maxmean_sum"),
+                    atol=1e-6,
+                ),
+            )
 
     rejected = {
         "optimizer muon_airbench with muon_ns_steps 0": {
@@ -1079,6 +1111,14 @@ def main() -> int:
             "muon_ns_steps": 0,
         },
         "global_pool fullpool2 (unknown)": {"global_pool": "fullpool2"},
+        "optimizer muon_airbench with muon_groups [] (empty)": {
+            "optimizer": "muon_airbench",
+            "muon_groups": [],
+        },
+        "optimizer muon_airbench with muon_groups [3] (no such group)": {
+            "optimizer": "muon_airbench",
+            "muon_groups": [3],
+        },
         "g3_pair inner128 (unknown variant)": {"g3_pair": "inner128"},
         "g3_pair inner512 with 1x1 inner kernels in group 3": {
             "g3_pair": "inner512",

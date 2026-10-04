@@ -1,0 +1,23 @@
+{
+  "round": "r31",
+  "n": 40,
+  "seed": 40,
+  "control": {},
+  "jobs": [
+    {
+      "name": "paired40-s40",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "stack-e10.0-s40",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "maxmean_sum",
+            "epochs": 10.0
+          },
+          "hypothesis": "paired n=40 in ONE container vs the record (PR #23 recipe): group 2 residual pair through 192 channels + summed max/mean pooling at 10 epochs; n=16 paired gave +0.04 +- 0.08 pp / -0.13 s"
+        }
+      ]
+    }
+  ]
+}

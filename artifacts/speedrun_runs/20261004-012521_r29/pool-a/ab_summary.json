@@ -1,0 +1,248 @@
+{
+  "round": "r29",
+  "job": "pool-a",
+  "environment": {
+    "task_id": "ta-01M424T44C54Q6D6C03C36Q9WR",
+    "hostname": "modal",
+    "region": "us-east",
+    "cloud": "CLOUD_PROVIDER_AWS",
+    "cpu_count": 20,
+    "affinity_cpus": 20,
+    "cgroup_cpu_max": "20000000",
+    "compile_threads_env": null,
+    "gpu_name": "NVIDIA A100-SXM4-80GB",
+    "gpu_memory": "81920 MiB",
+    "gpu_power_limit": "400.00 W",
+    "driver": "580.95.05",
+    "mig": "Disabled"
+  },
+  "gpu_attempts": [
+    "NVIDIA A100-SXM4-80GB @ 400.00 W [task ta-01M424T44C54Q6D6C03C36Q9WR CLOUD_PROVIDER_AWS/us-east]"
+  ],
+  "container_seconds": 327.6,
+  "rows": [
+    {
+      "label": "fullpool",
+      "params": "{\"count_nonfinite\": true, \"global_pool\": \"fullpool\"}",
+      "delta": {
+        "global_pool": "fullpool"
+      },
+      "hypothesis": "systems: Devin's full-map F.max_pool2d instead of max over the flattened positions (same values; kernel speed check)",
+      "config": "futurebiohackers {\"global_pool\": \"fullpool\"}",
+      "returncode": 0,
+      "folder": "artifacts/speedrun_runs/20261004-012521_r29/pool-a/00_fullpool",
+      "gpu": "NVIDIA A100-SXM4-80GB",
+      "power_limit": "400.00 W",
+      "task_id": "ta-01M424T44C54Q6D6C03C36Q9WR",
+      "region": "us-east",
+      "cloud": "CLOUD_PROVIDER_AWS",
+      "container_wall": 180.3,
+      "deadline_hit": false,
+      "nonfinite": 0,
+      "build_mode": "warm",
+      "complete": true,
+      "qualified": true,
+      "run_error": null,
+      "n": 8,
+      "trials_ok": 8,
+      "mean_acc": 0.7506,
+      "acc_std": 0.0018685364784848482,
+      "mean_time": 4.270163689499999,
+      "time_std": 0.015537808514296338,
+      "mean_eval": 0.0835322537500005,
+      "build_time": 134.056059601,
+      "mean_prepare": 0.060555436249998706,
+      "mean_train": 4.20960825325,
+      "by_trial": {
+        "0": [
+          0.7506,
+          4.302747941999996
+        ],
+        "1": [
+          0.7508,
+          4.2494512149999935
+        ],
+        "2": [
+          0.7542,
+          4.261758411999978
+        ],
+        "3": [
+          0.7489,
+          4.260083086000009
+        ],
+        "4": [
+          0.7516,
+          4.269064923000002
+        ],
+        "5": [
+          0.7507,
+          4.272381620000004
+        ],
+        "6": [
+          0.7479,
+          4.27460429300001
+        ],
+        "7": [
+          0.7501,
+          4.271218024999996
+        ]
+      },
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "accs": [
+        0.7506,
+        0.7508,
+        0.7542,
+        0.7489,
+        0.7516,
+        0.7507,
+        0.7479,
+        0.7501
+      ],
+      "times": [
+        4.302747941999996,
+        4.2494512149999935,
+        4.261758411999978,
+        4.260083086000009,
+        4.269064923000002,
+        4.272381620000004,
+        4.27460429300001,
+        4.271218024999996
+      ],
+      "evals": [
+        0.0878733039999986,
+        0.08238384599999904,
+        0.08334948300000633,
+        0.08452620699998192,
+        0.08033400400000801,
+        0.08220746500001042,
+        0.08416823700000009,
+        0.08341548399999965
+      ],
+      "verdict": "QUALIFIED (>= 75%)",
+      "paired": {
+        "pairs": 8,
+        "dacc": 0.00022500000000003073,
+        "dacc_se": 0.0007729234854018342,
+        "dtime": -0.13074839412499983,
+        "dtime_se": 0.0022130964098772588
+      },
+      "dtime_adj": -0.1532483941250029
+    },
+    {
+      "label": "control",
+      "params": "{\"count_nonfinite\": true}",
+      "delta": {},
+      "hypothesis": "control",
+      "config": "futurebiohackers {}",
+      "returncode": 0,
+      "folder": "artifacts/speedrun_runs/20261004-012521_r29/pool-a/01_control",
+      "gpu": "NVIDIA A100-SXM4-80GB",
+      "power_limit": "400.00 W",
+      "task_id": "ta-01M424T44C54Q6D6C03C36Q9WR",
+      "region": "us-east",
+      "cloud": "CLOUD_PROVIDER_AWS",
+      "container_wall": 85.8,
+      "deadline_hit": false,
+      "nonfinite": 0,
+      "build_mode": "warm",
+      "complete": true,
+      "qualified": true,
+      "run_error": null,
+      "n": 8,
+      "trials_ok": 8,
+      "mean_acc": 0.750375,
+      "acc_std": 0.002741089460154743,
+      "mean_time": 4.400912083624998,
+      "time_std": 0.019138437576586512,
+      "mean_eval": 0.07975422250000008,
+      "build_time": 39.401175419,
+      "mean_prepare": 0.055190484749996216,
+      "mean_train": 4.345721598875002,
+      "by_trial": {
+        "0": [
+          0.749,
+          4.438094794000023
+        ],
+        "1": [
+          0.7543,
+          4.376132918999986
+        ],
+        "2": [
+          0.7533,
+          4.379543895999973
+        ],
+        "3": [
+          0.7491,
+          4.396012238999958
+        ],
+        "4": [
+          0.7483,
+          4.399939597000014
+        ],
+        "5": [
+          0.7506,
+          4.403415481000025
+        ],
+        "6": [
+          0.7462,
+          4.405752522
+        ],
+        "7": [
+          0.7522,
+          4.4084052210000095
+        ]
+      },
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "accs": [
+        0.749,
+        0.7543,
+        0.7533,
+        0.7491,
+        0.7483,
+        0.7506,
+        0.7462,
+        0.7522
+      ],
+      "times": [
+        4.438094794000023,
+        4.376132918999986,
+        4.379543895999973,
+        4.396012238999958,
+        4.399939597000014,
+        4.403415481000025,
+        4.405752522,
+        4.4084052210000095
+      ],
+      "evals": [
+        0.08992201799998156,
+        0.0792570070000238,
+        0.08087724400002116,
+        0.07670640099996717,
+        0.07782813200003602,
+        0.08301341599997158,
+        0.07382738100000097,
+        0.07660218099999838
+      ],
+      "verdict": "QUALIFIED (>= 75%)"
+    }
+  ],
+  "profile": null
+}

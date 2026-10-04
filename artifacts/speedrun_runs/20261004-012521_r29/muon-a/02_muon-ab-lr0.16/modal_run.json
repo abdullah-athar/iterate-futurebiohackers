@@ -1,0 +1,35 @@
+{
+  "returncode": 0,
+  "wall_seconds": 92.8,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T002858Z-3d6d5cce",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"muon_lr\": 0.16, \"muon_momentum\": 0.6, \"muon_ns_steps\": 3, \"optimizer\": \"muon_airbench\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "muon-ab-lr0.16",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"muon_lr\": 0.16, \"muon_momentum\": 0.6, \"muon_ns_steps\": 3, \"optimizer\": \"muon_airbench\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"muon_lr\": 0.16, \"muon_momentum\": 0.6, \"muon_ns_steps\": 3, \"optimizer\": \"muon_airbench\"}",
+    "delta": {
+      "optimizer": "muon_airbench",
+      "muon_momentum": 0.6,
+      "muon_ns_steps": 3,
+      "muon_lr": 0.16
+    },
+    "hypothesis": "Devin's Muon at lr 0.16",
+    "env": {},
+    "config": "futurebiohackers {\"muon_lr\": 0.16, \"muon_momentum\": 0.6, \"muon_ns_steps\": 3, \"optimizer\": \"muon_airbench\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
