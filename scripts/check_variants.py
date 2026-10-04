@@ -7,15 +7,18 @@
    tests the code path rather than promoted values. The control also keeps the reference's step
    count and prints nothing on stderr.
 2. Every hyperparameter variant we plan to screen (optimizer, schedule shape, augmentation,
-   resolution and batch schedules, systems switches; the architecture is out of scope) and every
-   default-off switch of our own (the un-augmented finish, progressive depth, the label-smoothing
-   schedule, the non-finite counter) must run end to end on CPU with finite predictions, taking
-   exactly the optimizer steps the recipe's own loop arithmetic implies, with the learning rate,
-   weight decay, whitening-bias gradient, training resolution, input layout, skip phase and label
-   smoothing of every step following the recipe's formulas on example progress.
+   resolution and batch schedules, systems switches) and every default-off switch of our own (the
+   un-augmented finish, progressive depth, the label-smoothing schedule, the non-finite counter,
+   the narrower residual pairs, squeeze-and-excitation, the multi-scale head and the max + mean
+   poolings) must run end to end on CPU with finite predictions, taking exactly the optimizer
+   steps the recipe's own loop arithmetic implies, with the learning rate, weight decay,
+   whitening-bias gradient, training resolution, input layout, skip phase and label smoothing of
+   every step following the recipe's formulas on example progress.
    Structural checks cover the downscaled copies, the lookahead EMA, the whitening-bias freeze,
    the optimizer parametrization, BatchNorm momentum and recalibration, the un-augmented view,
-   the skipped convolutions, the smoothing tensor and the combinations build must reject.
+   the skipped convolutions, the smoothing tensor, the pair shapes, the SE gate, the features fed
+   to the head, the reset of every new parameter in prepare and the combinations build must
+   reject.
 
 CPU, synthetic images, well under a minute. Run from the speedrun env with cwd cifar100-speedrun:
     uv run python ../scripts/check_variants.py [reference_submission_dir]
@@ -27,6 +30,7 @@ ref> to compare against another commit (it must share the baseline's state layou
 from __future__ import annotations
 
 import contextlib
+import copy
 import io
 import math
 import os
@@ -59,6 +63,9 @@ OFF: dict[str, object] = {
     "skip_residual_groups": [],
     "label_smoothing_end": None,
     "g3_pair": "full",
+    "g2_pair": "full",
+    "se_groups": [],  # se_ratio is inert without se_groups
+    "multiscale_head": False,
 }
 # --params deltas on top of BASE; every other value is the recipe's default (28 px first half).
 VARIANTS = {
@@ -146,6 +153,30 @@ OWN_SWITCHES = {
     },
     # label smoothing 0.35 -> 0.15 linearly over example progress
     "label_smoothing_0.35_to_0.15": {"label_smoothing": 0.35, "label_smoothing_end": 0.15},
+    # squeeze-and-excitation: group 3 (64 -> 4 -> 64 at BASE widths), groups 2 and 3, ratio 8,
+    # and a depth-2 group (the pair-free path of ConvGroup.forward)
+    "se_g2": {"se_groups": [2]},
+    "se_g12": {"se_groups": [1, 2]},
+    "se_ratio8": {"se_groups": [2], "se_ratio": 8},
+    "se_g1_depth2": {"se_groups": [1], "depths": [3, 2, 3]},
+    # multi-scale head (group 2's pooled output concatenated in front of group 3's) and the
+    # max + mean poolings, alone and together
+    "multiscale": {"multiscale_head": True},
+    "pool_maxmean_cat": {"global_pool": "maxmean_cat"},
+    "pool_maxmean_sum": {"global_pool": "maxmean_sum"},
+    "multiscale_maxmean_cat": {"multiscale_head": True, "global_pool": "maxmean_cat"},
+    # narrower residual pairs: group 3 through 448 / 384 channels, group 2 through 192
+    "g3_inner448": {"g3_pair": "inner448"},
+    "g3_inner384": {"g3_pair": "inner384"},
+    "g2_inner192": {"g2_pair": "inner192"},
+    "g2_inner192_g3_inner384": {"g2_pair": "inner192", "g3_pair": "inner384"},
+    # the architecture switches stacked
+    "stack_all": {
+        "se_groups": [2],
+        "multiscale_head": True,
+        "global_pool": "maxmean_sum",
+        "g2_pair": "inner192",
+    },
 }
 results: list[bool] = []
 
@@ -772,45 +803,242 @@ def main() -> int:
             and math.isclose(float(run.state.smoothing), 0.35, abs_tol=1e-7),
         )
 
-    # 6. Combinations build must reject.
-    # g3_pair: conv shapes of group 3's pair, the residual/output width, and a probe forward.
+    # 6. Architecture switches: residual pairs, squeeze-and-excitation, the head's features.
+    # g3_pair / g2_pair: conv shapes of the pair, the residual/output width, and a probe forward.
     for name, run in runs.items():
         hyp, net = run.state.hyp, run.state.net
-        pair = hyp["g3_pair"]
-        if pair == "full":
-            continue
-        g, w3 = net.layers[2], hyp["widths"][2]
-        kind, inner = new.G3_PAIRS[pair]
-        shapes = {
-            "conv2": tuple(g.conv2.weight.shape),
-            "conv3": tuple(g.conv3.weight.shape),
-            "conv2a": tuple(g.conv2a.weight.shape)
-            if getattr(g, "conv2a", None) is not None
-            else None,
-        }
-        if kind == "bottleneck":
-            expected = {
-                "conv2": (inner, inner, 3, 3),
-                "conv3": (w3, inner, 1, 1),
-                "conv2a": (inner, w3, 1, 1),
+        for key, index, table in (("g2_pair", 1, new.G2_PAIRS), ("g3_pair", 2, new.G3_PAIRS)):
+            pair = hyp[key]
+            if pair == "full":
+                continue
+            g, width = net.layers[index], hyp["widths"][index]
+            kind, inner = table[pair]
+            shapes = {
+                "conv2": tuple(g.conv2.weight.shape),
+                "conv3": tuple(g.conv3.weight.shape),
+                "conv2a": tuple(g.conv2a.weight.shape)
+                if getattr(g, "conv2a", None) is not None
+                else None,
             }
-        else:
-            expected = {"conv2": (inner, w3, 3, 3), "conv3": (w3, inner, 3, 3), "conv2a": None}
-        with torch.inference_mode():
-            probe = g(torch.randn(2, hyp["widths"][1], 6, 6))
-        check(
-            f"{name}: group 3 pair shapes {shapes} == {expected}; output width {w3}; "
-            f"norm2 over {g.norm2.num_features} channels",
-            shapes == expected
-            and tuple(probe.shape) == (2, w3, 3, 3)
-            and g.norm2.num_features == inner
-            and g.norm3.num_features == w3,
-        )
+            if kind == "bottleneck":
+                expected = {
+                    "conv2": (inner, inner, 3, 3),
+                    "conv3": (width, inner, 1, 1),
+                    "conv2a": (inner, width, 1, 1),
+                }
+            else:
+                expected = {
+                    "conv2": (inner, width, 3, 3),
+                    "conv3": (width, inner, 3, 3),
+                    "conv2a": None,
+                }
+            with torch.inference_mode():
+                probe = g(torch.randn(2, hyp["widths"][index - 1], 6, 6))
+            check(
+                f"{name}: group {index + 1} pair {pair} shapes {shapes} == {expected}; output "
+                f"width {width}; norm2 over {g.norm2.num_features} channels",
+                shapes == expected
+                and tuple(probe.shape) == (2, width, 3, 3)
+                and g.norm2.num_features == inner
+                and g.norm3.num_features == width,
+            )
     check(
-        "g3_pair full (default) registers no conv2a and the same state_dict keys as the control",
+        "the defaults (inner512 pair) register no conv2a and the same state_dict keys as the "
+        "control",
         getattr(d.state.net.layers[2], "conv2a", None) is None and set(d.weights) == set(b.weights),
     )
 
+    # Squeeze-and-excitation: exactly the listed groups carry the two Linear layers, in the
+    # state_dict and the optimizer's base group; the gate is applied at the end of the group.
+    def se_keys(hyp):
+        return {
+            f"net.layers.{g}.se_fc{i}.{p}"
+            for g in hyp["se_groups"]
+            for i in (1, 2)
+            for p in ("weight", "bias")
+        }
+
+    def se_shapes_ok(run):
+        hyp, net = run.state.hyp, run.state.net
+        ratio = hyp["se_ratio"]
+        for index, g in enumerate(net.layers):
+            c = hyp["widths"][index]
+            if index not in hyp["se_groups"]:
+                if g.se_fc1 is not None or g.se_fc2 is not None:
+                    return False
+                continue
+            shapes = tuple(
+                tuple(p.shape)
+                for p in (g.se_fc1.weight, g.se_fc1.bias, g.se_fc2.weight, g.se_fc2.bias)
+            )
+            if shapes != ((c // ratio, c), (c // ratio,), (c, c // ratio), (c,)):
+                return False
+        return {k for k in run.weights if "se_fc" in k} == se_keys(hyp)
+
+    check_all(
+        "every run: exactly the se_groups groups carry se_fc1 (c -> c / se_ratio) and se_fc2 (back "
+        "to c) with biases, and the state_dict's se_fc keys are exactly theirs (4 per SE group, "
+        "none without SE)",
+        every,
+        se_shapes_ok,
+    )
+
+    def se_in_base_group(run):
+        others = run.state.optimizers[0].param_groups[1]["params"]
+        params = [p for n, p in run.state.net.named_parameters() if "se_fc" in n]
+        return len(params) == 4 * len(run.state.hyp["se_groups"]) and all(
+            any(p is q for q in others) for p in params
+        )
+
+    check_all(
+        "every run: the SE weights and biases (4 per SE group) train in SGD's base group (lr, not "
+        "the BatchNorm-bias group)",
+        every,
+        se_in_base_group,
+    )
+
+    def se_gate_ok(run):
+        """With the SE weights zeroed the gate is sigmoid(0) = 0.5 for every channel, so the
+        group's output must be exactly half of the same group's output without the gate."""
+        hyp, net = run.state.hyp, run.state.net
+        for index in hyp["se_groups"]:
+            gated = copy.deepcopy(net.layers[index])
+            for p in (*gated.se_fc1.parameters(), *gated.se_fc2.parameters()):
+                p.data.zero_()
+            plain = copy.deepcopy(net.layers[index])
+            plain.se_fc1 = plain.se_fc2 = None
+            c_in = hyp["widths"][index - 1] if index else net.whiten.out_channels
+            x = torch.randn(2, c_in, 8, 8)
+            with torch.inference_mode():
+                if not torch.equal(gated(x), 0.5 * plain(x)):
+                    return False
+        return True
+
+    se_runs = {k: r for k, r in runs.items() if r.state.hyp["se_groups"]}
+    check_all(
+        f"every SE run ({sorted(se_runs)}): a probe forward of each SE group with its SE weights "
+        "zeroed equals 0.5 x the group's forward without the gate (sigmoid(0) = 0.5), depth-2 "
+        "group included",
+        se_runs,
+        se_gate_ok,
+    )
+
+    # The head's features: pooled(w3), with group 2's pooled output in front under
+    # multiscale_head, pooled by max / cat(max, mean) / max + mean over the positions.
+    def ref_pool(x, mode):
+        flat = x.flatten(2)
+        if mode == "maxmean_cat":
+            return torch.cat((flat.max(2).values, flat.mean(2)), 1)
+        if mode == "maxmean_sum":
+            return flat.max(2).values + flat.mean(2)
+        return flat.max(2).values  # "max" (no run here uses adaptive or amax)
+
+    probe_images = synthetic_split(train=False).images[:4].float().div(255)
+
+    def head_features(run):
+        """Group 2's and group 3's outputs and the head's input on a probe batch, via hooks."""
+        net, taken = run.state.net, {}
+        handles = [
+            net.layers[1].register_forward_hook(lambda m, a, out: taken.__setitem__("g2", out)),
+            net.layers[2].register_forward_hook(lambda m, a, out: taken.__setitem__("g3", out)),
+            net.head.register_forward_pre_hook(lambda m, a: taken.__setitem__("head", a[0])),
+        ]
+        run.state.classifier.eval()
+        with torch.inference_mode():
+            run.state.classifier(probe_images)
+        for handle in handles:
+            handle.remove()
+        return taken
+
+    def head_ok(run):
+        hyp = run.state.hyp
+        w2, w3 = hyp["widths"][1:]
+        mode = hyp["global_pool"]
+        taken = head_features(run)
+        expected = ref_pool(taken["g3"], mode)
+        width = 2 * w3 if mode == "maxmean_cat" else w3
+        if hyp["multiscale_head"]:
+            expected = torch.cat((ref_pool(taken["g2"], mode), expected), 1)
+            width += 2 * w2 if mode == "maxmean_cat" else w2
+        return (
+            run.state.net.head.in_features == width
+            and tuple(taken["head"].shape) == (len(probe_images), width)
+            and torch.equal(taken["head"], expected)
+        )
+
+    check_all(
+        "every run: the head has pooled(w3) inputs (+ pooled(w2) in front with multiscale_head) "
+        "and on a probe batch it is fed exactly max / cat(max, mean) / max + mean over the "
+        "positions of group 3's output (and group 2's), bit for bit",
+        every,
+        head_ok,
+    )
+
+    # Muon: the SE Linear weights are not conv filters; they must train with the head's SGD group.
+    muon_state = new.build(
+        BuildContext(torch.device("cpu"), {**BASE, "optimizer": "muon", "se_groups": [1, 2]})
+    )
+    seed_everything(7)
+    new.prepare(muon_state, synthetic_split(train=True), 7)
+    sgd, muon = muon_state.optimizers
+    head_group = sgd.param_groups[2]["params"]
+    covered = sorted(
+        id(p) for optimizer in (sgd, muon) for g in optimizer.param_groups for p in g["params"]
+    )
+    check(
+        "muon + se_groups [1, 2]: every trainable parameter sits in exactly one optimizer group, "
+        "the 8 SE weights and biases share the head's SGD group, Muon gets the conv filters only",
+        covered == sorted(id(p) for p in muon_state.net.parameters() if p.requires_grad)
+        and sum("se_fc" in n for n, _ in muon_state.net.named_parameters()) == 8
+        and all(
+            any(p is q for q in head_group)
+            for n, p in muon_state.net.named_parameters()
+            if "se_fc" in n or n == "head.weight"
+        )
+        and len(head_group) == 9
+        and all(p.ndim == 4 for p in muon.param_groups[0]["params"]),
+    )
+
+    # Every new parameter is reset by prepare: after a trial, the next prepare must leave the
+    # network exactly as a fresh build's first prepare with the same seed (no trained state
+    # survives), and every trainable parameter must have moved during the trial. Last use of
+    # these runs.
+    def reset_ok(run):
+        trained = {k: v.clone() for k, v in run.state.net.state_dict().items()}
+        data = synthetic_split(train=True)
+        seed_everything(11)
+        new.prepare(run.state, data, 11)
+        again = run.state.net.state_dict()
+        fresh = new.build(BuildContext(torch.device("cpu"), run.state.hyp))
+        seed_everything(11)
+        new.prepare(fresh, data, 11)
+        first = fresh.net.state_dict()
+        trainable = [n for n, p in run.state.net.named_parameters() if p.requires_grad]
+        return (
+            set(again) == set(first)
+            and all(torch.equal(again[k], first[k]) for k in again)
+            and all(not torch.equal(trained[k], again[k]) for k in trainable)
+        )
+
+    reset_runs = [
+        name
+        for name in (
+            "se_g12",
+            "se_g1_depth2",
+            "multiscale_maxmean_cat",
+            "g2_inner192_g3_inner384",
+            "stack_all",
+        )
+        if name in runs
+    ]
+    check_all(
+        f"{reset_runs}: after a trial, prepare resets every parameter (SE, head, pairs included) "
+        "to a fresh build's seeded init, bit for bit, and every trainable parameter had moved",
+        {name: runs[name] for name in reset_runs},
+        reset_ok,
+    )
+
+    # 7. Combinations build must reject.
     rejected = {
         "g3_pair inner128 (unknown variant)": {"g3_pair": "inner128"},
         "g3_pair inner512 with 1x1 inner kernels in group 3": {
@@ -837,6 +1065,20 @@ def main() -> int:
             "skip_compile": "turbo",
         },
         "label_smoothing_end 1.0 (must be < 1)": {"label_smoothing_end": 1.0},
+        "g2_pair inner64x (unknown variant)": {"g2_pair": "inner64x"},
+        "g2_pair 5 (not a string)": {"g2_pair": 5},
+        "g2_pair inner192 with group 2 at depth 2": {"g2_pair": "inner192", "depths": [3, 2, 3]},
+        "se_groups [3] (not 0/1/2)": {"se_groups": [3]},
+        "se_groups [2, 1] (not sorted)": {"se_groups": [2, 1]},
+        "se_groups [2, 2] (duplicate)": {"se_groups": [2, 2]},
+        "se_ratio 7 with group 3 at 768 channels (768 % 7 != 0)": {
+            "se_groups": [2],
+            "se_ratio": 7,
+            "widths": [64, 256, 768],
+        },
+        "se_ratio 0 with group 3": {"se_groups": [2], "se_ratio": 0},
+        "multiscale_head 1 (not a boolean)": {"multiscale_head": 1},
+        "global_pool meanmax (unknown)": {"global_pool": "meanmax"},
     }
     for name, delta in rejected.items():
         try:

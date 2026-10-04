@@ -71,12 +71,28 @@ DEFAULTS = {
     "stem": "patch2",  # "patch2": 2x2 whitening at 31x31; "patch4s2": 4x4 stride-2 at 15x15
     "inner_kernels": [3, 3, 3],  # kernel size of conv2/conv3 in each group (1 or 3)
     # Group 3's residual pair (the two convs after conv1; the residual and the group output keep
-    # widths[2] channels): "full" = two 3x3 convs at widths[2]; "inner512" / "inner640" = the
-    # 3x3 pair through 512 / 640 channels; "bottleneck384" = 1x1 -> 384, 3x3 at 384, 1x1 back.
+    # widths[2] channels): "full" = two 3x3 convs at widths[2]; "inner384" / "inner448" /
+    # "inner512" / "inner640" = the 3x3 pair through that many channels; "bottleneck384" = 1x1
+    # -> 384, 3x3 at 384, 1x1 back.
     "g3_pair": "inner512",
+    # Group 2's residual pair, the same way: "full" = two 3x3 convs at widths[1]; "inner192" =
+    # the 3x3 pair through 192 channels (the residual and the output keep widths[1]).
+    "g2_pair": "full",
     # "max" is max(dim).values; adaptive_max_pool2d's backward uses slow atomics and
-    # "amax" trains to NaN under torch.compile in torch 2.4.
+    # "amax" trains to NaN under torch.compile in torch 2.4. "maxmean_cat" feeds the head the
+    # per-channel max and mean concatenated (twice the channels); "maxmean_sum" adds them.
     "global_pool": "max",
+    # Multi-scale head (off): the head also reads group 2's output (widths[1] channels), pooled
+    # by the global_pool rule and concatenated in front of group 3's pooled features, so it has
+    # pooled(widths[1]) + pooled(widths[2]) inputs (256 + 768 by default).
+    "multiscale_head": False,
+    # Squeeze-and-excitation (off with []): each listed group (indices 0/1/2) ends with a channel
+    # gate, out * sigmoid(fc2(act(fc1(mean of out over positions)))), fc1: c -> c / se_ratio and
+    # fc2: c / se_ratio -> c, both with biases (768 -> 48 -> 768 for group 3), all in the network
+    # dtype. Left out on the progressive-depth skip path, which ends after conv1. se_ratio must
+    # divide the width of every listed group.
+    "se_groups": [],
+    "se_ratio": 16,
     # "muon" follows hiverge/cifar10-speedrun: Muon on conv filters, SGD on biases and head.
     "optimizer": "sgd",
     "muon_lr": 0.205,
@@ -108,12 +124,18 @@ DEFAULTS = {
 }
 
 
-# g3_pair variants: (kind, inner channels); None keeps the full-width pair.
+# g3_pair / g2_pair variants: (kind, inner channels); None keeps the full-width pair.
 G3_PAIRS = {
     "full": None,
+    "inner384": ("inner", 384),
+    "inner448": ("inner", 448),
     "inner512": ("inner", 512),
     "inner640": ("inner", 640),
     "bottleneck384": ("bottleneck", 384),
+}
+G2_PAIRS = {
+    "full": None,
+    "inner192": ("inner", 192),
 }
 
 
@@ -171,6 +193,7 @@ class ConvGroup(nn.Module):
         kernel=3,
         pool=True,
         pair=None,
+        se_ratio=None,
     ):
         super().__init__()
         self.conv1 = Conv(channels_in, channels_out)
@@ -183,7 +206,8 @@ class ConvGroup(nn.Module):
             self.conv3 = Conv(channels_out, channels_out, kernel) if depth == 3 else None
             self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
         else:
-            # A cheaper residual pair (g3_pair): the residual and the output keep channels_out.
+            # A cheaper residual pair (g3_pair / g2_pair): the residual and the output keep
+            # channels_out.
             kind, inner = pair
             if kind == "bottleneck":
                 self.conv2a = Conv(channels_out, inner, 1)
@@ -196,21 +220,53 @@ class ConvGroup(nn.Module):
                 self.norm2 = BatchNorm(inner, bn_momentum)
                 self.conv3 = Conv(inner, channels_out, kernel)
             self.norm3 = BatchNorm(channels_out, bn_momentum)
+        if se_ratio is None:
+            self.se_fc1 = self.se_fc2 = None
+        else:
+            # Squeeze-and-excitation (se_groups): a channel gate from the spatial means through
+            # a channels_out / se_ratio bottleneck; nn.Linear, so net.reset() covers it.
+            self.se_fc1 = nn.Linear(channels_out, channels_out // se_ratio)
+            self.se_fc2 = nn.Linear(channels_out // se_ratio, channels_out)
         self.act = act
 
     def forward(self, x, skip: bool = False):
         x = self.conv1(self.pool(x)) if self.pool_first else self.pool(self.conv1(x))
         x = self.norm1.activate(x, self.act)
-        if skip:  # progressive depth: conv2/conv3 and the residual add are left out
+        if skip:  # progressive depth: conv2/conv3, the residual add and the SE gate are left out
             return x
         if self.conv3 is None:
-            return self.norm2.activate(self.conv2(x), self.act)
-        x0 = x
-        conv2a = getattr(self, "conv2a", None)
-        if conv2a is not None:  # bottleneck pair: 1x1 reduction before the 3x3
-            x = self.norm2a.activate(conv2a(x), self.act)
-        x = self.norm2.activate(self.conv2(x), self.act)
-        return self.norm3.activate(self.conv3(x), self.act, x0)
+            x = self.norm2.activate(self.conv2(x), self.act)
+        else:
+            x0 = x
+            conv2a = getattr(self, "conv2a", None)
+            if conv2a is not None:  # bottleneck pair: 1x1 reduction before the 3x3
+                x = self.norm2a.activate(conv2a(x), self.act)
+            x = self.norm2.activate(self.conv2(x), self.act)
+            x = self.norm3.activate(self.conv3(x), self.act, x0)
+        if self.se_fc1 is not None:  # squeeze-and-excitation: rescale the channels by a gate
+            gate = torch.sigmoid(self.se_fc2(self.act(self.se_fc1(x.mean(dim=(2, 3))))))
+            x = x * gate[:, :, None, None]
+        return x
+
+
+def pool_features(x, mode):
+    """Global pooling of [N, C, H, W] features: "max" (max(dim).values), "adaptive" and "amax"
+    give [N, C]; "maxmean_cat" concatenates the per-channel max and mean into [N, 2C];
+    "maxmean_sum" adds them."""
+    if mode == "adaptive":
+        return F.adaptive_max_pool2d(x, 1).flatten(1)
+    x = x.flatten(2)
+    if mode == "amax":
+        return x.amax(2)
+    if mode == "maxmean_cat":
+        return torch.cat((x.max(2).values, x.mean(2)), 1)
+    if mode == "maxmean_sum":
+        return x.max(2).values + x.mean(2)
+    return x.max(2).values
+
+
+def pooled_width(channels, mode):
+    return 2 * channels if mode == "maxmean_cat" else channels
 
 
 class Net(nn.Module):
@@ -226,7 +282,7 @@ class Net(nn.Module):
         stem_width = 2 * 3 * patch * patch
         self.whiten = nn.Conv2d(3, stem_width, kernel_size=patch, padding=0, bias=True)
         self.whiten.weight.requires_grad = False
-        pair = G3_PAIRS[hyp["g3_pair"]]
+        pairs = (None, G2_PAIRS[hyp["g2_pair"]], G3_PAIRS[hyp["g3_pair"]])
         groups = []
         for index, (c_in, c_out, depth, pool_first, kernel, pool) in enumerate(
             zip(
@@ -249,14 +305,19 @@ class Net(nn.Module):
                     pool_first,
                     kernel,
                     pool,
-                    pair=pair if index == 2 else None,
+                    pair=pairs[index],
+                    se_ratio=hyp["se_ratio"] if index in hyp["se_groups"] else None,
                 )
             )
         self.layers = nn.Sequential(*groups)
-        self.head = nn.Linear(w3, num_classes, bias=False)
+        self.global_pool = hyp["global_pool"]
+        self.multiscale = hyp["multiscale_head"]
+        features = pooled_width(w3, self.global_pool)
+        if self.multiscale:
+            features += pooled_width(w2, self.global_pool)
+        self.head = nn.Linear(features, num_classes, bias=False)
         self.scaling_factor = hyp["scaling_factor"]
         self.muon_head = hyp["optimizer"] == "muon"
-        self.global_pool = hyp["global_pool"]
         self.skip_groups = tuple(hyp["skip_residual_groups"])
 
     def reset(self):
@@ -283,17 +344,19 @@ class Net(nn.Module):
         b = self.whiten.bias
         b = b if whiten_bias_grad else b.detach()
         x = self.act(F.conv2d(x, self.whiten.weight, b, stride=self.whiten_stride))
-        if skip:  # progressive depth: the groups in skip_residual_groups run shallow
+        if self.multiscale:  # the head reads group 2's pooled output in front of group 3's
             for index, group in enumerate(self.layers):
-                x = group(x, index in self.skip_groups)
+                x = group(x, skip and index in self.skip_groups)
+                if index == 1:
+                    mid = pool_features(x, self.global_pool)
+            x = torch.cat((mid, pool_features(x, self.global_pool)), 1)
         else:
-            x = self.layers(x)
-        if self.global_pool == "adaptive":
-            x = F.adaptive_max_pool2d(x, 1).flatten(1)
-        elif self.global_pool == "amax":
-            x = x.flatten(2).amax(2)
-        else:
-            x = x.flatten(2).max(2).values
+            if skip:  # progressive depth: the groups in skip_residual_groups run shallow
+                for index, group in enumerate(self.layers):
+                    x = group(x, index in self.skip_groups)
+            else:
+                x = self.layers(x)
+            x = pool_features(x, self.global_pool)
         if self.muon_head:
             return self.head(x) / x.size(-1)
         return self.head(x) * self.scaling_factor
@@ -521,12 +584,31 @@ def build(context: BuildContext):
         raise ValueError(f"g3_pair must be one of {sorted(G3_PAIRS)}")
     if hyp["g3_pair"] != "full" and (depths[2] != 3 or hyp["inner_kernels"][2] != 3):
         raise ValueError("g3_pair variants need group 3 at depth 3 with 3x3 inner kernels")
+    if not isinstance(hyp["g2_pair"], str) or hyp["g2_pair"] not in G2_PAIRS:
+        raise ValueError(f"g2_pair must be one of {sorted(G2_PAIRS)}")
+    if hyp["g2_pair"] != "full" and (depths[1] != 3 or hyp["inner_kernels"][1] != 3):
+        raise ValueError("g2_pair variants need group 2 at depth 3 with 3x3 inner kernels")
     if hyp["stem"] not in ("patch2", "patch4s2"):
         raise ValueError("stem must be patch2 or patch4s2")
     if any(b <= 0 or not 0 <= f <= 1 for b, f in hyp["batch_schedule"]):
         raise ValueError("batch_schedule entries must be [positive batch, fraction]")
-    if hyp["global_pool"] not in ("adaptive", "amax", "max"):
-        raise ValueError("global_pool must be adaptive, amax, or max")
+    if hyp["global_pool"] not in ("adaptive", "amax", "max", "maxmean_cat", "maxmean_sum"):
+        raise ValueError("global_pool must be adaptive, amax, max, maxmean_cat, or maxmean_sum")
+    if type(hyp["multiscale_head"]) is not bool:
+        raise ValueError("multiscale_head must be a boolean")
+    se_groups, se_ratio = hyp["se_groups"], hyp["se_ratio"]
+    if (
+        not isinstance(se_groups, list)
+        or any(type(g) is not int or g not in (0, 1, 2) for g in se_groups)
+        or se_groups != sorted(set(se_groups))
+    ):
+        raise ValueError("se_groups must be a sorted list of distinct group indices from 0, 1, 2")
+    if (
+        type(se_ratio) is not int
+        or se_ratio <= 0
+        or any(hyp["widths"][g] % se_ratio for g in se_groups)
+    ):
+        raise ValueError("se_ratio must be a positive integer dividing the width of every SE group")
     if hyp["optimizer"] not in ("sgd", "muon") or len(hyp["color_jitter"]) != 2:
         raise ValueError("optimizer must be sgd or muon; color_jitter needs two ranges")
     if type(hyp["count_nonfinite"]) is not bool:
@@ -644,7 +726,15 @@ def build(context: BuildContext):
         nonfinite=None,
     )
     if hyp["hard_fraction"] < 1:
-        proxy_hyp = {**hyp, "widths": hyp["proxy_widths"], "depths": [2, 2, 2], "g3_pair": "full"}
+        proxy_hyp = {
+            **hyp,
+            "widths": hyp["proxy_widths"],
+            "depths": [2, 2, 2],
+            "g3_pair": "full",
+            "g2_pair": "full",
+            "se_groups": [],
+            "multiscale_head": False,
+        }
         proxy = Net(proxy_hyp, context.num_classes).to(
             device, dtype, memory_format=torch.channels_last
         )
@@ -777,11 +867,18 @@ def _make_muon(net, batch_size, total_steps, hyp, state):
     bias_lr, head_lr = hyp["bias_lr"], hyp["head_lr"]
     norm_biases = [p for name, p in net.named_parameters() if "norm" in name and p.requires_grad]
     filters = [p for p in net.parameters() if p.ndim == 4 and p.requires_grad]
+    # The head's SGD group also takes the SE Linear weights and biases (neither conv filters
+    # nor BatchNorm biases); without SE it holds the head weight alone.
+    head = [
+        p
+        for name, p in net.named_parameters()
+        if p.ndim < 4 and "norm" not in name and p is not net.whiten.bias and p.requires_grad
+    ]
     sgd = torch.optim.SGD(
         [
             dict(params=[net.whiten.bias], lr=bias_lr, weight_decay=wd / bias_lr, whiten=True),
             dict(params=norm_biases, lr=bias_lr, weight_decay=wd / bias_lr),
-            dict(params=[net.head.weight], lr=head_lr, weight_decay=wd / head_lr),
+            dict(params=head, lr=head_lr, weight_decay=wd / head_lr),
         ],
         momentum=hyp["momentum"],
         nesterov=True,
