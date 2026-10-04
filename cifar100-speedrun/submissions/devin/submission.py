@@ -38,14 +38,20 @@ DEFAULTS = {
     "widths": [128, 256, 768],
     "depth": 3,  # convs per group; the third adds a residual connection
     "depths": [2, 3, 3],  # per-group convs; None uses depth for every group
+    "inner_widths": [0, 0, 0],  # >0 narrows a group's residual pair through that many channels
+    "inner_kernels": [[3, 3], [3, 3], [3, 3]],  # per-group [conv2, conv3] kernel sizes (1 or 3)
+    "bn_dtype": "float",  # "half" keeps BatchNorm in the fp16 network dtype
     "train_resolution": 24,  # reduced resolution for the first training stage
     "resolution_switch": 0.25,  # fraction of steps before returning to 32 pixels
+    # [[resolution, end fraction], ...] before 32 px; overrides the two keys above if set
+    "resolution_schedule": None,
     "crop_mode": "indexed",  # "indexed" preserves channels-last with one gather
     "fused_sgd": True,
     "optimizer": "sgd",  # "muon": orthogonalized updates for conv filters, SGD for the rest
     "muon_lr": 0.24,
     "muon_momentum": 0.6,
     "muon_ns_steps": 3,
+    "muon_compile": "step",  # "step" compiles the per-bucket Muon update; "none" runs eagerly
     "compile_loss": True,
     "hard_fraction": 1.0,  # <1 enables a freshly trained small proxy
     "proxy_widths": [32, 64, 128],
@@ -84,8 +90,8 @@ class BatchNorm(nn.BatchNorm2d):
 
 
 class Conv(nn.Conv2d):
-    def __init__(self, channels_in, channels_out):
-        super().__init__(channels_in, channels_out, kernel_size=3, padding="same", bias=False)
+    def __init__(self, channels_in, channels_out, kernel=3):
+        super().__init__(channels_in, channels_out, kernel, padding="same", bias=False)
 
     def reset_parameters(self):
         super().reset_parameters()
@@ -94,15 +100,26 @@ class Conv(nn.Conv2d):
 
 
 class ConvGroup(nn.Module):
-    def __init__(self, channels_in, channels_out, depth, bn_momentum, gelu_approximate, pool_first):
+    def __init__(
+        self,
+        channels_in,
+        channels_out,
+        depth,
+        bn_momentum,
+        gelu_approximate,
+        pool_first,
+        inner=0,
+        kernels=(3, 3),
+    ):
         super().__init__()
+        inner = inner if inner and depth == 3 else channels_out
         self.conv1 = Conv(channels_in, channels_out)
         self.pool = nn.MaxPool2d(2)
         self.pool_first = pool_first
         self.norm1 = BatchNorm(channels_out, bn_momentum)
-        self.conv2 = Conv(channels_out, channels_out)
-        self.norm2 = BatchNorm(channels_out, bn_momentum)
-        self.conv3 = Conv(channels_out, channels_out) if depth == 3 else None
+        self.conv2 = Conv(channels_out, inner, kernels[0])
+        self.norm2 = BatchNorm(inner, bn_momentum)
+        self.conv3 = Conv(inner, channels_out, kernels[1]) if depth == 3 else None
         self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
         self.approximate = gelu_approximate
 
@@ -137,6 +154,8 @@ class GlobalMaxPool(nn.Module):
     def forward(self, x):
         if self.implementation == "max":
             return F.max_pool2d(x, x.shape[-2:])
+        if self.implementation == "maxmean":
+            return F.max_pool2d(x, x.shape[-2:]) + F.avg_pool2d(x, x.shape[-2:])
         return F.adaptive_max_pool2d(x, 1)
 
 
@@ -151,13 +170,34 @@ class Net(nn.Module):
         self.layers = nn.Sequential(
             Activation(hyp["gelu_approximate"]),
             ConvGroup(
-                24, w1, depths[0], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][0]
+                24,
+                w1,
+                depths[0],
+                bn_momentum,
+                hyp["gelu_approximate"],
+                hyp["pool_first"][0],
+                hyp["inner_widths"][0],
+                hyp["inner_kernels"][0],
             ),
             ConvGroup(
-                w1, w2, depths[1], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][1]
+                w1,
+                w2,
+                depths[1],
+                bn_momentum,
+                hyp["gelu_approximate"],
+                hyp["pool_first"][1],
+                hyp["inner_widths"][1],
+                hyp["inner_kernels"][1],
             ),
             ConvGroup(
-                w2, w3, depths[2], bn_momentum, hyp["gelu_approximate"], hyp["pool_first"][2]
+                w2,
+                w3,
+                depths[2],
+                bn_momentum,
+                hyp["gelu_approximate"],
+                hyp["pool_first"][2],
+                hyp["inner_widths"][2],
+                hyp["inner_kernels"][2],
             ),
             GlobalMaxPool(hyp["global_pool"]),
         )
@@ -275,6 +315,15 @@ def indexed_crop(images, crop_size):
 #############################################
 
 
+def _resolution_schedule(hyp):
+    """[(resolution, end fraction of steps), ...] for the stages before 32 px."""
+    if hyp["resolution_schedule"] is not None:
+        return [(int(r), float(end)) for r, end in hyp["resolution_schedule"]]
+    if hyp["train_resolution"] < 32 and hyp["resolution_switch"] > 0:
+        return [(hyp["train_resolution"], hyp["resolution_switch"])]
+    return []
+
+
 def build(context: BuildContext):
     hyp = {**DEFAULTS, **context.parameters}
     unknown = set(hyp) - set(DEFAULTS)
@@ -289,6 +338,26 @@ def build(context: BuildContext):
         raise ValueError(
             "train_resolution must be 24, 28, or 32; resolution_switch must be in [0, 1]"
         )
+    schedule = _resolution_schedule(hyp)
+    ends = [end for _, end in schedule]
+    if (
+        any(r not in (16, 20, 24, 28) for r, _ in schedule)
+        or ends != sorted(ends)
+        or any(not 0 < end <= 1 for end in ends)
+    ):
+        raise ValueError(
+            "resolution_schedule entries need resolutions 16-28 and increasing ends in (0, 1]"
+        )
+    if len(hyp["inner_widths"]) != 3 or any(w < 0 for w in hyp["inner_widths"]):
+        raise ValueError("inner_widths must contain three non-negative channel counts")
+    if len(hyp["inner_kernels"]) != 3 or any(
+        len(k) != 2 or any(v not in (1, 3) for v in k) for k in hyp["inner_kernels"]
+    ):
+        raise ValueError("inner_kernels must contain three [k2, k3] pairs of 1 or 3")
+    if hyp["bn_dtype"] not in ("float", "half"):
+        raise ValueError("bn_dtype must be float or half")
+    if hyp["global_pool"] not in ("max", "maxmean", "adaptive"):
+        raise ValueError("global_pool must be max, maxmean or adaptive")
     if hyp["crop_mode"] not in ("masked", "indexed", "triton"):
         raise ValueError("crop_mode must be masked, indexed, or triton")
     if hyp["epochs"] <= 0 or hyp["batch_size"] <= 0:
@@ -320,9 +389,9 @@ def build(context: BuildContext):
 
     net = Net(hyp, context.num_classes).to(device, dtype, memory_format=torch.channels_last)
     for m in net.modules():
-        if isinstance(m, nn.BatchNorm2d):
+        if isinstance(m, nn.BatchNorm2d) and hyp["bn_dtype"] == "float":
             m.float()
-    if cuda and hyp["compile"] and hyp["train_resolution"] < 32:
+    if cuda and hyp["compile"] and schedule:
         # Progressive resizing: one static graph per resolution over the same eager net.
         # dynamic=False keeps dynamo from switching to dynamic shapes on the second size, and
         # the low-res graph compiles in the cheaper low_res_compile mode (a second
@@ -380,7 +449,7 @@ def build(context: BuildContext):
             torch.randint(0, 256, (count, 3, 32, 32), dtype=torch.uint8),
             torch.randint(0, context.num_classes, (count,)),
         )
-        for resolution in sorted({hyp["train_resolution"], 32}):
+        for resolution in sorted({r for r, _ in schedule} | {32}):
             state.warmup_resolution = resolution
             for _ in range(2):
                 prepare(state, synthetic, seed=0)
@@ -425,18 +494,12 @@ def prepare(state, data: TrainingData, seed: int) -> None:
 
     # Alternating flip: flip a random half once, then mirror everything on odd epochs.
     images = batch_flip_lr(images)
-    if hyp["train_resolution"] < 32:
-        small = F.interpolate(
-            images,
-            size=(hyp["train_resolution"],) * 2,
-            mode="bilinear",
-            align_corners=False,
-        )
+    state.small_images = {}
+    for resolution in {r for r, _ in _resolution_schedule(hyp)}:
+        small = F.interpolate(images, size=(resolution,) * 2, mode="bilinear", align_corners=False)
         if hyp["translate"]:
             small = F.pad(small, (hyp["translate"],) * 4, "reflect")
-        state.small_images = small.to(memory_format=torch.channels_last)
-    else:
-        state.small_images = None
+        state.small_images[resolution] = small.to(memory_format=torch.channels_last)
     if hyp["translate"]:
         images = F.pad(images, (hyp["translate"],) * 4, "reflect")
     state.images = images
@@ -459,40 +522,56 @@ def prepare(state, data: TrainingData, seed: int) -> None:
     state.whiten_bias_steps = math.ceil(hyp["whiten_bias_epochs"] * state.steps_per_epoch)
 
 
-def _newton_schulz(g, steps, eps=1e-7):
+def _newton_schulz(g, steps: int, eps: float = 1e-7):
+    """Batched quintic Newton-Schulz orthogonalization of [n, rows, cols] with rows <= cols."""
     a, b, c = 3.4445, -4.7750, 2.0315
     x = g.bfloat16()
-    x = x / (x.norm() + eps)
-    transpose = g.size(0) > g.size(1)
-    if transpose:
-        x = x.T
+    x = x / (x.norm(dim=(1, 2), keepdim=True) + eps)
     for _ in range(steps):
-        m = x @ x.T
+        m = x @ x.mT
         x = a * x + (b * m + c * m @ m) @ x
-    return x.T if transpose else x
+    return x
+
+
+def _muon_updates(params, grads, buffers, momentum: float, ns_steps: int):
+    """Nesterov momentum, filter renormalization and the orthogonalized update for one bucket."""
+    torch._foreach_mul_(buffers, momentum)
+    torch._foreach_add_(buffers, grads)
+    g = torch.stack(torch._foreach_add(grads, buffers, alpha=momentum)).flatten(2)
+    transpose = g.size(1) > g.size(2)
+    u = _newton_schulz(g.mT if transpose else g, ns_steps)
+    u = (u.mT if transpose else u).reshape(len(params), *params[0].shape)
+    norms = torch._foreach_norm(params)
+    torch._foreach_mul_(params, [len(p) ** 0.5 / n for p, n in zip(params, norms)])
+    return list(u.to(params[0].dtype).unbind(0))
 
 
 class Muon(torch.optim.Optimizer):
     """Keller Jordan's Muon (airbench94_muon): Nesterov momentum, then each filter bank's
-    update is orthogonalized by a Newton-Schulz iteration; weights are renormalized."""
+    update is orthogonalized by a Newton-Schulz iteration; weights are renormalized.
+    Filters of one shape share a batched Newton-Schulz call; compile="step" compiles the
+    whole per-bucket update (the learning rate is applied outside, so it never recompiles)."""
 
-    def __init__(self, params, lr, momentum, ns_steps):
+    def __init__(self, params, lr, momentum, ns_steps, compile="none"):
         super().__init__(params, dict(lr=lr, momentum=momentum, ns_steps=ns_steps))
+        shapes = {}
+        for p in self.param_groups[0]["params"]:
+            shapes.setdefault(tuple(p.shape), []).append(p)
+        self.buckets = list(shapes.values())
+        self.flat = [p for ps in self.buckets for p in ps]
+        self.buffers = [[torch.zeros_like(p) for p in ps] for ps in self.buckets]
+        self.updates = (
+            torch.compile(_muon_updates, dynamic=False) if compile == "step" else (_muon_updates)
+        )
 
     @torch.no_grad()
     def step(self):
-        for group in self.param_groups:
-            for p in group["params"]:
-                if p.grad is None:
-                    continue
-                buf = self.state[p].get("momentum_buffer")
-                if buf is None:
-                    buf = self.state[p]["momentum_buffer"] = torch.zeros_like(p.grad)
-                buf.mul_(group["momentum"]).add_(p.grad)
-                g = p.grad.add(buf, alpha=group["momentum"])
-                p.mul_(len(p) ** 0.5 / p.float().norm())
-                update = _newton_schulz(g.reshape(len(g), -1), group["ns_steps"])
-                p.add_(update.view(g.shape).to(p.dtype), alpha=-group["lr"])
+        group = self.param_groups[0]
+        updates = []
+        for params, buffers in zip(self.buckets, self.buffers):
+            grads = [p.grad for p in params]
+            updates += self.updates(params, grads, buffers, group["momentum"], group["ns_steps"])
+        torch._foreach_add_(self.flat, updates, alpha=-group["lr"])
 
 
 class _Optimizers:
@@ -526,7 +605,13 @@ def _make_optimizer(net, lr, lr_biases, wd, hyp, device):
         fused=hyp["fused_sgd"] and device.type == "cuda",
     )
     if filters:
-        muon = Muon(filters, hyp["muon_lr"], hyp["muon_momentum"], hyp["muon_ns_steps"])
+        muon = Muon(
+            filters,
+            hyp["muon_lr"],
+            hyp["muon_momentum"],
+            hyp["muon_ns_steps"],
+            compile=hyp["muon_compile"] if device.type == "cuda" else "none",
+        )
         optimizer = _Optimizers(optimizer, muon)
     for group in optimizer.param_groups:
         group["initial_lr"] = group["lr"]
@@ -567,6 +652,7 @@ def _fit(state, total_steps, proxy_only=False):
         else None
     )
     step = 0
+    stage_ends = [(r, int(total_steps * end)) for r, end in _resolution_schedule(hyp)]
     net.train()
     for epoch in range(math.ceil(total_steps / steps_per_epoch)):
         images = None
@@ -577,13 +663,9 @@ def _fit(state, total_steps, proxy_only=False):
                 break
             resolution = getattr(state, "warmup_resolution", None)
             if resolution is None:
-                resolution = (
-                    hyp["train_resolution"]
-                    if step < int(total_steps * hyp["resolution_switch"])
-                    else 32
-                )
+                resolution = next((r for r, end in stage_ends if step < end), 32)
             if resolution != current_resolution:
-                source = state.small_images if resolution < 32 else state.images
+                source = state.small_images[resolution] if resolution < 32 else state.images
                 if state.crop_kernel is not None:
                     images = state.crop_kernel(source, resolution, flip=epoch % 2 == 1)
                 else:
