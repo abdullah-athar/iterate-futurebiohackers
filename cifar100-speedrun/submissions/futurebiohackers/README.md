@@ -16,7 +16,7 @@ group, which runs at 3x3 at 78-89% of peak.
 Training: 11.5 epochs at batch 1024, Nesterov SGD (lr 11.5, weight decay 0.017 per 1024
 examples, momentum 0.85, BatchNorm-bias lr 32x), label smoothing 0.25, logit scale
 1.25/9, BatchNorm momentum 0.5, lookahead weight average. The first 15% of the
-examples train on 20x20 bilinear downsamples of the images (0.39x the FLOPs), the next 35% on
+examples train on 20x20 bilinear downsamples of the images (0.39x the pixels), the next 35% on
 24x24 (0.56x), the second half at 32x32. Augmentation: alternating flip, 2-pixel translation, per-image brightness
 and contrast jitter of 0.2. Normalization and patch whitening of the training images
 run inside the timer.
@@ -51,8 +51,10 @@ Cards at the same power limit differ by one to two percent in speed, so each see
 and the previous one (PR #33) back to back in one container, both compiled cold (fresh Inductor cache)
 under a hard four-CPU limit, the judges' quota; the build times of the first four rows are those real
 cold builds. The PR #33, PR #29, PR #27 and PR #28 rows are also 4-CPU cold containers; the older
-rows ran in 20-CPU containers. Official judging runs on an A100 80GB PCIe, where times are higher
-(about 8-9% on the earlier recipe); the ranking between recipes carries over.
+rows ran in 20-CPU containers. Official judging runs on an A100 80GB PCIe, where times are about
+10% higher: this recipe 75.23% in 4.07 s vs PR #29 75.30% in 4.35 s (paired n=40 on seeds 0-39, both
+cold at 4 CPUs in one PCIe container; PR #33 in another: 75.26% in 4.16 s vs PR #29 75.24% in 4.26 s);
+the ranking between recipes carries over.
 
 | Seeds | Recipe | Mean accuracy | Min / max trial | Mean preparation + training | Qualified |
 | --- | --- | ---: | ---: | ---: | --- |
@@ -204,8 +206,8 @@ Tested in same-GPU comparisons against a control (8 to 40 paired trials each):
 | `ema_every: 0` | 0.6 points less accurate |
 | Vision transformer (patch 4, dim 256, 6 layers) | 37% at 9 epochs, 58% at 30 epochs (39 s) |
 
-Convolutions are about 75% of GPU time and Inductor's BatchNorm/activation kernels about
-20% (profile of this recipe: GPU busy 99%, no host synchronisation inside the step, about
+Convolutions are about 70% of GPU time and Inductor's BatchNorm/activation kernels about
+25% (profiles of the 10-epoch ancestors of this recipe: GPU busy 99%, no host synchronisation inside the step, about
 180 kernels per step). Inductor's CUDA graphs are on; a whole-run graph would add little
 since the GPU is already busy for the whole step.
 
