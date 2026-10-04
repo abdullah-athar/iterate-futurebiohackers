@@ -57,6 +57,41 @@ def run_spend(store: RunStore) -> Spend:
     return s
 
 
+class CallBudget:
+    """Spend cap for a batch of auxiliary calls outside a run (e.g. calibration): same reserve/settle
+    interface as RunBudget's auxiliary side. Each call reserves the largest cost seen so far (or a default)
+    and is refused if spent + in flight + that estimate would pass the cap; an unreported cost is charged
+    as the estimate, so an unknown cost cannot slip past the cap."""
+
+    def __init__(self, max_usd: float, first_estimate: float = DEFAULT_AUX_USD) -> None:
+        self.max_usd, self.spent_usd, self._reserved = max_usd, 0.0, 0.0
+        self._est, self.calls, self.refused, self.unknown = first_estimate, 0, 0, 0
+        self._lock = threading.Lock()
+
+    @property
+    def capped(self) -> bool:
+        return True
+
+    def reserve_aux(self, kind: str):
+        with self._lock:
+            if self.spent_usd + self._reserved + self._est > self.max_usd + 1e-9:
+                self.refused += 1
+                return None
+            self._reserved += self._est
+            return (self._est, 1)
+
+    def settle_aux(self, ticket, rec: dict) -> None:
+        with self._lock:
+            self._reserved = max(0.0, self._reserved - ticket[0])
+            cost = rec.get("cost_usd")
+            if cost is None:
+                self.unknown += 1
+                cost = ticket[0]
+            self.spent_usd += float(cost)
+            self.calls += 1
+            self._est = max(self._est if self.calls > 1 else 0.0, float(cost))
+
+
 class RunBudget:
     def __init__(self, store: RunStore, max_usd: float | None = None, max_calls: int | None = None,
                  max_tokens: int | None = None) -> None:

@@ -211,6 +211,7 @@ def main(argv=None) -> None:
     ap.add_argument("--max-run-pairs", type=int, default=30)
     ap.add_argument("--problem", default="median_string")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--max-usd", type=float, default=5.0, help="spend cap for all describe calls (refused calls = undescribed)")
     args = ap.parse_args(argv)
     pairs, items = build_pairs(sources(), args.runs, args.max_run_pairs)
     calls = 2 * len(items) * len(args.backends)
@@ -225,10 +226,13 @@ def main(argv=None) -> None:
     work = args.out / f"calibration-{stamp}"
     report = {"model": args.model, "vocab": vocab.version, "pairs": len(pairs), "programs": len(items), "metrics": {}}
     keys = sorted(items)
+    from autoresearch.budget import CallBudget
+    budget = CallBudget(args.max_usd)
     for backend in args.backends:
         passes = []
         for k in (1, 2):  # separate caches: pass 2 never hits pass 1
-            d = FamilyDescriber(work / f"{backend}-pass{k}", problem, vocab, backend, args.model, kind="describe:calibration")
+            d = FamilyDescriber(work / f"{backend}-pass{k}", problem, vocab, backend, args.model, budget=budget,
+                                kind="describe:calibration", workers=8)
             sigs = d.describe_many([items[x] for x in keys])
             passes.append(dict(zip(keys, sigs)))
         metric_names = ["weighted_jaccard"] + (["minilm"] if backend == "existing" else [])
@@ -240,12 +244,15 @@ def main(argv=None) -> None:
                 p.setdefault("d", {})[label] = r.value
             report["metrics"][label] = {"version": metric.version, **analyse(pairs, label)}
         report.setdefault("undescribed", {})[backend] = sum(1 for x in keys if passes[0][x] is None or passes[1][x] is None)
+    report["spend"] = {"usd": round(budget.spent_usd, 4), "calls": budget.calls, "refused": budget.refused,
+                       "unknown_cost": budget.unknown, "cap_usd": args.max_usd}
     report["pairs_detail"] = pairs
     args.out.mkdir(parents=True, exist_ok=True)
     path = args.out / f"calibration-{stamp}.json"
     path.write_text(json.dumps(report, indent=1))
     lines = [f"# Distance calibration ({stamp})", "", f"model {args.model}, vocabulary {vocab.version}, "
-             f"{len(pairs)} pairs over {len(items)} programs", ""]
+             f"{len(pairs)} pairs over {len(items)} programs; spend ${budget.spent_usd:.2f} over {budget.calls} calls "
+             f"(cap ${args.max_usd:g}, {budget.refused} refused, {budget.unknown} with unknown cost)", ""]
     for label, m in report["metrics"].items():
         lines += [f"## {label}", "", "| split:relation | n | min | median | mean | max |", "|---|---|---|---|---|---|"]
         for rel, s in m["relations"].items():
