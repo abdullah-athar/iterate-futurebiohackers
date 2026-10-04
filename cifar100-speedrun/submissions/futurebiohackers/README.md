@@ -69,8 +69,9 @@ instead of the first quarter, so the 28 px phase shrinks from a quarter to 15%. 
 0.14 s per trial for -0.01 +- 0.05 / -0.07 +- 0.06 points on the two seed sets (-0.04 +- 0.04 over
 the 80 paired trials); the screens before it: -0.12 s at +0.15 +- 0.09 points over 8 paired trials
 and -0.13 s at -0.01 +- 0.06 over 16 on the group-2-pair recipe of PR #26, -0.15 s at -0.07 +- 0.08
-over 16 on this recipe. Longer 24 px phases cost accuracy faster than they save time (a 24 px first
-half: -0.34 points for -0.73 s at 10 epochs), and 28 px to 60% was neutral. On PR #26's recipe the
+over 16 on this recipe. The 35% point comes from the schedule ladder: on the 9-epoch PR #14 recipe a 24 px first half saved
+0.73 s for 0.34 +- 0.11 points (8 paired trials, below 75%), and a 28 px phase to 60% was neutral on
+PR #26's recipe. On PR #26's recipe the
 same change lands at 75.07% on seeds 40-79, below that PR's floor, so it is proposed on this one.
 The rest is PR #25: the final pooling's max and mean are written as `F.max_pool2d` and
 `F.avg_pool2d`, which `torch.compile` lowers to pointwise kernels instead of the reduction
