@@ -23,7 +23,7 @@ from benchmark.api import BuildContext, TrainingData
 
 # Override any value with --params, e.g. '{"epochs": 9, "widths": [128, 384, 768]}'.
 DEFAULTS = {
-    "epochs": 8.25,
+    "epochs": 9.0,
     "batch_size": 1024,
     "lr": 11.5,  # per 1024 examples, decoupled from momentum (airbench convention)
     "momentum": 0.85,
@@ -44,7 +44,7 @@ DEFAULTS = {
     "train_resolution": 24,  # reduced resolution for the first training stage
     "resolution_switch": 0.25,  # fraction of steps before returning to 32 pixels
     # [[resolution, end fraction], ...] before 32 px; overrides the two keys above if set
-    "resolution_schedule": None,
+    "resolution_schedule": [[24, 0.5]],
     "crop_mode": "indexed",  # "indexed" preserves channels-last with one gather
     "fused_sgd": True,
     "optimizer": "sgd",  # "muon": orthogonalized updates for conv filters, SGD for the rest
@@ -58,7 +58,7 @@ DEFAULTS = {
     "proxy_every": 4,  # proxy backward/update period; scores every batch
     "proxy_mode": "offline",  # airbench-style prepass, or online selection
     "gelu_approximate": "none",  # "tanh" uses a cheaper approximation; "silu" swaps in SiLU
-    "global_pool": "max",  # "max": plain full-map max pool, avoids adaptive atomics
+    "global_pool": "maxmean",  # full-map max + mean pool; "max" alone; both avoid adaptive atomics
     "autotune_backends": "ATEN,TRITON",  # ATen/cuDNN and Inductor Triton candidates
     "pool_first": [False, False, False],  # move selected group pools before conv1
     "scaling_factor": 1.25 / 9,  # logit scale (airbench uses 1/9)

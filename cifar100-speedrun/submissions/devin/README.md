@@ -114,3 +114,27 @@ paid for itself inside the stack. The stack with 24x24 at 9.0 epochs reached 75.
 default and `--params '{"epochs": 9.0}'` is the safer alternative. 28x28 for half the steps
 (75.34% in 5.92 s at 9.0 epochs) and cutout, momentum 0.8 and longer low-resolution phases
 were rejected.
+
+## Modal round (4 October, A100-SXM4-80GB, 4 CPUs, same-container pairs)
+
+Runner: `scripts/modal_ab.py` (control, then each variant, same seeds, one container).
+
+New defaults: max + mean global pooling (`global_pool: "maxmean"`), 24 px for the first half
+(`resolution_schedule: [[24, 0.5]]`), 9 epochs. 40-trial confirmation against the previous
+defaults (8.25 epochs, 24 px first quarter, max pool):
+
+| Seeds start | New defaults | Previous defaults |
+| --- | ---: | ---: |
+| 72402879 | **75.32%, 4.717 s** | 75.32%, 4.929 s |
+| 112574195 | **75.28%, 4.80 s** (33 of 40 trials) | 75.27%, 5.059 s |
+
+16-trial screens (same container as the previous defaults):
+- Muon on conv filters (batched Newton-Schulz, `muon_compile: "step"`), lr 0.16-0.2 at 6.5 epochs:
+  75.28-75.38% in 4.88-4.91 s vs 75.28% in 5.41 s (about -0.5 s). Eager per-filter Muon at
+  8.25 epochs: 76.2-76.3% but +1.05 s; 2 Newton-Schulz steps: 73.5%. Being confirmed at 40 trials.
+- Max + mean pool alone: +0.08 points, no time cost. fp16 BatchNorm: neutral.
+- 20 px first stage (`[[20, 0.15], [24, 0.5]]`): -0.07 s for -0.2 points vs the 24 px half.
+- Narrowed residual pairs: last group through 512 channels -0.13 s for -0.04 points; plus group 2
+  through 192 (3x3 then 1x1) -0.58 s for -0.35 points (below 75%).
+- Same-card ranking (20 trials): Côme's `speedrun-20px-g1-k11` 75.33% in 4.09 s, this recipe
+  (old defaults) 75.34% in 5.37 s, `main` 74.98% in 5.13 s.
