@@ -184,37 +184,49 @@ _CACHE_LOCK = threading.Lock()
 
 
 def _read_cache(path: Path | None) -> dict:
-    if not path or not path.exists():
-        return {}
-    with _CACHE_LOCK:
-        return json.loads(path.read_text())
+    """Caller holds _CACHE_LOCK (a plain Lock: taking it again here would deadlock)."""
+    return json.loads(path.read_text()) if path and path.exists() else {}
+
+
+def _log_usage(cache_path: Path | None, cost_usd: float, calls: int, ok: bool) -> None:
+    """Append describe spend next to the cache (describe_usage.jsonl): it is not part of the agents' cost_usd."""
+    if cache_path:
+        with _CACHE_LOCK:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            with (cache_path.parent / "describe_usage.jsonl").open("a") as f:
+                f.write(json.dumps({"cost_usd": round(cost_usd, 6), "calls": calls, "ok": ok}) + "\n")
 
 
 def describe(source: str, vocab: Vocabulary, problem: str, *, model: str = "sonnet",
              cache_path: Path | None = None, use_cache: bool = True, retries: int = 2) -> Descriptor:
     """One structured `claude -p` call per program, cached by normalised-source fingerprint."""
     key = fingerprint(source)
-    cache = _read_cache(cache_path)
+    with _CACHE_LOCK:
+        cache = _read_cache(cache_path)
     if use_cache and key in cache:
         return Descriptor.from_dict(cache[key])
     prompt = PROMPT.format(problem=problem, vocab=vocab.prompt_block(), source=source)
-    error = None
+    error, cost, calls = None, 0.0, 0
     for _ in range(retries + 1):
         text = prompt if error is None else f"{prompt}\n\nYour previous answer was invalid: {error}."
         proc = subprocess.run(
             ["claude", "-p", "--output-format", "json", "--model", model, "--tools", "",
              "--system-prompt", SYSTEM, "--json-schema", json.dumps(DESCRIBE_SCHEMA)],
             input=text, capture_output=True, text=True, timeout=180)
+        calls += 1
         try:
-            out = json.loads(proc.stdout)["structured_output"]
-            d = Descriptor.from_dict(out)
+            res = json.loads(proc.stdout)
+            cost += float(res.get("total_cost_usd") or 0.0)
+            d = Descriptor.from_dict(res["structured_output"])
             error = _validate(d)
-        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError, AttributeError) as e:
             error = f"unparseable output ({e}): {proc.stderr[-300:]}"
         if error is None:
             break
     else:
+        _log_usage(cache_path, cost, calls, ok=False)
         raise RuntimeError(f"describe failed: {error}")
+    _log_usage(cache_path, cost, calls, ok=True)
     if cache_path:
         with _CACHE_LOCK:  # re-read under the lock so concurrent describers don't drop each other's entries
             cache = _read_cache(cache_path)

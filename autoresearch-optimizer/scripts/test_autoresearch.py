@@ -265,6 +265,41 @@ def test_gap_directions():
     print("  Gap-directions test passed!")
 
 
+def test_describe_cache():
+    print("Testing describe() through the on-disk cache, in parallel (fake claude)...")
+    import types
+    from concurrent.futures import ThreadPoolExecutor
+
+    import autoresearch.descriptors as D
+
+    calls = []
+
+    def fake_run(cmd, input, **kw):
+        calls.append(1)
+        out = {"total_cost_usd": 0.01, "structured_output": {
+            "terms": [{"term": "hill climbing", "tier": 6}], "new_terms": [], "summary": "s"}}
+        return types.SimpleNamespace(stdout=json.dumps(out), stderr="")
+
+    real, D.subprocess = D.subprocess, types.SimpleNamespace(run=fake_run)
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-describe-"))
+    try:
+        cache = tmp / "descriptors.json"
+        sources = [f"def solve(instance):\n    return '{c}'\n" for c in "abcdef"]
+        with ThreadPoolExecutor(6) as pool:  # concurrent cache writes: the path that deadlocked
+            futures = [pool.submit(D.describe, s, D.Vocabulary(), "p", cache_path=cache) for s in sources]
+            descs = [f.result(timeout=10) for f in futures]
+        assert all(d.core == "hill climbing" for d in descs)
+        assert len(json.loads(cache.read_text())) == 6
+        D.describe(sources[0], D.Vocabulary(), "p", cache_path=cache)  # cache hit: no new call
+        assert len(calls) == 6, len(calls)
+        usage = [json.loads(l) for l in (tmp / "describe_usage.jsonl").read_text().splitlines()]
+        assert len(usage) == 6 and abs(sum(u["cost_usd"] for u in usage) - 0.06) < 1e-9, usage
+    finally:
+        D.subprocess = real
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Describe-cache test passed!")
+
+
 def test_viz_lineage():
     print("Testing the dashboard's idea-lineage chart (merges, duplicates, disjoint trees)...")
     from autoresearch_viz.html import render
@@ -312,5 +347,6 @@ if __name__ == "__main__":
     test_exploration_exploitation()
     test_lineage_parents()
     test_gap_directions()
+    test_describe_cache()
     test_viz_lineage()
     print("\nAll autoresearch tests passed!")
