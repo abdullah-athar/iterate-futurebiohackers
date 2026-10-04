@@ -1,0 +1,33 @@
+{
+  "returncode": 0,
+  "wall_seconds": 97.6,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T000708Z-363dcf3a",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 10.5, \"g3_pair\": \"inner448\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "g3-inner448-e10.5",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 10.5, \"g3_pair\": \"inner448\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 10.5, \"g3_pair\": \"inner448\"}",
+    "delta": {
+      "g3_pair": "inner448",
+      "epochs": 10.5
+    },
+    "hypothesis": "D ladder: 448 pair with half an epoch back",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 10.5, \"g3_pair\": \"inner448\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

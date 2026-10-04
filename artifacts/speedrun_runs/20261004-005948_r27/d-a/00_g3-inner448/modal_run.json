@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 206.0,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T000132Z-1dff9a93",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"g3_pair\": \"inner448\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "g3-inner448",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"g3_pair\": \"inner448\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"g3_pair\": \"inner448\"}",
+    "delta": {
+      "g3_pair": "inner448"
+    },
+    "hypothesis": "D: group 3 pair through 448 channels (record: 512)",
+    "env": {},
+    "config": "futurebiohackers {\"g3_pair\": \"inner448\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
