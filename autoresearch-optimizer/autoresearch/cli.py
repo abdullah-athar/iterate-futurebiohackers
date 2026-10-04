@@ -175,7 +175,8 @@ DIVERSITY_FLAGS = (
     "semantic_retry_before_codegen", "entropy_controller", "family_grace", "grace_min_evaluations",
     "grace_max_evaluations", "grace_patience", "grace_epsilon", "max_protected_families", "max_proposal_regenerations",
     "top_k", "allocation_window", "stagnation_generations", "explore_boost_fraction", "max_override_fraction",
-    "archive_threshold", "batch_threshold", "drift_threshold_max", "bandit_counts_all_attempts",
+    "archive_threshold", "batch_threshold", "drift_threshold_max", "bandit_counts_all_attempts", "tune_exact_only",
+    "grace_max_attempts",
 )
 
 
@@ -208,6 +209,9 @@ def _diversity_args(s) -> None:
     g.add_argument("--batch-threshold", dest="batch_threshold", type=float,
                    help="calibrated min distance between proposals of one batch")
     g.add_argument("--drift-threshold-max", dest="drift_threshold_max", type=float)
+    g.add_argument("--tune-exact-only", dest="tune_exact_only", action="store_true", default=None,
+                   help="tune children (grace tries included) are refused only as exact copies, not as near-duplicates")
+    g.add_argument("--grace-max-attempts", dest="grace_max_attempts", type=int)
     g.add_argument("--legacy-bandit-counting", dest="bandit_counts_all_attempts", action="store_false", default=None,
                    help="do not count duplicates/guard rejections/empty sessions as bandit tries (old behaviour)")
 

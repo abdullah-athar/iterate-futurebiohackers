@@ -48,7 +48,7 @@ from .families import (
     top_k_entropy,
 )
 from .json_cache import JsonCache
-from .ledger import Entry
+from .ledger import STATUS_REJECTED_DUPLICATE, Entry
 from .novelty import NoveltyVerdict
 from .prompts import MODES
 
@@ -164,14 +164,16 @@ def grace_states(archive: FamilyArchive, initial_families: set[str], cfg, can_fu
 
 
 def _replay_grace(st, grace_ids: set[int], archive: FamilyArchive, cfg) -> tuple[int, int, bool]:
-    """Replay the family's tries in id order from its first valid program: every grace try uses one funded
-    evaluation (also when it failed or drifted to another family), every record beating the previous one by
+    """Replay the family's tries in id order from its first valid program: every evaluated grace try uses one
+    funded evaluation (also when it failed or drifted to another family); a try refused as a code duplicate
+    was never evaluated, so it does not use the budget, but every grace try counts against grace_max_attempts
+    so a family whose agents keep returning copies still expires. Every record beating the previous one by
     more than epsilon adds one to the budget. Stops at expiry, so expiry is final: a later record (made by a
     normal try) does not bring the bonus back. Returns (used, improvements, expired)."""
     first = st.valid[0]
     record_ids = {eid for eid, _ in st.records}
     prev = archive.by_id[first].objective
-    used, improvements = 1, 0
+    used, improvements, attempts = 1, 0, 0
     budget = min(cfg.grace_max_evaluations, cfg.grace_min_evaluations + cfg.grace_patience)
     if used >= budget:
         return used, improvements, True
@@ -180,7 +182,11 @@ def _replay_grace(st, grace_ids: set[int], archive: FamilyArchive, cfg) -> tuple
             continue
         e = archive.by_id[eid]
         if eid in grace_ids:
-            used += 1
+            attempts += 1
+            if e.status != STATUS_REJECTED_DUPLICATE:
+                used += 1
+            if attempts >= cfg.grace_max_attempts:
+                return used, improvements, True
         if eid in record_ids:
             if record_gain(e.objective, prev, archive.sense) > cfg.grace_epsilon:
                 improvements += 1

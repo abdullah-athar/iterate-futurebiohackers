@@ -96,6 +96,10 @@ class LoopConfig:
     grace_min_evaluations: int = 2            # first candidate + one refinement
     grace_max_evaluations: int = 6            # evaluations funded by the new-family budget, at most
     grace_patience: int = 1                   # funded refinements beyond the minimum even without progress (0 = off)
+    grace_max_attempts: int = 8               # grace tries of any outcome (duplicates included) before expiry
+    # tune children (grace tries included) lose only to exact copies of the normalised source, not to the 0.95
+    # near-duplicate gate: a refinement is a small edit by design (Johann's layer does the same for its tune)
+    tune_exact_only: bool = False
     # objective units a family record must improve by to fund one more refinement: just above the largest
     # re-scoring range measured on the validate split (88 for a time-bounded annealer, 0 for the seed;
     # scripts/measure_eval_noise.py), so evaluation noise alone never extends a protection

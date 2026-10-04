@@ -98,8 +98,12 @@ PROMPT = "Read AGENT.md and STATUS.md in the current directory and follow them. 
 def write_workspace(run: ResearchRun, a: Assignment, gen: int, n: int, mix: str, turn_s: int, ws: Path,
                     eval_backend: str) -> None:
     ctx = run.context(mode=a.mode, parent_ids=a.parent_ids)
+    warn = ("\n\n## Duplicate check\nOnly an exact copy of an earlier candidate is refused, but the check runs on the "
+            "normalised source: renaming variables, reformatting or editing comments leaves it an exact copy, which is "
+            "refused without evaluation. Make a real change to the algorithm or its parameters."
+            if run.config.tune_exact_only and a.mode == "tune" else "")
     (ws / "STATUS.md").write_text(build_user_prompt(run.problem.describe(), ctx, run.config.descriptors)
-                                  + (f"\n\n{a.notes}" if a.notes else ""))
+                                  + (f"\n\n{a.notes}" if a.notes else "") + warn)
     (ws / "AGENT.md").write_text(AGENT_MD.format(worker=a.worker, gen=gen, mode=a.mode, n=n, mix=mix,
                                                  turn_s=turn_s, half=turn_s // 2,
                                                  direction=a.direction or "your choice"))
@@ -321,7 +325,7 @@ def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propo
             if not r["source"]:
                 continue
             # with descriptors, tune children only lose to exact copies (refinement is the point)
-            exact = layer is not None and r["assignment"].mode == "tune"
+            exact = (layer is not None or run.config.tune_exact_only) and r["assignment"].mode == "tune"
             r["pre"] = run.precheck(r["source"], extra_prior=arrivals, threshold=1.0 if exact else None)
             arrivals.append((next_id + i, r["source"]))
         if layer or div:

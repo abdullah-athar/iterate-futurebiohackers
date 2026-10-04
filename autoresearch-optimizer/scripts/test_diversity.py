@@ -586,6 +586,75 @@ def test_diverse_parents_are_good_and_different():
     print("  diverse parents: tune slots alternate between good programs of different families, never a weak one")
 
 
+def test_grace_duplicates_do_not_use_budget():
+    from autoresearch.families import FamilyArchive
+    from autoresearch.ledger import Entry
+    from autoresearch.scheduler import grace_states
+    cfg = grace_cfg(grace_min_evaluations=2, grace_patience=1, grace_max_attempts=4)
+    es = make_entries([(0, "local_search", 0, None), (1, "beam_search", 100, None)])
+    for i in (2, 3):  # two grace tries refused as code duplicates: not evaluated, budget untouched
+        es.append(Entry(id=i, parent_ids=[1], mode="tune", hypothesis="", status="rejected_duplicate", proposer="x",
+                        generation=i, novelty={"nearest_id": 1}, usage={"grace_family": "beam_search"}))
+    p = grace_states(FamilyArchive(es), {"local_search"}, cfg, True)[0]
+    assert (p.status, p.used) == ("active", 1), p
+    for i in (4, 5):  # two more copies: 4 attempts reach grace_max_attempts, so it still ends
+        es.append(Entry(id=i, parent_ids=[1], mode="tune", hypothesis="", status="rejected_duplicate", proposer="x",
+                        generation=i, novelty={"nearest_id": 1}, usage={"grace_family": "beam_search"}))
+    p = grace_states(FamilyArchive(es), {"local_search"}, cfg, True)[0]
+    assert (p.status, p.used) == ("expired", 1), p
+    print("  grace: a refused duplicate does not use the funded budget; repeated copies still end the protection")
+
+
+def test_tune_exact_only_lets_small_refinements_through():
+    import re
+
+    from autoresearch.loop import LoopConfig
+    restore = _no_holdout()
+    try:
+        out = {}
+        for flag in (False, True):
+            tmp = tmpdir("exact")
+            try:
+                prompts = []
+
+                def propose_many(run, gen, assignments):
+                    by_id = {e.id: e for e in run.entries()}
+                    res = []
+                    for a in assignments:
+                        src = run.store.read_candidate(by_id[a.parent_ids[0]])
+                        if a.worker == 0:   # a real but tiny change: one constant of the parent
+                            src = re.sub(r"(NOISE = \['[a-z]+)(\d+)", lambda m: m.group(1) + str(int(m.group(2)) + 1), src, 1)
+                        else:              # cosmetic only: a comment -> an exact copy after normalisation
+                            src = src + "\n# reformatted\n"
+                        res.append({"assignment": a, "source": src, "hypothesis": "small", "usage": {"cost_usd": 0.01}})
+                    return res
+                with patched_describer():
+                    from autoresearch import swarm
+                    from autoresearch.ledger import RunStore
+                    from autoresearch.loop import ResearchRun, evaluate_candidate
+                    cfg = LoopConfig(problem="median_string", descriptors=False, modes=["tune"], tune_exact_only=flag)
+                    run = ResearchRun.create(RunStore(tmp / "run"), cfg, seed_source=world_source("local_search", 10000, 0),
+                                             evaluate=fake_evaluate)
+                    real_ws = swarm.write_workspace
+                    swarm.run_swarm(run, 2, 1, 1e9, propose_many,
+                                    lambda srcs: [evaluate_candidate("median_string", s, 1000, fake_evaluate) for s in srcs],
+                                    swarm.Events(run, 0.0, log=lambda line: None), max_generations=1)
+                out[flag] = [e.status for e in run.entries() if e.generation == 1]
+                ws = tmp / "ws"
+                ws.mkdir()
+                real_ws(run, swarm.Assignment(0, "tune", [0]), 1, 1, "tune 1", 60, ws, "local")
+                prompts.append((ws / "STATUS.md").read_text())
+                out[(flag, "warn")] = "Duplicate check" in prompts[0]
+            finally:
+                shutil.rmtree(tmp, ignore_errors=True)
+        assert out[False] == ["rejected_duplicate", "rejected_duplicate"], out  # 0.95 gate drops the small edit
+        assert out[True][0] != "rejected_duplicate" and out[True][1] == "rejected_duplicate", out
+        assert out[(True, "warn")] and not out[(False, "warn")]
+    finally:
+        restore()
+    print("  tune exact-only: a small real edit is evaluated, a cosmetic copy is still refused, the agent is warned")
+
+
 TESTS = [test_describe_miss_then_hit, test_describe_cache_invalidation, test_unknown_cost_is_not_zero,
          test_cache_concurrent_processes_and_threads, test_budget_caps_with_calls_in_flight,
          test_vocabulary_synonyms, test_distance_properties, test_entropy_cases, test_family_record_rule,
@@ -593,7 +662,8 @@ TESTS = [test_describe_miss_then_hit, test_describe_cache_invalidation, test_unk
          test_world_slow_family_gets_its_refinements, test_controller_moves_budget_on_concentration_and_stagnation,
          test_all_off_is_the_reference, test_distance_policy_per_mode, test_rejections_count_in_bandit_and_cost,
          test_plan_first_regenerates_and_hands_back, test_calibration_report_outside_repo,
-         test_diverse_parents_are_good_and_different]
+         test_diverse_parents_are_good_and_different, test_grace_duplicates_do_not_use_budget,
+         test_tune_exact_only_lets_small_refinements_through]
 
 if __name__ == "__main__":
     for t in TESTS:
