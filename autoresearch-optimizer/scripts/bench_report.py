@@ -331,7 +331,8 @@ def html_page(rows, groups, args, calibration: dict | None) -> str:
 
 ARM_LABELS = {"A": "A · reference", "B": "B · distance", "C": "C · entropy + grace", "D": "D · B + C",
               "J": "J · Johann's layer", "C1": "C1 · grace only", "C2": "C2 · controller only",
-              "initial": "initial framework", "johann": "Johann (original)"}
+              "initial": "initial framework", "johann": "Johann (original)",
+              "Cfix": "C fix · C + tune exact-only", "Dfix": "D fix · D + tune exact-only"}
 
 
 def interactive_card(rows: list[dict], arms: list[str], color: dict, args) -> str:
