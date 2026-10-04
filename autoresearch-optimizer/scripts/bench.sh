@@ -56,7 +56,11 @@ for seed in $SEEDS; do
       [[ $spec == *,* ]] && flags=${spec#*,} && flags=${flags//,/ }
       dir=$OPT/artifacts/runs/$TAG-$problem-$name-s$seed
       if grep -qs '"type": "run_end"' "$dir/events.jsonl"; then
-        echo "skip $dir (finished)"
+        if grep -qs "\"sha\": \"$sha\"" "$dir/bench.json"; then
+          echo "skip $dir (finished)"
+        else
+          echo "skip $dir: finished with another commit; give this version its own arm name (e.g. mine-v2=HEAD)"
+        fi
         continue
       fi
       echo "== $dir ($sha, $MODEL, $AGENTS agents x $GENERATIONS generations)"
