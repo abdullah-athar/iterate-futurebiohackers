@@ -349,7 +349,11 @@ def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propo
 
 
 def _per_agent_estimate(run: ResearchRun, cap: float | None) -> float | None:
-    """Mean reported cost of the last generation's sessions; before any, the per-session cap (or None)."""
+    """What a generation reserves per agent session. With a per-session cap (--max-budget-usd) it is that cap,
+    the worst case, so a run-level cap is never passed by a generation that costs more than the last one.
+    Without one: the mean reported cost of the last generation's sessions (None before any)."""
+    if cap is not None:
+        return cap
     entries = run.entries()
     last = max((e.generation or 0 for e in entries), default=0)
     costs = [e.usage["cost_usd"] for e in entries
