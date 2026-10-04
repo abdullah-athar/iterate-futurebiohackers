@@ -1,0 +1,57 @@
+{
+  "round": "r29",
+  "n": 8,
+  "seed": 0,
+  "control": {},
+  "jobs": [
+    {
+      "name": "muon-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "muon-ab-lr0.24",
+          "params": {
+            "optimizer": "muon_airbench",
+            "muon_momentum": 0.6,
+            "muon_ns_steps": 3,
+            "muon_lr": 0.24
+          },
+          "hypothesis": "Devin's airbench94-style Muon (conv filters orthogonalised, renormalised; BN biases and head on SGD) at his lr 0.24"
+        },
+        {
+          "label": "muon-ab-lr0.16",
+          "params": {
+            "optimizer": "muon_airbench",
+            "muon_momentum": 0.6,
+            "muon_ns_steps": 3,
+            "muon_lr": 0.16
+          },
+          "hypothesis": "Devin's Muon at lr 0.16"
+        },
+        {
+          "label": "muon-ab-lr0.32",
+          "params": {
+            "optimizer": "muon_airbench",
+            "muon_momentum": 0.6,
+            "muon_ns_steps": 3,
+            "muon_lr": 0.32
+          },
+          "hypothesis": "Devin's Muon at lr 0.32"
+        }
+      ]
+    },
+    {
+      "name": "pool-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "fullpool",
+          "params": {
+            "global_pool": "fullpool"
+          },
+          "hypothesis": "systems: Devin's full-map F.max_pool2d instead of max over the flattened positions (same values; kernel speed check)"
+        }
+      ]
+    }
+  ]
+}
