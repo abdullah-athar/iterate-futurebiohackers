@@ -5,7 +5,7 @@
   "control": {},
   "jobs": [
     {
-      "name": "confirm16-stack",
+      "name": "confirm16-stack-a",
       "control_index": 1,
       "variants": [
         {
@@ -25,7 +25,13 @@
             "epochs": 9.875
           },
           "hypothesis": "n=16 paired confirmation of the stack (g2 pair 192 + summed max+mean pooling) at 9.875 epochs vs the record"
-        },
+        }
+      ]
+    },
+    {
+      "name": "confirm16-stack-b",
+      "control_index": 1,
+      "variants": [
         {
           "label": "stack-e9.75-n16",
           "params": {
