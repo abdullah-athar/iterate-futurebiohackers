@@ -44,13 +44,14 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=ROOT / "artifacts" / "descriptors" / "compare")
     ap.add_argument("--model", default="sonnet")
     args = ap.parse_args()
-    problem = " ".join(get_problem("median_string").describe().strip().splitlines()[:4])
     vocab_path, cache = args.out / "vocab.json", args.out / "descriptors.json"
     vocab = Vocabulary.load(vocab_path)
     emb = Embedder()
     rows = {}
     for run in args.runs:
         store = RunStore(run)
+        name = json.loads((run / "config.json").read_text()).get("problem", "median_string")
+        problem = " ".join(get_problem(name).describe().strip().splitlines()[:4])  # same text the run's describer saw
         entries = store.entries()
         seed = entries[0]
         evaluated = [e for e in entries if e.evals and e.id != 0]

@@ -178,7 +178,10 @@ class ResearchRun:
             eligible = [m for m in eligible if m != "tune"] or eligible
         stats = {m: [0, 0.0] for m in MODES}
         for e in entries:
-            if e.mode in stats and e.status not in (STATUS_SEED, STATUS_REJECTED_DUPLICATE, STATUS_REJECTED_GUARD):
+            # a proposal the descriptor gate dropped unevaluated still cost an agent: a zero-reward try
+            # (code duplicates and guard rejections stay uncounted, as without the layer)
+            skipped = e.status in (STATUS_SEED, STATUS_REJECTED_DUPLICATE, STATUS_REJECTED_GUARD)
+            if e.mode in stats and (not skipped or e.usage.get("gate_dropped")):
                 stats[e.mode][0] += 1
                 stats[e.mode][1] += 1.0 if e.improved_global else (0.5 if e.improved_instances else 0.0)
         total = sum(n for n, _ in stats.values()) or 1

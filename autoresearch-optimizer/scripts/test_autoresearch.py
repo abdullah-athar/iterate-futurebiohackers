@@ -170,13 +170,15 @@ def test_swarm():
     print("  Swarm test passed!")
 
 
-def test_exploration_exploitation():
-    print("Testing the exploration-exploitation layer in the swarm (fake proposer and describer, local evaluation)...")
+def _ee_swarm(tmp: Path, fail: tuple[str, ...] = ()):
+    """One 6-agent generation with the layer on (fake proposer and describer); `fail` = fixture files whose
+    describe call raises. Returns (run, assignments seen by the proposer, the descriptor_gate event, gen-1 entries)."""
     from autoresearch import exploration_exploitation as ee
     from autoresearch import swarm
     from autoresearch.descriptors import Descriptor
 
     fixtures = repo_root / "scripts" / "descriptor_fixtures"
+    failing = {(fixtures / f).read_text() for f in fail}
     seed = get_problem("median_string").seed_source()
     hill = ("hill climbing", ["substitution moves", "set median initialisation", "first-improvement selection"])
     by_worker = [  # bandit gives 2 agents each to tune, fix_losers, new_family -> workers in that order
@@ -191,6 +193,8 @@ def test_exploration_exploitation():
     seen_assignments = []
 
     def fake_describe(source, vocab, problem, **kw):
+        if source in failing:
+            raise RuntimeError("describe failed: fake")
         core, mids = labels.get(source, ("greedy construction", ["column-wise majority vote"]))
         return Descriptor([(core, 6)] + [(t, 3) for t in mids], summary=core)
 
@@ -200,18 +204,27 @@ def test_exploration_exploitation():
                  "usage": {"model": "fake", "seconds": 1.0, "outcome": "ok", "cost_usd": 0.01}} for a in assignments]
 
     real_describe, ee.describe = ee.describe, fake_describe
-    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-ee-"))
     try:
         run = ResearchRun.create(RunStore(tmp / "run"), LoopConfig(problem="median_string", descriptors=True))
-        lines = []
-        emit = swarm.Events(run, 0.0, log=lines.append)
+        emit = swarm.Events(run, 0.0, log=lambda line: None)
         swarm.run_swarm(run, 6, 1, 1e9, propose_many, swarm.local_evaluator("median_string", 1000), emit,
                         max_generations=1)
+    finally:
+        ee.describe = real_describe
+    events = [json.loads(l) for l in (run.store.root / "events.jsonl").read_text().splitlines()]
+    gate = next(e for e in events if e["type"] == "descriptor_gate")
+    return run, seen_assignments, gate, [e for e in run.entries() if e.generation == 1]
+
+
+def test_exploration_exploitation():
+    print("Testing the exploration-exploitation layer in the swarm (fake proposer and describer, local evaluation)...")
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-ee-"))
+    try:
+        run, seen_assignments, g, gen1 = _ee_swarm(tmp)
         modes = [a.mode for a in seen_assignments]
         assert modes == ["tune", "tune", "fix_losers", "fix_losers", "new_family", "new_family"], modes
         assert all("Descriptor contract" in a.notes for a in seen_assignments if a.mode == "tune")
         assert all("Research landscape" in a.notes for a in seen_assignments)
-        gen1 = [e for e in run.entries() if e.generation == 1]
         branch = [e.usage.get("branch") for e in gen1]
         assert branch == ["K", "K->L", None, None, "L", "L"], branch
         assert gen1[0].evals, "tune child that kept its descriptor must be evaluated"
@@ -220,14 +233,32 @@ def test_exploration_exploitation():
         assert dup.status == STATUS_REJECTED_DUPLICATE and "not selected by max-min" in dup.note, dup.note
         assert dup.usage["min_dist"] < run.config.desc_threshold
         assert all(e.usage["min_dist"] >= run.config.desc_threshold for e in (gen1[1], gen1[5]))
+        assert (g["tune_kept"], g["drifted"], g["pool"], g["slots"], g["selected"], g["undescribed"]) == (1, 1, 3, 3, 2, 0), g
         events = [json.loads(l) for l in (run.store.root / "events.jsonl").read_text().splitlines()]
-        g = next(e for e in events if e["type"] == "descriptor_gate")
-        assert (g["tune_kept"], g["drifted"], g["pool"], g["slots"], g["selected"]) == (1, 1, 3, 3, 2), g
         assert next(e for e in events if e["type"] == "gen_end")["vocab"] > 0
+        # the bandit counts the gate-dropped proposal as a zero-reward new_family try
+        assert dup.usage.get("gate_dropped") is True
+        entries = run.entries()
+        with_drop = run.mode_scores(entries, run.archive(entries))["new_family"]
+        next(e for e in entries if e.id == dup.id).usage.pop("gate_dropped")
+        assert with_drop < run.mode_scores(entries, run.archive(entries))["new_family"]
     finally:
-        ee.describe = real_describe
         shutil.rmtree(tmp, ignore_errors=True)
     print("  Exploration-exploitation test passed!")
+
+
+def test_gate_describe_failure():
+    print("Testing that a candidate whose describe call fails is evaluated, not dropped...")
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-ee-"))
+    try:
+        run, _, g, gen1 = _ee_swarm(tmp, fail=("center_star_consensus.py",))
+        star = gen1[5]  # new_family, describe raised
+        assert star.status != STATUS_REJECTED_DUPLICATE and star.evals, (star.status, star.note)
+        assert star.usage["descriptor"] is None and not star.usage.get("gate_dropped")
+        assert (g["pool"], g["selected"], g["undescribed"]) == (3, 1, 1), g
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Describe-failure test passed!")
 
 def test_lineage_parents():
     import autoresearch.exploration_exploitation as ee
@@ -275,6 +306,7 @@ def test_describe_cache():
     calls = []
 
     def fake_run(cmd, input, **kw):
+        assert kw.get("cwd") == tempfile.gettempdir(), kw.get("cwd")  # outside the repo: no project CLAUDE.md
         calls.append(1)
         out = {"total_cost_usd": 0.01, "structured_output": {
             "terms": [{"term": "hill climbing", "tier": 6}], "new_terms": [], "summary": "s"}}
@@ -347,6 +379,7 @@ if __name__ == "__main__":
     test_exploration_exploitation()
     test_lineage_parents()
     test_gap_directions()
+    test_gate_describe_failure()
     test_describe_cache()
     test_viz_lineage()
     print("\nAll autoresearch tests passed!")

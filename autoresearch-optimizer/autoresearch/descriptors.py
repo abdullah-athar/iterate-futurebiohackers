@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import tempfile
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -209,10 +210,11 @@ def describe(source: str, vocab: Vocabulary, problem: str, *, model: str = "sonn
     error, cost, calls = None, 0.0, 0
     for _ in range(retries + 1):
         text = prompt if error is None else f"{prompt}\n\nYour previous answer was invalid: {error}."
+        # run outside the repo: from inside it, claude also loads the project CLAUDE.md (~2x the input tokens)
         proc = subprocess.run(
             ["claude", "-p", "--output-format", "json", "--model", model, "--tools", "",
              "--system-prompt", SYSTEM, "--json-schema", json.dumps(DESCRIBE_SCHEMA)],
-            input=text, capture_output=True, text=True, timeout=180)
+            input=text, capture_output=True, text=True, timeout=180, cwd=tempfile.gettempdir())
         calls += 1
         try:
             res = json.loads(proc.stdout)

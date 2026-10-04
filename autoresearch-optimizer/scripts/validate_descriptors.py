@@ -126,7 +126,7 @@ def main() -> None:
     path = args.out / f"validation-{time.strftime('%Y%m%d-%H%M%S')}.json"
     path.write_text(json.dumps(report, indent=1))
     vocab.save(args.out / "validation-vocab.json")
-    print(f"\nreport: {path.relative_to(ROOT)}")
+    print(f"\nreport: {path.resolve().relative_to(ROOT) if path.resolve().is_relative_to(ROOT) else path}")
 
 
 if __name__ == "__main__":

@@ -115,7 +115,8 @@ def cmd_swarm(args) -> None:
     if not store.exists:
         run = ResearchRun.create(store, LoopConfig(problem=args.problem, time_budget_ms=args.budget_ms,
                                                    modes=args.modes, exploit=args.exploit,
-                                                   descriptors=not args.no_descriptors, describe_model=args.model))
+                                                   descriptors=not args.no_descriptors,
+                                                   describe_model=args.describe_model))
         print(f"Initialised run at {store.root}\n" + ResearchRun.describe_entry(run.entries()[0]))
     run = ResearchRun(store)
     emit = swarm.Events(run, time.time())
@@ -214,6 +215,9 @@ def main(argv=None) -> None:
     s.add_argument("--no-descriptors", action="store_true",
                    help="new run without the exploration-exploitation layer (descriptor contract for tune, "
                         "max-min novelty selection for new_family, research landscape)")
+    s.add_argument("--describe-model", default="sonnet",
+                   help="model that writes the descriptors, independent of --model so the descriptors (and the "
+                        "distance thresholds tuned on them) stay comparable across runs")
     s.set_defaults(fn=cmd_swarm)
 
     s = sub.add_parser("report", help="render report.md (optionally with held-out evaluation)")
