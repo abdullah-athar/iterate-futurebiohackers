@@ -1,4 +1,5 @@
-"""Tests for the autoresearch loop: novelty gate, import guard, candidate/scorer boundary, archive, agent-mode run."""
+"""Tests for the autoresearch loop: novelty gate, import guard, candidate/scorer boundary, archive, agent-mode run,
+hypothesis gate, dashboard lineage."""
 
 import json
 import os
@@ -14,10 +15,12 @@ if str(repo_root) not in sys.path:
 
 from autoresearch.archive import Archive
 from autoresearch.guard import check_imports
+from autoresearch.hypothesis_gate import _parse_decisions, lexical_judge
 from autoresearch.ledger import (
     STATUS_KEPT,
     STATUS_REJECTED_DUPLICATE,
     STATUS_REJECTED_GUARD,
+    STATUS_REJECTED_HYPOTHESIS,
     STATUS_REJECTED_SCREEN,
     RunStore,
 )
@@ -141,6 +144,38 @@ def test_agent_run():
     print("  Agent-mode run test passed!")
 
 
+def test_hypothesis_gate():
+    print("Testing hypothesis gate (lexical judge, judge-answer parsing)...")
+    judge = lexical_judge()
+    prior = [("#3", "simulated annealing over insert and delete moves from the set median")]
+    new = [("w00", "Simulated annealing with insert/delete moves starting from the set median"),
+           ("w01", "bit-parallel Myers distance kernel to evaluate more neighbours within the CPU budget"),
+           ("w02", "Myers bit-parallel distance kernel so more neighbours are evaluated within CPU budget")]
+    verdicts, usage = judge(new, prior)
+    assert [v.keep for v in verdicts] == [False, True, False], verdicts
+    assert verdicts[0].similar_to == "#3" and verdicts[2].similar_to == "w01" and usage == {}
+
+    labels = ["w00", "w01", "w02", "w03"]
+    answer = ('noise {"decisions": [{"id": "w00", "duplicate_of": "#7", "reason": "same SA"}, '
+              '{"id": "w01", "duplicate_of": null}, {"id": "w02", "duplicate_of": "w01", "reason": "same kernel"}, '
+              '{"id": "w03", "duplicate_of": "w03"}]} trailing')
+    verdicts = _parse_decisions(answer, labels)
+    # a ledger id or an earlier kept proposal rejects; a self/forward reference keeps the idea
+    assert [v.keep for v in verdicts] == [False, True, False, True], verdicts
+    assert verdicts[2].similar_to == "w01" and verdicts[2].reason == "same kernel"
+
+    from autoresearch.swarm import _first_line, _merge_usage
+    hyp = {"model": "m", "seconds": 2.0, "cost_usd": 0.02, "prompt_tokens": 5000, "completion_tokens": 50, "gate_cost_usd": 0.005}
+    code = {"model": "m", "seconds": 40.0, "cost_usd": 0.10, "prompt_tokens": 90000, "completion_tokens": 3000,
+            "num_turns": 8, "outcome": "ok"}
+    u = _merge_usage(hyp, code)
+    assert abs(u["cost_usd"] - 0.125) < 1e-9 and u["hyp_cost_usd"] == 0.02 and u["gate_cost_usd"] == 0.005
+    assert u["prompt_tokens"] == 95000 and u["outcome"] == "ok"
+    assert abs(_merge_usage(hyp)["cost_usd"] - 0.025) < 1e-9
+    assert _first_line("\n- **Use Myers bit-parallel distance**\nbecause...") == "Use Myers bit-parallel distance"
+    print("  Hypothesis gate test passed!")
+
+
 def test_swarm():
     print("Testing swarm generations with a fake proposer (local evaluation)...")
     from autoresearch import swarm
@@ -168,6 +203,94 @@ def test_swarm():
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("  Swarm test passed!")
+
+
+def test_swarm_hypothesis_first():
+    print("Testing swarm recording of hypothesis-gate rejections...")
+    from autoresearch import swarm
+
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-swarm-hyp-"))
+    try:
+        run = ResearchRun.create(RunStore(tmp / "run"), LoopConfig(problem="median_string"))
+
+        def propose_many(run, gen, assignments):
+            u = {"model": "fake", "seconds": 1.0, "outcome": "ok", "cost_usd": 0.03, "hyp_cost_usd": 0.01}
+            out = [{"assignment": assignments[0], "source": mp.FAST_INDEL_SEARCH, "hypothesis": "fast indel search", "usage": u}]
+            for a in assignments[1:]:
+                out.append({"assignment": a, "source": "", "hypothesis": "fast indel search again",
+                            "usage": {**u, "outcome": "rejected_hypothesis", "cost_usd": 0.01},
+                            "gate": {"keep": False, "similar_to": "w00", "reason": "same idea"}})
+            return out
+
+        lines = []
+        emit = swarm.Events(run, 0.0, log=lines.append)
+        swarm.run_swarm(run, 3, 1, 1e9, propose_many, swarm.local_evaluator("median_string", 1000), emit,
+                        max_generations=1)
+        gen1 = [e for e in run.entries() if e.generation == 1]
+        assert [e.status for e in gen1] == [STATUS_KEPT, STATUS_REJECTED_HYPOTHESIS, STATUS_REJECTED_HYPOTHESIS]
+        assert all(not e.source_path and "same idea as w00" in e.note for e in gen1[1:])
+        # repeated ideas are not evidence for the mode bandit, and the report counts them apart
+        assert run.steps_since_improvement(run.entries()) == 0
+        text = render(run)
+        assert "1 evaluated" in text and "hypothesis gate: 2 of 3 ideas stopped" in text, text
+        assert any("1 hypothesis-gate" not in l and "2 hypothesis-gate" in l for l in lines), lines
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Swarm hypothesis-first test passed!")
+
+
+def test_swarm_model_schedule():
+    print("Testing the per-generation model schedule (--model sonnet,opus)...")
+    from autoresearch import swarm
+
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-swarm-sched-"))
+    real, seen = swarm.run_claude, []
+    try:
+        run = ResearchRun.create(RunStore(tmp / "run"), LoopConfig(problem="median_string"))
+        swarm.run_claude = lambda ws, turn_s, model, *a, **k: seen.append(model) or {"model": model, "seconds": 0.0, "outcome": "ok"}
+        propose = swarm.claude_proposer("sonnet,opus", 1, "local", None, lambda *a, **k: None)
+        for gen in (1, 2, 3):
+            propose(run, gen, [swarm.Assignment(0, "tune", [0])])
+        assert seen == ["sonnet", "opus", "opus"], seen  # the last model is kept after the schedule ends
+    finally:
+        swarm.run_claude = real
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Model schedule test passed!")
+
+
+def test_viz_grid():
+    print("Testing the model-grid page (configurations x benchmarks x repeats)...")
+    from autoresearch_viz.grid import config_name, render_grid
+    from autoresearch_viz.load import load_run
+
+    def ev(score):
+        return {"split": "validate", "score": score, "baseline": 100, "instances": []}
+
+    def run(name, problem, models, best, cost):
+        d = tmp / name
+        d.mkdir()
+        (d / "config.json").write_text(json.dumps({"problem": problem}))
+        rows = [{"id": 0, "parent_ids": [], "mode": "seed", "status": "seed", "objective": 90, "evals": {"validate": ev(90)}, "timestamp": 1.0}]
+        for i, m in enumerate(models, 1):
+            rows.append({"id": i, "parent_ids": [i - 1], "mode": "tune", "status": "kept", "objective": best + len(models) - i,
+                         "improved_global": True, "evals": {"validate": ev(best + len(models) - i)}, "timestamp": 1.0 + 30 * i,
+                         "usage": {"cost_usd": cost / len(models)}, "proposer": f"claude-code:{m}"})
+        (d / "ledger.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        return load_run(d)
+
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-viz-grid-"))
+    try:
+        runs = [run("a-sonnet-s0", "p1", ["sonnet", "sonnet"], 80, 0.5), run("a-sonnet-s1", "p1", ["sonnet", "sonnet"], 82, 0.7),
+                run("a-sopus-s0", "p1", ["sonnet", "opus"], 75, 0.9), run("b-opus-s0", "p2", ["opus", "opus"], 70, 1.5)]
+        assert [config_name(r) for r in runs] == ["Sonnet", "Sonnet", "Sopus", "Opus"]
+        html = render_grid(runs)
+        assert html.count("<div class='facet'>") == (3 + 5 + 1) * 2, "one panel per benchmark in each scatter, per-seed and progress view"
+        assert "Sopus better on 1/1 seeds" in html, "paired head-to-head on the shared seed 0"
+        assert "data-run='Sopus'" in html and 'class="pareto"' in html and "seed 1" in html
+        assert "$0.60 <span class='muted'>± $0.14</span>" in html, "mean ± sd of the two Sonnet repeats"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Model grid page test passed!")
 
 
 def test_viz_lineage():
@@ -207,12 +330,64 @@ def test_viz_lineage():
     print("  Lineage chart test passed!")
 
 
+def test_viz_quality_efficiency():
+    print("Testing the dashboard's quality vs efficiency card and cost axis...")
+    from autoresearch_viz.html import render
+    from autoresearch_viz.load import load_run
+
+    def ev(score):
+        return {"split": "validate", "score": score, "baseline": 100, "instances": []}
+
+    def run(dir_, best, cost):
+        rows = [{"id": 0, "parent_ids": [], "mode": "seed", "status": "seed", "objective": 90, "evals": {"validate": ev(90)},
+                 "timestamp": 1.0},
+                {"id": 1, "parent_ids": [0], "mode": "tune", "status": "kept", "objective": best, "improved_global": True,
+                 "evals": {"validate": ev(best)}, "timestamp": 61.0, "usage": {"cost_usd": cost}, "proposer": "claude-code:x"}]
+        dir_.mkdir()
+        (dir_ / "ledger.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        return load_run(dir_)
+
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-viz-qe-"))
+    try:
+        strong, cheap = run(tmp / "strong", 70, 2.0), run(tmp / "cheap", 80, 0.5)
+        strong.label, cheap.label = "Strong", "Cheap"
+        html = render([strong, cheap])
+        card = html[html.index("<h2>Quality vs efficiency</h2>"):html.index("<h2>Research progress</h2>")]
+        assert "Quality<span class='qe-win'> · Strong wins</span>" in card and "Efficiency<span class='qe-win'> · Cheap wins</span>" in card
+        assert "+22.2% ★" in card and "$0.50 ★" in card and "20 ★" in card  # gain, cost, points per dollar (10 / 0.5)
+        assert 'data-key="cost">vs cost</button>' in html
+        assert "Cheap end · $0.50" in html and "Strong end · $2.00" in html, "each run's real end is marked on the cost axis"
+        # one show/hide button per run, and every bar row is tagged so the page can hide it and re-rank the rest
+        assert "<button class='on' aria-pressed='true' data-run='Strong'>" in html and "data-run='Cheap'>" in html
+        assert card.count('<g class="mb" data-run="Cheap"') >= 4 and "class='card qe-card' data-runs=" in html
+        assert "class='runtoggles'" not in render([strong])
+        # a model schedule: the hand-over is marked on the curve with the time and cost spent so far
+        rows = [json.loads(l) for l in (tmp / "strong" / "ledger.jsonl").read_text().splitlines()]
+        rows.append({**rows[1], "id": 2, "parent_ids": [1], "objective": 65, "evals": {"validate": ev(65)}, "timestamp": 121.0,
+                     "proposer": "claude-code:opus"})
+        rows[1]["proposer"] = "claude-code:sonnet"
+        (tmp / "sched").mkdir()
+        (tmp / "sched" / "ledger.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        sched = render([load_run(tmp / "sched")])
+        assert ">Sonnet → Opus</text>" in sched and "1.0m into the run, $2.00 spent" in sched
+        assert "A ring marks" not in html, "no ring note without a model switch"
+        assert "<h2>Quality vs efficiency</h2>" not in render([strong]), "the card needs two runs"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Quality vs efficiency card test passed!")
+
+
 if __name__ == "__main__":
     random.seed(0)
     test_novelty_gate()
     test_import_guard()
     test_evaluator_boundary()
     test_agent_run()
+    test_hypothesis_gate()
     test_swarm()
+    test_swarm_hypothesis_first()
+    test_swarm_model_schedule()
     test_viz_lineage()
+    test_viz_quality_efficiency()
+    test_viz_grid()
     print("\nAll autoresearch tests passed!")

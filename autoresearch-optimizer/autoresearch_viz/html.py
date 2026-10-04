@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import math
 from datetime import UTC, datetime
 from html import escape
 
-from .charts import BarGroup, DagEdge, DagNode, RefLine, Series, dag_chart, fmt_num, grouped_hbars, stacked_hbars, step_chart
+from .charts import (BarGroup, DagEdge, DagNode, RefLine, Series, dag_chart, fmt_num, grouped_hbars, metric_bars, stacked_hbars,
+                     step_chart)
 from .load import STATUS_LABELS, STATUS_ORDER, STATUS_REJECTED_DUPLICATE, Run
-from .metrics import Summary, best_delta_text, best_so_far, per_instance, summarize
+from .metrics import Summary, best_delta_text, best_so_far, held_out_gain_pct, model_switches, per_instance, summarize
 
 PALETTE = ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#0891b2", "#be185d", "#4d7c0f"]
 STATUS_COLORS = {
@@ -18,6 +20,7 @@ STATUS_COLORS = {
     "rejected_duplicate": "#fbbf24",
     "failed": "#ef4444",
     "rejected_guard": "#7c2d12",
+    "rejected_hypothesis": "#a78bfa",
     "seed": "#2563eb",
 }
 MODE_COLORS = {"tune": "#0ea5e9", "fix_losers": "#f97316", "new_family": "#8b5cf6", "merge": "#ec4899", "seed": "#2563eb"}
@@ -43,7 +46,7 @@ h1{font-size:28px;margin:0 0 4px}h2{font-size:19px;margin:0 0 4px}h3{font-size:1
 svg.chart{max-width:100%;height:auto;display:block}
 svg .grid{stroke:#eef2f7;stroke-width:1}svg .axis{stroke:#cbd5e1;stroke-width:1}
 svg .tick,svg .val,svg .seg{font-size:11px;fill:#64748b}svg .seg{fill:#fff;font-weight:600}svg .label{font-size:12px;fill:#334155}
-svg .ref{font-size:11px}svg .cat{font-size:12px;fill:#0f172a}
+svg .ref{font-size:11px}svg .end{font-size:11px;fill:var(--ink)}svg .swbg{fill:var(--card);stroke-width:1.2}svg .cat{font-size:12px;fill:#0f172a}
 svg [data-tip]{cursor:pointer}svg.chart circle[data-tip]:hover{r:7}
 .linbar{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;margin:0 0 4px}.linbar .tabs{margin:0;align-items:center}.linbar .tabs>span{font-size:13px;color:var(--muted);margin-right:2px}
 .linzoom button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:3px 10px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted);margin-left:4px}
@@ -62,12 +65,44 @@ select{font:inherit;padding:5px 8px;border-radius:8px;border:1px solid var(--lin
 #tip{position:fixed;pointer-events:none;background:#0f172a;color:#fff;padding:6px 9px;border-radius:6px;font-size:12px;max-width:360px;display:none;z-index:9;white-space:pre-line}
 .note-syn{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:10px 14px;margin-bottom:18px;font-size:13.5px}
 footer{color:var(--muted);font-size:12px;margin-top:30px}
+.qe{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:18px}.qe-grp{border:1px solid var(--line);border-radius:10px;padding:4px 14px 10px}
+.qe-fig{margin:8px 0 0}.qe-prop{margin-right:14px;white-space:nowrap}.qe-fig figcaption{display:flex;justify-content:space-between;gap:8px;font-size:13px}.qe-fig figcaption span{color:var(--muted);font-size:12px}
+.runtoggles{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--bg);padding:8px 0;margin:0 0 14px}
+.runtoggles>span{font-size:13px;color:var(--muted);margin-right:4px}
+.runtoggles button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px 5px 9px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted)}
+.runtoggles button .sw{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;opacity:.35}
+.runtoggles button.on{color:var(--ink);border-color:#94a3b8}.runtoggles button.on .sw{opacity:1}
+.runtoggles button:not(.on){text-decoration:line-through}
 .events{margin:0;padding-left:18px;font-size:12.5px;color:#334155}.events li{margin:2px 0}
-@media print{.tabs{display:none}.panel{display:block!important}}
+@media print{.tabs,.runtoggles{display:none}.panel{display:block!important}}
 """
 
 JS = """
+const HIDDEN=new Set();
+const escHtml=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function relayoutBars(){document.querySelectorAll('svg.mbars').forEach(svg=>{
+ const hi=svg.dataset.higher==='1',ml=+svg.dataset.ml,pw=+svg.dataset.pw,rh=+svg.dataset.rh;
+ const rows=[...svg.querySelectorAll('g.mb')].filter(g=>!HIDDEN.has(g.dataset.run));
+ const vs=rows.map(g=>+g.dataset.v).filter(Number.isFinite);
+ const best=vs.length?(hi?Math.max(...vs):Math.min(...vs)):NaN,top=vs.length?(Math.max(...vs,0)||1):1;
+ rows.forEach((g,i)=>{g.setAttribute('transform','translate(0,'+(4+i*rh)+')');const v=+g.dataset.v,r=g.querySelector('rect');if(!r)return;
+  const w=Math.max(pw*Math.max(v,0)/top,2),t=g.querySelector('.val'),win=v===best;r.setAttribute('width',w.toFixed(1));t.setAttribute('x',(ml+w+6).toFixed(1));
+  t.textContent=g.dataset.f+(win?' ★':'');[t,g.querySelector('.cat')].forEach(x=>x.setAttribute('font-weight',win?'700':'400'));});
+ svg.setAttribute('viewBox','0 0 '+svg.dataset.w+' '+(8+rh*rows.length));svg.querySelector('.axis').setAttribute('y2',4+rh*rows.length);
+ const w=rows.find(g=>+g.dataset.v===best);svg.dataset.winner=w?w.dataset.run:'';});
+ document.querySelectorAll('.qe-grp').forEach(grp=>{const svg=grp.querySelector('svg.mbars'),span=grp.querySelector('.qe-win');
+  if(span)span.textContent=svg&&svg.dataset.winner?' · '+svg.dataset.winner+' wins':'';});
+ document.querySelectorAll('.qe-card').forEach(c=>{const rs=JSON.parse(c.dataset.runs).filter(r=>!HIDDEN.has(r.l)),lead=c.querySelector('.qe-lead');
+  if(!rs.length){lead.innerHTML='No run shown';return;}const q=rs.reduce((a,b)=>b.best<a.best?b:a),cs=rs.filter(r=>r.cost);
+  let h='<b>'+escHtml(q.l)+'</b> finds the best solver ('+q.bestf+', '+q.gainf+' vs the seed)';
+  if(cs.length){const k=cs.reduce((a,b)=>b.cost<a.cost?b:a);h+='; <b>'+escHtml(k.l)+'</b> is the cheapest run ('+k.costf+', '+k.gainf+' vs the seed in '+k.secsf+')';}
+  lead.innerHTML=h;});}
+function applyRuns(){document.querySelectorAll('[data-run]').forEach(el=>{if(!el.closest('.runtoggles'))el.style.display=HIDDEN.has(el.dataset.run)?'none':'';});
+ document.querySelectorAll('.runtoggles button').forEach(b=>{const on=!HIDDEN.has(b.dataset.run);b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});relayoutBars();}
 function bind(){
+document.querySelectorAll('.runtoggles button').forEach(b=>b.addEventListener('click',()=>{const r=b.dataset.run;
+ if(HIDDEN.has(r))HIDDEN.delete(r);else if(document.querySelectorAll('.runtoggles button.on').length>1)HIDDEN.add(r);applyRuns();}));
+applyRuns();
 document.querySelectorAll('.tabs').forEach(t=>{t.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
  t.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
  const grp=t.dataset.group;document.querySelectorAll('.panel[data-group="'+grp+'"]').forEach(p=>p.classList.toggle('on',p.dataset.key===b.dataset.key));})); });
@@ -95,10 +130,14 @@ def _badge(text: str, color: str) -> str:
     return f'<span class="badge" style="background:{color}">{escape(text)}</span>'
 
 
-def _legend(items: list[tuple[str, str]]) -> str:
+def _legend(items: list[tuple[str, str]], runs: frozenset[str] = frozenset()) -> str:
+    """Colour key; items whose label is in `runs` follow the page's run toggles."""
+    def tag(label: str) -> str:
+        return f' data-run="{escape(label, quote=True)}"' if label in runs else ""
+
     return (
         '<div class="legend">'
-        + "".join(f'<span><span class="sw" style="background:{c}"></span>{escape(l)}</span>' for l, c in items)
+        + "".join(f'<span{tag(l)}><span class="sw" style="background:{c}"></span>{escape(l)}</span>' for l, c in items)
         + "</div>"
     )
 
@@ -155,6 +194,8 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
         ("tokens", "cumulative agent tokens (prompt + completion)", "tokens"),
         ("seconds", "wall-clock", "seconds"),
     ]
+    if any(e.cost for r in runs for e in r.entries):
+        axes.append(("cost", "cumulative agent cost (Claude Code's estimate)", "usd"))
     panels, buttons = [], []
     for i, (key, xl, unit) in enumerate(axes):
         series = []
@@ -166,7 +207,14 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
                 if p.improved:
                     e = next(x for x in run.entries if x.id == p.entry_id)
                     marks.append((getattr(p, key), p.best, f"#{e.id} [{e.mode}] → {fmt_num(p.best)}\n{e.hypothesis}"))
-            series.append(Series(run.label, colors[run.label], xy, marks))
+            end = max((x for x, _ in xy), default=None) if key != "evals" and len(runs) > 1 else None
+            switches = []
+            for p, old, new in model_switches(run):
+                switches.append((getattr(p, key), p.best, f"{_model_name(old)} → {_model_name(new)}",
+                                 f"{run.label} switches from {_model_name(old)} to {_model_name(new)} after #{p.entry_id}: "
+                                 f"{fmt_num(p.seconds, 'seconds')} into the run, {fmt_num(p.cost, 'usd')} spent, "
+                                 f"{fmt_num(p.tokens, 'tokens')} tokens, best so far {fmt_num(p.best)}"))
+            series.append(Series(run.label, colors[run.label], xy, marks, end, switches))
         max_x = max((getattr(p, key) for r in runs for p in best_so_far(r)), default=0)
         panels.append(
             f'<div class="panel {"on" if i == 0 else ""}" data-group="x" data-key="{key}">'
@@ -177,12 +225,70 @@ def _progress_card(runs: list[Run], colors: dict[str, str], summaries: list[Summ
         )
         buttons.append(f'<button class="{"on" if i == 0 else ""}" data-key="{key}">vs {key if key != "seconds" else "wall-clock"}</button>')
     return (
-        '<section class="card"><h2>Research progress</h2><p class="lead">Best objective found so far. Dots mark proposals that set a new global best; hover for the hypothesis.</p>'
+        '<section class="card"><h2>Research progress</h2><p class="lead">Best objective found so far. Dots mark proposals that set a new global best; hover for the hypothesis.'
+        + (" A ring marks where a run hands over to another model (<code>--model sonnet,opus</code>); hover it for the time and cost spent at that moment."
+           if any(model_switches(r) for r in runs) else "")
+        + "</p>"
         f'<div class="tabs" data-group="x">{"".join(buttons)}</div>'
-        + _legend([(r.label, colors[r.label]) for r in runs])
+        + _legend([(r.label, colors[r.label]) for r in runs], frozenset(r.label for r in runs))
         + "".join(panels)
         + "</section>"
     )
+
+
+def _quality_efficiency_card(summaries: list[Summary], colors: dict[str, str], runs: list[Run]) -> str:
+    """Two or more runs (e.g. one per model): what each one found versus what it cost, with the winner of each measure."""
+    pairs = [(s, r) for s, r in zip(summaries, runs) if math.isfinite(s.best_objective)]
+    if len(pairs) < 2:
+        return ""
+
+    def per_dollar(s: Summary) -> float:
+        return (s.seed_objective - s.best_objective) / s.cost_usd if s.cost_usd else math.nan
+
+    def block(title: str, note: str, value, unit: str, higher: bool) -> str:
+        rows = [(s.label, value(s, r), colors[s.label]) for s, r in pairs]
+        return (f"<figure class='qe-fig'><figcaption><b>{escape(title)}</b><span>{escape(note)}</span></figcaption>"
+                + metric_bars(rows, unit=unit, higher_is_better=higher) + "</figure>")
+
+    quality = [("gain over the seed", f"{pairs[0][0].objective_split} split · higher is better",
+                lambda s, r: s.gain_vs_seed_pct, "pct", True),
+               ("held-out gain over the seed", "instances the search never saw · higher is better", held_out_gain_pct, "pct", True)]
+    efficiency = [("total agent cost", "Claude Code's estimate · lower is better", lambda s, r: s.cost_usd or math.nan, "usd", False),
+                  ("wall-clock", "first to last ledger entry · lower is better", lambda s, r: s.seconds, "seconds", False),
+                  ("objective points gained per dollar", "higher is better", lambda s, r: per_dollar(s), "", True)]
+    best_q = min(pairs, key=lambda p: p[0].best_objective)[0]
+    costed = [p for p in pairs if p[0].cost_usd]
+    cheap = min(costed, key=lambda p: p[0].cost_usd)[0] if costed else None
+    lead = (f"<b>{escape(best_q.label)}</b> finds the best solver ({fmt_num(best_q.best_objective)}, "
+            f"{fmt_num(best_q.gain_vs_seed_pct, 'pct')} vs the seed)")
+    if cheap:
+        lead += (f"; <b>{escape(cheap.label)}</b> is the cheapest run ({fmt_num(cheap.cost_usd, 'usd')}, "
+                 f"{fmt_num(cheap.gain_vs_seed_pct, 'pct')} vs the seed in {fmt_num(cheap.seconds, 'seconds')})")
+    models = "".join(f"<span class='qe-prop' data-run='{escape(s.label, quote=True)}'>{escape(s.label)}: <code>{escape(_proposers(r))}</code></span>"
+                     for s, r in pairs)
+    data = [{"l": s.label, "best": s.best_objective, "bestf": fmt_num(s.best_objective), "gainf": fmt_num(s.gain_vs_seed_pct, "pct"),
+             "cost": s.cost_usd or 0, "costf": fmt_num(s.cost_usd, "usd"), "secsf": fmt_num(s.seconds, "seconds")} for s, _ in pairs]
+    return (
+        f"<section class='card qe-card' data-runs='{escape(json.dumps(data), quote=True)}'><h2>Quality vs efficiency</h2>"
+        f"<p class='lead'><span class='qe-lead'>{lead}</span>. A ★ marks the winner of each measure among the runs shown. Proposers: {models}.</p><div class='qe'>"
+        f"<div class='qe-grp'><h3>Quality<span class='qe-win'> · {escape(best_q.label)} wins</span></h3>"
+        + "".join(block(*q) for q in quality)
+        + f"</div><div class='qe-grp'><h3>Efficiency<span class='qe-win'>{(' · ' + escape(cheap.label) + ' wins') if cheap else ''}</span></h3>"
+        + "".join(block(*e) for e in efficiency)
+        + "</div></div><p class='muted' style='font-size:12.5px;margin:10px 0 0'>The 'vs cost' tab of <i>Research progress</i> "
+        "shows the same trade-off over the run. With one run per flavour, differences of a few percent are within noise.</p></section>"
+    )
+
+
+def _model_name(proposer: str) -> str:
+    """'claude-code:sonnet' -> 'Sonnet'."""
+    name = proposer.split(":", 1)[-1]
+    return name[:1].upper() + name[1:]
+
+
+def _proposers(run: Run) -> str:
+    """The run's proposers in first-use order, e.g. 'claude-code:sonnet → claude-code:opus' for a model schedule."""
+    return " → ".join(dict.fromkeys(e.proposer for e in run.proposals)) or "?"
 
 
 def _baselines_card(runs: list[Run]) -> str:
@@ -217,7 +323,7 @@ def _scoreboard(summaries: list[Summary], colors: dict[str, str], runs: list[Run
     for s, run in zip(summaries, runs):
         gc = s.gap_closed_pct
         rows.append(
-            f"<tr class='{'best' if s is best_label else ''}'><td class='l'><span class='sw' style='background:{colors[s.label]}'></span><b>{escape(s.label)}</b>"
+            f"<tr class='{'best' if s is best_label else ''}' data-run='{escape(s.label, quote=True)}'><td class='l'><span class='sw' style='background:{colors[s.label]}'></span><b>{escape(s.label)}</b>"
             f"<span class='note' style='display:block;font-size:12px;color:#64748b'>{escape(run.describe())}</span></td>"
             f"<td>{fmt_num(s.best_objective)} <span class='muted'>({fmt_num(s.seed_objective)})</span></td>"
             f"<td><b>{fmt_num(s.gain_vs_baseline_pct, 'pct')}</b></td><td>{'—' if gc is None else f'{gc:.0f}%'}</td>"
@@ -235,7 +341,7 @@ def _scoreboard(summaries: list[Summary], colors: dict[str, str], runs: list[Run
             st = s.modes.get(m)
             cells.append("<td>—</td>" if not st else f"<td>{st.global_wins}+{st.instance_wins} / {st.tried}</td>")
         mode_rows.append(
-            f"<tr><td class='l'><span class='sw' style='background:{colors[s.label]}'></span>{escape(s.label)}</td>{''.join(cells)}</tr>"
+            f"<tr data-run='{escape(s.label, quote=True)}'><td class='l'><span class='sw' style='background:{colors[s.label]}'></span>{escape(s.label)}</td>{''.join(cells)}</tr>"
         )
     mode_table = (
         (
@@ -280,7 +386,8 @@ def _instances_card(runs: list[Run], colors: dict[str, str]) -> str:
         for r in rows
     }
     legend = _legend(
-        [(r.label, colors[r.label]) for r in runs] + [("baseline (dashed grey)", "#64748b"), ("planted reference (dashed green; a feasible answer, not a proven optimum)", "#16a34a")]
+        [(r.label, colors[r.label]) for r in runs] + [("baseline (dashed grey)", "#64748b"), ("planted reference (dashed green; a feasible answer, not a proven optimum)", "#16a34a")],
+        frozenset(r.label for r in runs),
     )
     return (
         "<section class='card'><h2>Per-instance results</h2><p class='lead'>Best score each flavour reached on every benchmark instance. Shorter bars are better; the Pareto archive keeps solvers that win on any single instance, not just the total.</p>"
@@ -548,14 +655,24 @@ def _live_card(runs: list[Run]) -> str:
         ]
         recent = "".join(f"<li><code>{escape(format_event(e))}</code></li>" for e in ev[-14:][::-1])
         cards.append(
-            f"<h3>{escape(run.label)}{' · LIVE' if not done else ''}</h3><div class='kpis'>"
+            f"<div data-run='{escape(run.label, quote=True)}'><h3>{escape(run.label)}{' · LIVE' if not done else ''}</h3><div class='kpis'>"
             + "".join(f"<div class='kpi'><div class='v'>{escape(v)}</div><div class='k'>{escape(k)}</div><div class='d'>{escape(d)}</div></div>"
                       for v, k, d in tiles)
-            + f"</div><ul class='events'>{recent}</ul>"
+            + f"</div><ul class='events'>{recent}</ul></div>"
         )
     if not cards:
         return ""
     return "<section class='card'><h2>Now</h2><p class='lead'>Swarm progress from <code>events.jsonl</code> (newest first).</p>" + "".join(cards) + "</section>"
+
+
+def _run_toggles(runs: list[Run], colors: dict[str, str]) -> str:
+    """One button per run: hides or shows that run in every chart, legend and table (at least one stays shown)."""
+    if len(runs) < 2:
+        return ""
+    return ("<div class='runtoggles' role='group' aria-label='Runs shown'><span>Show:</span>"
+            + "".join(f"<button class='on' aria-pressed='true' data-run='{escape(r.label, quote=True)}'>"
+                      f"<span class='sw' style='background:{colors[r.label]}'></span>{escape(r.label)}</button>" for r in runs)
+            + "</div>")
 
 
 def render_main(runs: list[Run], title: str) -> str:
@@ -565,8 +682,10 @@ def render_main(runs: list[Run], title: str) -> str:
     return "\n".join([
         f"<h1>{escape(title)}</h1><p class='sub'>problem: <b>{escape(problem)}</b> · {len(runs)} run{'s' if len(runs) != 1 else ''} · "
         f"updated {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}</p>",
+        _run_toggles(runs, colors),
         _live_card(runs),
         _kpis(summaries, runs),
+        _quality_efficiency_card(summaries, colors, runs),
         _progress_card(runs, colors, summaries),
         _scoreboard(summaries, colors, runs),
         _baselines_card(runs),

@@ -20,6 +20,8 @@ def fmt_num(v: float, unit: str = "") -> str:
         return f"{v / 60:.1f}m" if v >= 60 else f"{v:.0f}s"
     if unit == "pct":
         return f"{v:+.1f}%"
+    if unit == "usd":
+        return f"${v:,.2f}"
     return f"{v:,.0f}" if abs(v) >= 100 or float(v).is_integer() else f"{v:.2f}"
 
 
@@ -45,6 +47,8 @@ class Series:
     color: str
     points: list[tuple[float, float]]
     markers: list[tuple[float, float, str]] = field(default_factory=list)  # (x, y, tooltip)
+    end: float | None = None  # where the run really stopped spending; drawn as a dashed vertical line
+    switches: list[tuple[float, float, str, str]] = field(default_factory=list)  # (x, y, label, tooltip): model hand-overs
 
 
 @dataclass
@@ -66,7 +70,8 @@ def step_chart(
     height: int = 380,
     extend_to: float | None = None,
 ) -> str:
-    ml, mr, mt, mb = 64, 24, 18, 48
+    ends = [s for s in series if s.end is not None and s.points]
+    ml, mr, mt, mb = 64, 24, 18 + 16 * len(ends), 48  # end-of-run labels get their own band above the plot
     pw, ph = width - ml - mr, height - mt - mb
     xs = [x for s in series for x, _ in s.points] + ([extend_to] if extend_to else [])
     ys = [y for s in series for _, y in s.points] + [r.y for r in refs]
@@ -102,9 +107,18 @@ def step_chart(
         out.append(
             f'<text class="ref" x="{ml + pw - 4}" y="{Y(r.y) - 5:.1f}" text-anchor="end" fill="{r.color}">{escape(r.label)} = {fmt_num(r.y)}</text>'
         )
+    for i, s in enumerate(ends):
+        x, y, text = X(s.end), 14 + 16 * i, f"{s.label} end · {fmt_num(s.end, x_unit)}"
+        out.append(
+            f'<g data-run="{escape(s.label, quote=True)}"><line x1="{x:.1f}" x2="{x:.1f}" y1="{y - 10}" y2="{mt + ph}" stroke="{s.color}" '
+            f'stroke-dasharray="5 4" stroke-width="1.5" data-tip="{escape(text, quote=True)}"/>'
+        )
+        anchor, dx = ("end", -6) if x > ml + pw * 0.7 else ("start", 6)
+        out.append(f'<text class="end" x="{x + dx:.1f}" y="{y}" text-anchor="{anchor}">{escape(text)}</text></g>')
     for s in series:
         if not s.points:
             continue
+        out.append(f'<g data-run="{escape(s.label, quote=True)}">')
         pts = sorted(s.points)
         d = f"M{X(pts[0][0]):.1f},{Y(pts[0][1]):.1f}"
         for (_x0, _y0), (x1, y1) in pairwise(pts):
@@ -116,6 +130,16 @@ def step_chart(
             out.append(
                 f'<circle cx="{X(x):.1f}" cy="{Y(y):.1f}" r="5" fill="{s.color}" stroke="#fff" stroke-width="1.5" data-tip="{escape(tip, quote=True)}"/>'
             )
+        for x, y, label, tip in s.switches:
+            w = 6.2 * len(label) + 10
+            bx = min(X(x) + 10, ml + pw - w)
+            out.append(
+                f'<circle cx="{X(x):.1f}" cy="{Y(y):.1f}" r="8" fill="#fff" stroke="{s.color}" stroke-width="2.5" data-tip="{escape(tip, quote=True)}"/>'
+                f'<circle cx="{X(x):.1f}" cy="{Y(y):.1f}" r="3" fill="{s.color}" pointer-events="none"/>'
+                f'<rect class="swbg" x="{bx:.1f}" y="{Y(y) - 30:.1f}" width="{w:.0f}" height="17" rx="4" stroke="{s.color}"/>'
+                f'<text class="end" x="{bx + 5:.1f}" y="{Y(y) - 18:.1f}">{escape(label)}</text>'
+            )
+        out.append("</g>")
     out.append("</svg>")
     return "\n".join(out)
 
@@ -126,6 +150,39 @@ class BarGroup:
     color: str
     values: dict[str, float]  # category -> value
     tips: dict[str, str] = field(default_factory=dict)
+
+
+def metric_bars(rows: list[tuple[str, float, str]], *, unit: str = "", higher_is_better: bool = True, width: int = 420) -> str:
+    """One bar per run from zero, `rows` = [(label, value, color)]; the winner's label and value are bold with a star.
+
+    Each row is a `<g class="mb" data-run>` carrying its value, so the page's run toggles can hide a run and
+    re-rank, re-scale and re-stack the others (see `relayoutBars` in html.JS)."""
+    vals = [v for _, v, _ in rows if v is not None and math.isfinite(v)]
+    if not vals:
+        return "<p class='muted'>—</p>"
+    best = max(vals) if higher_is_better else min(vals)
+    ml, mr, row_h, mt = 92, 96, 26, 4
+    pw = width - ml - mr
+    hi = max(max(vals), 0) or 1
+    out = [f'<svg class="chart mbars" viewBox="0 0 {width} {mt + row_h * len(rows) + 4}" role="img" data-w="{width}" '
+           f'data-ml="{ml}" data-pw="{pw}" data-rh="{row_h}" data-higher="{int(higher_is_better)}">',
+           f'<line class="axis" x1="{ml}" x2="{ml}" y1="{mt}" y2="{mt + row_h * len(rows)}"/>']
+    for i, (label, v, color) in enumerate(rows):
+        ok = v is not None and math.isfinite(v)
+        out.append(f'<g class="mb" data-run="{escape(label, quote=True)}" data-v="{v if ok else "nan"}" '
+                   f'data-f="{escape(fmt_num(v, unit), quote=True) if ok else ""}" transform="translate(0,{mt + i * row_h})">')
+        if not ok:
+            out.append(f'<text class="cat" x="{ml - 8}" y="17" text-anchor="end">{escape(label)}</text></g>')
+            continue
+        win = v == best
+        w = max(pw * max(v, 0) / hi, 2)
+        weight = ' font-weight="700"' if win else ""
+        out.append(f'<text class="cat" x="{ml - 8}" y="17" text-anchor="end"{weight}>{escape(label)}</text>')
+        out.append(f'<rect x="{ml}" y="5" width="{w:.1f}" height="15" rx="3" fill="{color}" '
+                   f'data-tip="{escape(f"{label}: {fmt_num(v, unit)}", quote=True)}"/>')
+        out.append(f'<text class="val" x="{ml + w + 6:.1f}" y="17"{weight}>{fmt_num(v, unit)}{" ★" if win else ""}</text></g>')
+    out.append("</svg>")
+    return "\n".join(out)
 
 
 def grouped_hbars(
@@ -168,9 +225,10 @@ def grouped_hbars(
             y = y0 + gi * (bar_h + gap)
             tip = g.tips.get(cat, f"{g.label}: {fmt_num(v)}")
             out.append(
-                f'<rect x="{ml}" y="{y:.1f}" width="{max(X(v) - ml, 1):.1f}" height="{bar_h}" fill="{g.color}" rx="2" data-tip="{escape(tip, quote=True)}"/>'
+                f'<g data-run="{escape(g.label, quote=True)}"><rect x="{ml}" y="{y:.1f}" width="{max(X(v) - ml, 1):.1f}" height="{bar_h}" '
+                f'fill="{g.color}" rx="2" data-tip="{escape(tip, quote=True)}"/>'
             )
-            out.append(f'<text class="val" x="{X(v) + 5:.1f}" y="{y + bar_h - 3:.1f}">{fmt_num(v)}</text>')
+            out.append(f'<text class="val" x="{X(v) + 5:.1f}" y="{y + bar_h - 3:.1f}">{fmt_num(v)}</text></g>')
         for mv, mlabel, mcolor in markers.get(cat, []):
             y_top, y_bot = y0 - 3, y0 + len(groups) * (bar_h + gap) - gap + 3
             out.append(
@@ -354,5 +412,245 @@ def dag_chart(
         )
         if n.label:
             out.append(f'<text class="nl" x="{x + n.radius + 2:.1f}" y="{y - n.radius:.1f}">{escape(n.label)}</text>')
+    out.append("</svg>")
+    return "\n".join(out)
+
+
+@dataclass
+class ScatterGroup:
+    label: str
+    color: str
+    points: list[tuple[float, float, str]]  # (x, y, tooltip): one per run
+
+
+def _mean_sd(vs: list[float]) -> tuple[float, float]:
+    vs = [v for v in vs if math.isfinite(v)]
+    if not vs:
+        return math.nan, math.nan
+    m = sum(vs) / len(vs)
+    return m, (sum((v - m) ** 2 for v in vs) / (len(vs) - 1)) ** 0.5 if len(vs) > 1 else 0.0
+
+
+def scatter_chart(
+    groups: list[ScatterGroup],
+    *,
+    x_label: str,
+    y_label: str,
+    x_unit: str = "",
+    y_unit: str = "",
+    width: int = 520,
+    height: int = 340,
+) -> str:
+    """Quality (y, higher is better) against a cost (x from zero, lower is better): one faint dot per run,
+    a large dot per group at the mean with ±1 sd whiskers, and a dashed line along the groups' Pareto front."""
+    ml, mr, mt, mb = 74, 18, 22, 46
+    pw, ph = width - ml - mr, height - mt - mb
+    xs = [x for g in groups for x, _, _ in g.points if math.isfinite(x)]
+    ys = [y for g in groups for _, y, _ in g.points if math.isfinite(y)]
+    if not xs or not ys:
+        return "<p class='muted'>No finished runs.</p>"
+    x_hi = max(xs) * 1.12 or 1
+    pad = (max(ys) - min(ys)) * 0.15 or 1
+    y_lo, y_hi = min(ys) - pad, max(ys) + pad
+
+    def X(x: float) -> float:
+        return ml + pw * x / x_hi
+
+    def Y(y: float) -> float:
+        return mt + ph * (1 - (y - y_lo) / (y_hi - y_lo))
+
+    out = [f'<svg class="chart" viewBox="0 0 {width} {height}" role="img">']
+    for t in nice_ticks(y_lo, y_hi, 5):
+        if y_lo <= t <= y_hi:
+            out.append(f'<line class="grid" x1="{ml}" x2="{ml + pw}" y1="{Y(t):.1f}" y2="{Y(t):.1f}"/>')
+            out.append(f'<text class="tick" x="{ml - 8}" y="{Y(t) + 4:.1f}" text-anchor="end">{fmt_num(t, y_unit)}</text>')
+    for t in nice_ticks(0, x_hi, 5):
+        if t <= x_hi:
+            out.append(f'<text class="tick" x="{X(t):.1f}" y="{mt + ph + 17}" text-anchor="middle">{fmt_num(t, x_unit)}</text>')
+    out.append(f'<line class="axis" x1="{ml}" x2="{ml + pw}" y1="{mt + ph}" y2="{mt + ph}"/>')
+    out.append(f'<line class="axis" x1="{ml}" x2="{ml}" y1="{mt}" y2="{mt + ph}"/>')
+    out.append(f'<text class="label" x="{ml + pw / 2:.0f}" y="{height - 8}" text-anchor="middle">{escape(x_label)}</text>')
+    out.append(f'<text class="label" transform="translate(14,{mt + ph / 2:.0f}) rotate(-90)" text-anchor="middle">{escape(y_label)}</text>')
+    out.append(f'<text class="tick" x="{ml + 6}" y="{mt + 12}">↖ better (more gain, less spent)</text>')
+    means = []
+    for g in groups:
+        mx, sx = _mean_sd([x for x, _, _ in g.points])
+        my, sy = _mean_sd([y for _, y, _ in g.points])
+        if math.isfinite(mx) and math.isfinite(my):
+            means.append((g, mx, sx, my, sy))
+    front, top = [], -math.inf
+    for g, mx, _, my, _ in sorted(means, key=lambda m: (m[1], -m[3])):
+        if my > top:
+            front.append((X(mx), Y(my)))
+            top = my
+    if len(front) > 1:
+        out.append('<polyline class="pareto" points="' + " ".join(f"{x:.1f},{y:.1f}" for x, y in front)
+                   + '" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4" data-tip="Pareto front of the mean results: '
+                   'no configuration is both cheaper and better than a point on it"/>')
+    for g, mx, sx, my, sy in means:
+        lab = escape(g.label, quote=True)
+        out.append(f'<g data-run="{lab}">')
+        for x, y, tip in g.points:
+            if math.isfinite(x) and math.isfinite(y):
+                out.append(f'<circle cx="{X(x):.1f}" cy="{Y(y):.1f}" r="4" fill="{g.color}" fill-opacity=".4" data-tip="{escape(tip, quote=True)}"/>')
+        cx, cy = X(mx), Y(my)
+        if sx:
+            out.append(f'<line x1="{X(mx - sx):.1f}" x2="{X(mx + sx):.1f}" y1="{cy:.1f}" y2="{cy:.1f}" stroke="{g.color}" stroke-width="1.5"/>')
+        if sy:
+            out.append(f'<line x1="{cx:.1f}" x2="{cx:.1f}" y1="{Y(my - sy):.1f}" y2="{Y(my + sy):.1f}" stroke="{g.color}" stroke-width="1.5"/>')
+        tip = (f"{g.label}: mean of {len(g.points)} run(s) {fmt_num(my, y_unit)} ± {fmt_num(sy, y_unit).lstrip('+')}, "
+               f"{fmt_num(mx, x_unit)} ± {fmt_num(sx, x_unit)}")
+        out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="7.5" fill="{g.color}" stroke="#fff" stroke-width="2" data-tip="{escape(tip, quote=True)}"/>')
+        anchor, dx = ("end", -11) if cx > ml + pw * 0.75 else ("start", 11)
+        out.append(f'<text class="end" x="{cx + dx:.1f}" y="{cy - 9:.1f}" text-anchor="{anchor}" font-weight="600">{escape(g.label)}</text></g>')
+    out.append("</svg>")
+    return "\n".join(out)
+
+
+@dataclass
+class DotColumn:
+    label: str
+    color: str
+    points: dict[str, tuple[float, str]]  # repeat (e.g. "seed 0") -> (value, tooltip)
+
+
+def _short(tag: str) -> str:
+    return tag.replace("seed ", "s")
+
+
+def paired_dots(cols: list[DotColumn], *, unit: str = "", higher_is_better: bool = True, from_zero: bool = False,
+                width: int = 520, height: int = 320) -> str:
+    """One column per configuration, one dot per repeat, a thin grey line joining the same repeat across
+    neighbouring columns (so a seed that does well everywhere reads as a high line) and a short bar at the mean.
+    A joining line sits inside both columns' `data-run` groups, so hiding either configuration hides it."""
+    vals = [v for c in cols for v, _ in c.points.values() if math.isfinite(v)]
+    if not vals:
+        return "<p class='muted'>No finished runs.</p>"
+    ml, mr, mt, mb = 74, 18, 26, 34
+    pw, ph = width - ml - mr, height - mt - mb
+    lo, hi = (0.0 if from_zero else min(vals)), max(vals)
+    pad = (hi - lo) * 0.12 or 1
+    y_lo, y_hi = (0.0 if from_zero else lo - pad), hi + pad
+    cw = pw / len(cols)
+
+    def X(i: int) -> float:
+        return ml + cw * (i + 0.5)
+
+    def Y(v: float) -> float:
+        return mt + ph * (1 - (v - y_lo) / (y_hi - y_lo))
+
+    out = [f'<svg class="chart" viewBox="0 0 {width} {height}" role="img">']
+    for t in nice_ticks(y_lo, y_hi, 5):
+        if y_lo <= t <= y_hi:
+            out.append(f'<line class="grid" x1="{ml}" x2="{ml + pw}" y1="{Y(t):.1f}" y2="{Y(t):.1f}"/>')
+            out.append(f'<text class="tick" x="{ml - 8}" y="{Y(t) + 4:.1f}" text-anchor="end">{fmt_num(t, unit)}</text>')
+    out.append(f'<line class="axis" x1="{ml}" x2="{ml}" y1="{mt}" y2="{mt + ph}"/>')
+    out.append(f'<line class="axis" x1="{ml}" x2="{ml + pw}" y1="{mt + ph}" y2="{mt + ph}"/>')
+    out.append(f'<text class="tick" x="{ml + 6}" y="{mt - 10}">{"↑ higher is better" if higher_is_better else "↓ lower is better"} · '
+               'grey lines join the same seed</text>')
+    for i, (a, b) in enumerate(pairwise(cols)):
+        for tag in sorted(set(a.points) & set(b.points)):
+            (va, _), (vb, _) = a.points[tag], b.points[tag]
+            if not (math.isfinite(va) and math.isfinite(vb)):
+                continue
+            d = vb - va
+            better = (d > 0) == higher_is_better and d != 0
+            tip = f"{tag}: {b.label} {fmt_num(vb, unit)} vs {a.label} {fmt_num(va, unit)} ({'+' if d >= 0 else '−'}{fmt_num(abs(d), unit).lstrip('+')}, " \
+                  f"{b.label + ' better' if better else a.label + ' better' if d else 'tie'})"
+            out.append(f'<g data-run="{escape(a.label, quote=True)}"><g data-run="{escape(b.label, quote=True)}">'
+                       f'<line x1="{X(i) + 6:.1f}" x2="{X(i + 1) - 6:.1f}" y1="{Y(va):.1f}" y2="{Y(vb):.1f}" stroke="#94a3b8" '
+                       f'stroke-width="1.5" data-tip="{escape(tip, quote=True)}"/></g></g>')
+    for i, c in enumerate(cols):
+        lab = escape(c.label, quote=True)
+        out.append(f'<g data-run="{lab}"><text class="cat" x="{X(i):.1f}" y="{mt + ph + 20}" text-anchor="middle" font-weight="600">{escape(c.label)}</text>')
+        pts = sorted(((v, tag, tip) for tag, (v, tip) in c.points.items() if math.isfinite(v)), reverse=True)
+        if not pts:
+            out.append("</g>")
+            continue
+        m = sum(v for v, _, _ in pts) / len(pts)
+        out.append(f'<line x1="{X(i) - 13:.1f}" x2="{X(i) + 13:.1f}" y1="{Y(m):.1f}" y2="{Y(m):.1f}" stroke="{c.color}" stroke-width="3" '
+                   f'stroke-linecap="round" data-tip="{escape(f"{c.label}: mean of {len(pts)} = {fmt_num(m, unit)}", quote=True)}"/>')
+        out.append(f'<text class="val" x="{X(i) + 18:.1f}" y="{Y(m) + 4:.1f}" font-weight="600" fill="#0f172a">{fmt_num(m, unit)}</text>')
+        last = -math.inf
+        for v, tag, tip in sorted(pts, key=lambda p: -p[0]):  # seed labels left of the dots, pushed apart when close
+            y = max(Y(v) + 4, last + 11)
+            last = y
+            out.append(f'<text class="tick" x="{X(i) - 17:.1f}" y="{y:.1f}" text-anchor="end">{_short(tag)}</text>')
+        for v, tag, tip in pts:
+            out.append(f'<circle cx="{X(i):.1f}" cy="{Y(v):.1f}" r="5" fill="{c.color}" stroke="#fff" stroke-width="2" '
+                       f'data-tip="{escape(tip, quote=True)}"/>')
+        out.append("</g>")
+    out.append("</svg>")
+    return "\n".join(out)
+
+
+@dataclass
+class BandGroup:
+    label: str
+    color: str
+    runs: dict[str, list[float]]  # repeat -> value after step x_start, x_start + 1, ...
+
+
+def band_chart(groups: list[BandGroup], *, x_label: str, y_label: str, y_unit: str = "", x_prefix: str = "gen", x0: int = 0,
+               switches: list[tuple[float, str, str]] = (), width: int = 520, height: int = 320) -> str:
+    """Progress over discrete steps: per group a thick mean line, a light min–max band over the repeats and the
+    repeats themselves as faint lines. `switches` = [(x in steps from x_start, label, colour)] draws a dashed vertical marker (e.g. a
+    model hand-over between two generations). Step i is labelled `x0 + i`; switch positions use the same numbering."""
+    n = max((len(v) for g in groups for v in g.runs.values()), default=0)
+    vals = [y for g in groups for v in g.runs.values() for y in v if math.isfinite(y)]
+    if not vals or n < 2:
+        return "<p class='muted'>No finished runs.</p>"
+    ml, mr, mt, mb = 74, 64, 26, 46
+    pw, ph = width - ml - mr, height - mt - mb
+    pad = (max(vals) - min(vals)) * 0.06 or 1
+    y_lo, y_hi = min(vals) - pad, max(vals) + pad
+
+    def X(i: float) -> float:
+        return ml + pw * i / (n - 1)
+
+    def Y(v: float) -> float:
+        return mt + ph * (1 - (v - y_lo) / (y_hi - y_lo))
+
+    out = [f'<svg class="chart" viewBox="0 0 {width} {height}" role="img">']
+    for t in nice_ticks(y_lo, y_hi, 5):
+        if y_lo <= t <= y_hi:
+            out.append(f'<line class="grid" x1="{ml}" x2="{ml + pw}" y1="{Y(t):.1f}" y2="{Y(t):.1f}"/>')
+            out.append(f'<text class="tick" x="{ml - 8}" y="{Y(t) + 4:.1f}" text-anchor="end">{fmt_num(t, y_unit)}</text>')
+    for i in range(n):
+        out.append(f'<text class="tick" x="{X(i):.1f}" y="{mt + ph + 17}" text-anchor="middle">{"seed" if i + x0 == 0 else f"{x_prefix} {i + x0}"}</text>')
+    out.append(f'<line class="axis" x1="{ml}" x2="{ml + pw}" y1="{mt + ph}" y2="{mt + ph}"/>')
+    out.append(f'<line class="axis" x1="{ml}" x2="{ml}" y1="{mt}" y2="{mt + ph}"/>')
+    out.append(f'<text class="label" x="{ml + pw / 2:.0f}" y="{height - 8}" text-anchor="middle">{escape(x_label)}</text>')
+    out.append(f'<text class="label" transform="translate(14,{mt + ph / 2:.0f}) rotate(-90)" text-anchor="middle">{escape(y_label)}</text>')
+    for k, (x, label, color) in enumerate(switches):
+        x -= x0
+        out.append(f'<line x1="{X(x):.1f}" x2="{X(x):.1f}" y1="{mt}" y2="{mt + ph}" stroke="{color}" stroke-dasharray="5 4" stroke-width="1.5"/>'
+                   f'<text class="end" x="{X(x) + 5:.1f}" y="{mt - 10 + 13 * k}">{escape(label)}</text>')
+    ends = []
+    for g in groups:
+        runs = [v for v in g.runs.values() if len(v) == n]
+        if not runs:
+            continue
+        cols = [[r[i] for r in runs] for i in range(n)]
+        mean = [sum(c) / len(c) for c in cols]
+        lo, hi = [min(c) for c in cols], [max(c) for c in cols]
+        out.append(f'<g data-run="{escape(g.label, quote=True)}">')
+        band = [(X(i), Y(hi[i])) for i in range(n)] + [(X(i), Y(lo[i])) for i in reversed(range(n))]
+        out.append(f'<polygon points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in band)}" fill="{g.color}" fill-opacity=".12"/>')
+        for tag, r in g.runs.items():
+            if len(r) == n:
+                out.append(f'<polyline points="{" ".join(f"{X(i):.1f},{Y(v):.1f}" for i, v in enumerate(r))}" fill="none" stroke="{g.color}" '
+                           f'stroke-opacity=".35" stroke-width="1.2" data-tip="{escape(f"{g.label} · {tag}: " + " → ".join(fmt_num(v, y_unit) for v in r), quote=True)}"/>')
+        out.append(f'<polyline points="{" ".join(f"{X(i):.1f},{Y(v):.1f}" for i, v in enumerate(mean))}" fill="none" stroke="{g.color}" stroke-width="2.4"/>')
+        for i in range(n):
+            tip = (f"{g.label} · {'seed solver' if i + x0 == 0 else f'after {x_prefix} {i + x0}'}: mean {fmt_num(mean[i], y_unit)} "
+                   f"(min {fmt_num(lo[i], y_unit)}, max {fmt_num(hi[i], y_unit)}, {len(runs)} runs)")
+            out.append(f'<circle cx="{X(i):.1f}" cy="{Y(mean[i]):.1f}" r="4.5" fill="{g.color}" stroke="#fff" stroke-width="2" data-tip="{escape(tip, quote=True)}"/>')
+        out.append("</g>")
+        ends.append((Y(mean[-1]) + 4, g.label))
+    last = -math.inf
+    for y, label in sorted(ends):  # direct labels right of the last point, pushed apart when the means are close
+        last = max(y, last + 13)
+        out.append(f'<text class="end" data-run="{escape(label, quote=True)}" x="{X(n - 1) + 8:.1f}" y="{last:.1f}" font-weight="600">{escape(label)}</text>')
     out.append("</svg>")
     return "\n".join(out)

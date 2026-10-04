@@ -6,6 +6,7 @@ from .archive import _inst_score
 from .ledger import (
     STATUS_REJECTED_DUPLICATE,
     STATUS_REJECTED_GUARD,
+    STATUS_REJECTED_HYPOTHESIS,
     STATUS_SEED,
     VERDICT_UNCONFIRMED,
     Entry,
@@ -51,9 +52,12 @@ def render(run: ResearchRun, holdout: bool = False, holdout_front: bool = False)
     seed = next((e for e in entries if e.status == STATUS_SEED), None)
     best = archive.global_best
     proposals = [e for e in entries if e.status != STATUS_SEED]
-    evaluated = [e for e in proposals if e.status not in (STATUS_REJECTED_DUPLICATE, STATUS_REJECTED_GUARD)]
+    evaluated = [e for e in proposals
+                 if e.status not in (STATUS_REJECTED_DUPLICATE, STATUS_REJECTED_GUARD, STATUS_REJECTED_HYPOTHESIS)]
     dups = sum(e.status == STATUS_REJECTED_DUPLICATE for e in proposals)
     guarded = sum(e.status == STATUS_REJECTED_GUARD for e in proposals)
+    hyp_gated = [e for e in proposals if e.status == STATUS_REJECTED_HYPOTHESIS]
+    two_phase = [e for e in proposals if "hyp_cost_usd" in e.usage and e.status != STATUS_REJECTED_HYPOTHESIS]
     tokens = sum(e.tokens for e in proposals)
     proposers = sorted({e.proposer for e in proposals}) or ["-"]
 
@@ -65,6 +69,12 @@ def render(run: ResearchRun, holdout: bool = False, holdout_front: bool = False)
     cost = sum(e.usage.get("cost_usd", 0.0) for e in proposals)
     if cost:
         out.append(f"- agent cost: ${cost:.2f} over {sum(1 for e in proposals if e.usage)} agent sessions")
+    if hyp_gated or two_phase:
+        hyp_cost = sum(e.usage.get("hyp_cost_usd", 0.0) for e in two_phase)
+        gate_cost = sum(e.usage.get("gate_cost_usd", 0.0) for e in proposals)
+        out.append(f"- hypothesis gate: {len(hyp_gated)} of {len(hyp_gated) + len(two_phase)} ideas stopped as repeats before "
+                   f"any code (${sum(e.usage.get('cost_usd', 0.0) for e in hyp_gated):.2f} spent on them); hypothesis phase "
+                   f"of implemented ideas ${hyp_cost:.2f}, gate calls ${gate_cost:.3f}")
     if seed and best and seed.scored:
         gain = seed.objective - best.objective
         out.append(f"- objective ({run.problem.objective_split} split, lower is better): seed {seed.objective:g} → best {best.objective:g} "

@@ -78,6 +78,26 @@ flowchart TD
 
 Watch it live with `just autoresearch-viz serve ...`.
 
+### Hypothesis-first mode (`swarm --hypothesis-first`)
+
+The novelty gate (step 3) saves evaluations, but by then each duplicate agent has already paid
+for a full coding session. In hypothesis-first mode each agent goes through three steps:
+
+1. **Hypothesis call** (timeout `--hyp-turn-s`, default 60 s): one tool-less call with a one-line
+   system prompt receives the agent's `STATUS.md`, mode and direction, and replies with a one-line
+   hypothesis. It skips the coding-agent instructions, which make up most of a session's input.
+2. **Hypothesis gate:** one small-model call per generation (`--gate llm --gate-model haiku`, about
+   4k input tokens) compares the new lines with each other in worker order and with the last 40
+   ledger hypotheses. `--gate lexical` compares content words instead. If the model call fails,
+   the gate falls back to the lexical comparison.
+3. **Coding session:** only agents with a distinct idea get a coding session, told to implement
+   the hypothesis already written in `hypothesis.txt`. The code novelty gate still runs.
+
+A repeated idea is recorded as `rejected_hypothesis` with no source, so later generations see the
+idea as taken and its cost is counted. It is not evidence for the mode bandit. The report shows
+how many ideas stopped and what the hypothesis phase and gate cost (`hyp_cost_usd`,
+`gate_cost_usd` in each entry's `usage`).
+
 ### Problems
 
 | Problem | Objective instances | Notes |
@@ -124,6 +144,8 @@ just autoresearch-swarm-smoke                                   # 2 agents, 1 ge
 just autoresearch-swarm --run artifacts/runs/swarm-1            # 32 agents/generation, 20 min
 just autoresearch-swarm --run artifacts/runs/long-1 --problem median_string_long   # MSA-scale 1500 bp instances
 just autoresearch-swarm --run artifacts/runs/swarm-1 --agents 8 --budget-min 10 --model opus
+just autoresearch-swarm --run artifacts/runs/swarm-2 --agents 8 --hypothesis-first   # dedupe ideas before code
+
 just autoresearch-swarm --run artifacts/runs/simple-1 --modes tune --exploit 1.0   # control: plain incumbent-only loop (no archive/merge/bandit)
 just autoresearch-viz serve artifacts/runs/swarm-1 --open      # live dashboard (run in a second terminal)
 just autoresearch-viz render artifacts/runs/swarm-1 artifacts/runs/simple-1 -o artifacts/viz/ablation.html   # offline comparison for the demo
@@ -241,13 +263,25 @@ autoresearch-optimizer/
   artifacts/        # local results, ignored by Git
 ```
 
+### Model schedule (`swarm --model sonnet,opus`)
+
+`--model` takes a comma-separated list, one model per generation, and keeps the last one after
+the list ends. `--model sonnet,opus` ("Sopus") lets the cheaper Sonnet find a good first minimum
+in generation 1, then hands every later generation to Opus to push it further. See
+[results/models4-sopus-1003.md](results/models4-sopus-1003.md).
+
 ## Visualise runs (`autoresearch_viz/`)
 
 A self-contained HTML dashboard: no network access is needed, so it also works offline in a demo.
 It shows:
+- with two or more runs, a "Show" row of buttons at the top that hides or shows each run in every
+  chart, legend and table; the ★ winners and the quality vs efficiency summary follow the runs shown;
 - a live "Now" panel: generation, agents back, elapsed time, cost, latest events;
-- best objective against evaluations, agent tokens and wall clock, with the hypothesis behind
-  every improvement;
+- with two or more runs (e.g. one per model), a quality vs efficiency card: gain over the seed on
+  the objective and held-out splits next to total cost, wall clock and objective points per dollar,
+  with the winner of each measure marked;
+- best objective against evaluations, agent tokens, wall clock and agent cost, with the hypothesis
+  behind every improvement; on the last three axes a dashed line marks where each run really stopped;
 - a scoreboard per run, including held-out gain;
 - per-instance bars;
 - the outcome mix of all proposals;
@@ -258,6 +292,16 @@ It shows:
 ```sh
 just autoresearch-viz serve artifacts/runs/swarm-1 --open          # live: refreshes every 3 s during a run
 just autoresearch-viz render artifacts/runs -o artifacts/viz/all.html   # static snapshot comparing all runs
+```
+
+To compare configurations across benchmarks with repeats, `scripts/model_grid.sh TAG` runs Sonnet, Opus
+and Sopus on `median_string` and `median_string_long` for swarm seeds 0–2 (4 agents × 3 generations;
+override with `AGENTS`, `GENERATIONS`, `SEEDS`, `PROBLEMS`, `CONFIGS`). `grid` then draws one
+quality-vs-efficiency scatter per benchmark (gain against cost or wall clock, mean ± sd per
+configuration, Pareto front) and a mean ± sd table:
+
+```sh
+just autoresearch-viz grid artifacts/runs/TAG-* -o results/TAG.html
 ```
 
 ## Work together
