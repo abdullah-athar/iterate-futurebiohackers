@@ -77,6 +77,7 @@ autoresearch *args:
 autoresearch-test:
     uv run python scripts/test_median_string.py
     uv run python scripts/test_autoresearch.py
+    uv run python scripts/test_diversity.py
 
 # Dashboard: just autoresearch-viz serve artifacts/runs/swarm-1 --open (live) or render RUN... -o out.html
 [working-directory: justfile_directory() / "autoresearch-optimizer"]

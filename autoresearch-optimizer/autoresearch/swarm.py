@@ -23,6 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from .budget import run_spend
 from .loop import ResearchRun, evaluate_candidate
 from .prompts import MODES, build_user_prompt
 
@@ -131,11 +132,12 @@ def run_claude(ws: Path, turn_s: int, model: str, max_budget_usd: float | None =
                 os.killpg(proc.pid, signal.SIGKILL)
                 proc.wait()
             outcome = "timeout"
-    usage = {"model": model, "seconds": round(time.time() - t0, 1), "outcome": outcome}
+    # cost_usd stays None (unknown) unless the session reported it: a killed session may still have spent
+    usage = {"model": model, "seconds": round(time.time() - t0, 1), "outcome": outcome, "cost_usd": None}
     try:
         res = json.loads((ws / "agent.json").read_text())
         u = res.get("usage", {})
-        usage.update(cost_usd=res.get("total_cost_usd", 0.0), num_turns=res.get("num_turns"),
+        usage.update(cost_usd=res.get("total_cost_usd"), num_turns=res.get("num_turns"),
                      prompt_tokens=u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0)
                      + u.get("cache_creation_input_tokens", 0),
                      completion_tokens=u.get("output_tokens", 0))
@@ -248,7 +250,10 @@ def format_event(r: dict) -> str:
 
 
 def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propose_many, evaluate_many, emit,
-              seed: int = 0, max_generations: int | None = None, eval_name: str = "") -> None:
+              seed: int = 0, max_generations: int | None = None, eval_name: str = "", budget=None,
+              per_agent_usd_cap: float | None = None) -> None:
+    """`budget` (RunBudget) adds run-level caps on cost/calls/tokens; a generation starts only if its
+    estimated spend (last generation's mean session cost, else `per_agent_usd_cap`) still fits."""
     rng = random.Random(seed)
     t0 = time.time()
     entries = run.entries()
@@ -258,11 +263,20 @@ def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propo
     if run.config.descriptors:
         from .exploration_exploitation import ExplorationExploitation
         layer = ExplorationExploitation(run)
+        layer.describer.budget = budget
     describe_s = 60.0 if layer else 0.0
     emit("run_start", agents=agents, budget_s=int(budget_s), turn_s=turn_s,
-         eval=eval_name + (", descriptors" if layer else ""))
+         eval=eval_name + (", descriptors" if layer else ""),
+         caps={} if budget is None else {"usd": budget.max_usd, "calls": budget.max_calls, "tokens": budget.max_tokens})
+    stop = ""
     while (time.time() - t0 + turn_s + describe_s + eval_s + 30 <= budget_s
            and (max_generations is None or generations < max_generations)):
+        if budget is not None:
+            ok, why = budget.reserve_generation(agents, _per_agent_estimate(run, per_agent_usd_cap))
+            if not ok:
+                stop = why
+                emit("budget_stop", gen=gen, reason=why)
+                break
         tg = time.time()
         assignments = allocate(run, agents, rng)
         if layer:
@@ -274,11 +288,13 @@ def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propo
         results.sort(key=lambda r: r["assignment"].worker)
         next_id = run.store.next_id()
         arrivals: list[tuple[int, str]] = []
-        for r in (r for r in results if r["source"]):
+        for i, r in enumerate(results):  # every result becomes the entry next_id + i (empty sessions too)
+            if not r["source"]:
+                continue
             # with descriptors, tune children only lose to exact copies (refinement is the point)
             exact = layer is not None and r["assignment"].mode == "tune"
             r["pre"] = run.precheck(r["source"], extra_prior=arrivals, threshold=1.0 if exact else None)
-            arrivals.append((next_id + len(arrivals), r["source"]))
+            arrivals.append((next_id + i, r["source"]))
         if layer:
             td = time.time()
             layer.gate(results, gen, emit)
@@ -286,13 +302,27 @@ def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propo
         emit("eval_start", gen=gen, n=len(passed(results)), dup=sum(1 for r in results if r.get("pre") and r["pre"][1].is_duplicate),
              guard=sum(1 for r in results if r.get("pre") and r["pre"][0]), empty=sum(1 for r in results if not r["source"]))
         eval_s, n = evaluate_and_record(run, gen, results, evaluate_many, emit)
+        if budget is not None:
+            budget.release_generation()
         proposals += n
         emit_gen_end(run, gen, tg, emit, **({"vocab": layer.describer.end_generation()} if layer else {}))
         gen += 1
         generations += 1
     write_holdout(run, emit)
     best = run.archive().global_best
-    emit("run_end", generations=generations, proposals=proposals, best_id=best.id, best=best.objective)
+    emit("run_end", generations=generations, proposals=proposals, best_id=best.id, best=best.objective,
+         **({"stopped_by": stop} if stop else {}))
+
+
+def _per_agent_estimate(run: ResearchRun, cap: float | None) -> float | None:
+    """Mean reported cost of the last generation's sessions; before any, the per-session cap (or None)."""
+    entries = run.entries()
+    last = max((e.generation or 0 for e in entries), default=0)
+    costs = [e.usage["cost_usd"] for e in entries
+             if e.generation == last and last and e.usage.get("cost_usd") is not None]
+    if costs:
+        return sum(costs) / len(costs)
+    return cap
 
 
 def passed(results: list[dict]) -> list[dict]:
@@ -311,12 +341,16 @@ def evaluate_and_record(run: ResearchRun, gen: int, results: list[dict], evaluat
             r["usage"]["eval_error"] = repr(ev)[:300]
     eval_s = max(30.0, time.time() - te)
     n = 0
-    for r in (r for r in results if r["source"]):
+    for r in results:
         a, u = r["assignment"], r["usage"]
-        e = run.record(r["source"], r["hypothesis"], a.mode, a.parent_ids, f"claude-code:{u.get('model', '?')}",
-                       r.get("evals", {}), r["pre"], generation=gen, usage=u, elapsed=u.get("seconds", 0.0),
-                       prompt_tokens=u.get("prompt_tokens", 0), completion_tokens=u.get("completion_tokens", 0),
-                       note=r.get("note", ""))
+        common = dict(generation=gen, usage=u, elapsed=u.get("seconds", 0.0),
+                      prompt_tokens=u.get("prompt_tokens", 0), completion_tokens=u.get("completion_tokens", 0))
+        if not r["source"]:  # the session cost money and was a try of its mode: keep it in the ledger
+            e = run.record_no_output(a.mode, a.parent_ids, f"claude-code:{u.get('model', '?')}",
+                                     r.get("hypothesis", ""), **common)
+        else:
+            e = run.record(r["source"], r["hypothesis"], a.mode, a.parent_ids, f"claude-code:{u.get('model', '?')}",
+                           r.get("evals", {}), r["pre"], note=r.get("note", ""), **common)
         emit("entry", gen=gen, id=e.id, worker=a.worker, mode=a.mode, status=e.status, verdict=e.verdict,
              objective=None if not e.scored else e.objective, new_best=e.improved_global)
         n += 1
@@ -327,9 +361,13 @@ def emit_gen_end(run: ResearchRun, gen: int, tg: float, emit, **extra) -> None:
     entries = run.entries()
     best = run.archive(entries).global_best
     gen_entries = [e for e in entries if e.generation == gen]
+    spend = run_spend(run.store)
+    # cost_usd = agent sessions (as before); total_usd adds describe/plan calls; unknown = unreported costs
     emit("gen_end", gen=gen, best_id=best.id, best=best.objective, seconds=round(time.time() - tg, 1),
          evaluated=sum(1 for e in gen_entries if e.evals), kept=sum(1 for e in gen_entries if e.status == "kept"),
-         cost_usd=round(sum(e.usage.get("cost_usd", 0.0) or 0.0 for e in entries), 2), **extra)
+         cost_usd=round(spend.by_kind.get("agent", 0.0), 4), total_usd=round(spend.usd, 4),
+         spend_by_kind={k: round(v, 4) for k, v in spend.by_kind.items()}, unknown_cost=spend.unknown_cost,
+         calls=spend.calls, tokens=spend.tokens, **extra)
 
 
 def write_holdout(run: ResearchRun, emit) -> None:

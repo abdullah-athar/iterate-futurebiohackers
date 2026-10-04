@@ -21,8 +21,28 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from autoresearch.llm_calls import read_usage  # noqa: E402
 from autoresearch_viz.load import load_run  # noqa: E402
 from autoresearch_viz.metrics import summarize  # noqa: E402
+
+
+def agent_spend(d: Path, ledger_usd: float) -> tuple[float, int]:
+    """Agent-session spend from agents/*-agent.json (one per session, empty sessions included, in every arm),
+    falling back to the ledger. Returns (known dollars, sessions whose cost was not reported)."""
+    files = sorted((d / "agents").glob("*-agent.json"))
+    if not files:
+        return ledger_usd, 0
+    usd, unknown = 0.0, 0
+    for f in files:
+        try:
+            cost = json.loads(f.read_text()).get("total_cost_usd")
+        except (json.JSONDecodeError, OSError):
+            cost = None
+        if cost is None:
+            unknown += 1
+        else:
+            usd += float(cost)
+    return usd, unknown
 
 
 def run_row(d: Path) -> dict:
@@ -31,13 +51,15 @@ def run_row(d: Path) -> dict:
     s = summarize(run)
     hold = json.loads((d / "holdout.json").read_text()) if (d / "holdout.json").exists() else {}
     hs, hb = hold.get("seed", {}).get("score"), hold.get("best", {}).get("score")
-    usage = d / "describe_usage.jsonl"
-    describe = sum(json.loads(l)["cost_usd"] for l in usage.read_text().splitlines()) if usage.exists() else 0.0
+    agent_usd, agent_unknown = agent_spend(d, s.cost_usd)
+    aux = read_usage(d)
+    describe = sum(r["cost_usd"] for r in aux if r.get("cost_usd") is not None)
     ts = {e["type"]: e["t"] for e in run.events if e.get("type") in ("run_start", "run_end")}
     return {**meta,
             "gain": s.gain_vs_seed_pct,
             "held": 100 * (hs - hb) / hs if hs and hb is not None else math.nan,
-            "agent_usd": s.cost_usd, "describe_usd": describe, "usd": s.cost_usd + describe,
+            "agent_usd": agent_usd, "describe_usd": describe, "usd": agent_usd + describe,
+            "unknown_cost": agent_unknown + sum(1 for r in aux if r.get("cost_usd") is None),
             "minutes": (ts["run_end"] - ts["run_start"]) / 60 if len(ts) == 2 else math.nan,
             "evaluated": sum(1 for e in run.proposals if e.evals), "proposals": len(run.proposals),
             "gated": sum(1 for e in run.proposals if e.note.startswith("not selected by max-min"))}

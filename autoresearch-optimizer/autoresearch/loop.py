@@ -14,6 +14,7 @@ from .ledger import (
     STATUS_EVALUATED,
     STATUS_FAILED,
     STATUS_KEPT,
+    STATUS_NO_OUTPUT,
     STATUS_REJECTED_DUPLICATE,
     STATUS_REJECTED_GUARD,
     STATUS_REJECTED_SCREEN,
@@ -81,6 +82,8 @@ class LoopConfig:
     landscape: int = 25            # archive members shown to agents as descriptor + summary
     gap_fraction: float = 1 / 3    # share of new_family agents with a gap prompt
     describe_model: str = "sonnet"
+    # accounting (reference fix, applies to every configuration): every agent session is a bandit try
+    bandit_counts_all_attempts: bool = True
 
     def to_dict(self) -> dict:
         return self.__dict__.copy()
@@ -178,12 +181,16 @@ class ResearchRun:
             eligible = [m for m in eligible if m != "tune"] or eligible
         stats = {m: [0, 0.0] for m in MODES}
         for e in entries:
-            # a proposal the descriptor gate dropped unevaluated still cost an agent: a zero-reward try
-            # (code duplicates and guard rejections stay uncounted, as without the layer)
-            skipped = e.status in (STATUS_SEED, STATUS_REJECTED_DUPLICATE, STATUS_REJECTED_GUARD)
-            if e.mode in stats and (not skipped or e.usage.get("gate_dropped")):
-                stats[e.mode][0] += 1
-                stats[e.mode][1] += 1.0 if e.improved_global else (0.5 if e.improved_instances else 0.0)
+            if e.mode not in stats or e.status == STATUS_SEED:
+                continue
+            # bandit_counts_all_attempts (default): every agent session is a try of its mode, so code
+            # duplicates, guard rejections, gate drops and empty sessions are zero-gain tries (no score is
+            # invented for them). Legacy: only those and the gate drops are skipped.
+            if not self.config.bandit_counts_all_attempts and not e.usage.get("gate_dropped") and e.status in (
+                    STATUS_REJECTED_DUPLICATE, STATUS_REJECTED_GUARD, STATUS_NO_OUTPUT):
+                continue
+            stats[e.mode][0] += 1
+            stats[e.mode][1] += 1.0 if e.improved_global else (0.5 if e.improved_instances else 0.0)
         total = sum(n for n, _ in stats.values()) or 1
         return {m: math.inf if stats[m][0] == 0 else
                 stats[m][1] / stats[m][0] + self.config.ucb_c * math.sqrt(math.log(total) / stats[m][0])
@@ -244,6 +251,17 @@ class ResearchRun:
         return self.record(source, hypothesis, mode, parent_ids, proposer, evals, pre,
                            elapsed=time.perf_counter() - t0, prompt_tokens=prompt_tokens,
                            completion_tokens=completion_tokens)
+
+    def record_no_output(self, mode: str, parent_ids: list[int], proposer: str, hypothesis: str = "",
+                         **fields) -> Entry:
+        """An agent session that wrote no candidate: no source, no evaluation, but its cost and the try
+        of its mode are kept (they used to vanish from the ledger, the bandit and cost_usd)."""
+        outcome = (fields.get("usage") or {}).get("outcome", "?")
+        entry = Entry(id=self.store.next_id(), parent_ids=parent_ids, mode=mode, hypothesis=hypothesis,
+                      status=STATUS_NO_OUTPUT, proposer=proposer, verdict=VERDICT_UNTESTED,
+                      note=f"agent session produced no candidate ({outcome}); not evaluated", **fields)
+        self.store.append(entry)
+        return entry
 
     def precheck(self, source: str, extra_prior: list[tuple[int, str]] = (),
                  threshold: float | None = None) -> tuple[list[str], NoveltyVerdict]:

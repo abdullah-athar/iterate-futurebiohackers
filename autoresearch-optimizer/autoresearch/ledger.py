@@ -17,6 +17,7 @@ STATUS_REJECTED_DUPLICATE = "rejected_duplicate"   # novelty gate; not evaluated
 STATUS_REJECTED_SCREEN = "rejected_screen"         # failed/invalid/worse-than-baseline on screen
 STATUS_FAILED = "failed"              # crash or timeout on the objective split
 STATUS_REJECTED_GUARD = "rejected_guard"           # disallowed imports/calls; not evaluated
+STATUS_NO_OUTPUT = "no_output"                     # the agent session wrote no candidate; it still cost a try
 
 VERDICT_SUPPORTED = "supported"            # new global best, confirmed on fresh instances
 VERDICT_PARTIAL = "partial"                # better on some instances, not globally

@@ -160,8 +160,10 @@ def test_swarm():
                         max_generations=2)
         entries = run.entries()
         assert [e.id for e in entries] == list(range(len(entries))), [e.id for e in entries]
-        assert [e.status for e in entries if e.generation == 1] == [STATUS_KEPT, STATUS_REJECTED_DUPLICATE]
-        assert all(e.status == STATUS_REJECTED_DUPLICATE for e in entries if e.generation == 2)
+        # the empty session (worker 2) is kept as a no_output try instead of vanishing with its cost
+        assert [e.status for e in entries if e.generation == 1] == [STATUS_KEPT, STATUS_REJECTED_DUPLICATE, "no_output"]
+        assert [e.status for e in entries if e.generation == 2] == [STATUS_REJECTED_DUPLICATE] * 2 + ["no_output"]
+        assert entries[2].novelty.get("nearest_id") in (0, 1), entries[2].novelty  # ids line up with empty slots
         kinds = [json.loads(l)["type"] for l in (run.store.root / "events.jsonl").read_text().splitlines()]
         assert kinds.count("gen_end") == 2 and kinds[-1] == "run_end", kinds
         assert (run.store.root / "holdout.json").exists()
@@ -239,9 +241,12 @@ def test_exploration_exploitation():
         # the bandit counts the gate-dropped proposal as a zero-reward new_family try
         assert dup.usage.get("gate_dropped") is True
         entries = run.entries()
-        with_drop = run.mode_scores(entries, run.archive(entries))["new_family"]
+        score = lambda: run.mode_scores(entries, run.archive(entries))["new_family"]  # noqa: E731
+        counted = score()
         next(e for e in entries if e.id == dup.id).usage.pop("gate_dropped")
-        assert with_drop < run.mode_scores(entries, run.archive(entries))["new_family"]
+        assert score() == counted  # default: every session is a try, flag or not
+        run.config.bandit_counts_all_attempts = False  # legacy counting: only the gate flag keeps it
+        assert counted < score()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("  Exploration-exploitation test passed!")
@@ -302,6 +307,7 @@ def test_describe_cache():
     from concurrent.futures import ThreadPoolExecutor
 
     import autoresearch.descriptors as D
+    import autoresearch.llm_calls as L
 
     calls = []
 
@@ -312,7 +318,7 @@ def test_describe_cache():
             "terms": [{"term": "hill climbing", "tier": 6}], "new_terms": [], "summary": "s"}}
         return types.SimpleNamespace(stdout=json.dumps(out), stderr="")
 
-    real, D.subprocess = D.subprocess, types.SimpleNamespace(run=fake_run)
+    real, L.subprocess = L.subprocess, types.SimpleNamespace(run=fake_run, TimeoutExpired=TimeoutError)
     tmp = Path(tempfile.mkdtemp(prefix="autoresearch-describe-"))
     try:
         cache = tmp / "descriptors.json"
@@ -324,10 +330,10 @@ def test_describe_cache():
         assert len(json.loads(cache.read_text())) == 6
         D.describe(sources[0], D.Vocabulary(), "p", cache_path=cache)  # cache hit: no new call
         assert len(calls) == 6, len(calls)
-        usage = [json.loads(l) for l in (tmp / "describe_usage.jsonl").read_text().splitlines()]
+        usage = [json.loads(l) for l in (tmp / "llm_usage.jsonl").read_text().splitlines()]
         assert len(usage) == 6 and abs(sum(u["cost_usd"] for u in usage) - 0.06) < 1e-9, usage
     finally:
-        D.subprocess = real
+        L.subprocess = real
         shutil.rmtree(tmp, ignore_errors=True)
     print("  Describe-cache test passed!")
 

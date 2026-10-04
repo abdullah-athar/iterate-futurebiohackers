@@ -124,8 +124,11 @@ def cmd_swarm(args) -> None:
     budget_ms = run.config.time_budget_ms
     evaluate = (swarm.modal_evaluator(run.problem_name, budget_ms) if args.eval == "modal"
                 else swarm.local_evaluator(run.problem_name, budget_ms))
+    from .budget import RunBudget
+    budget = RunBudget(store, max_usd=args.max_run_usd, max_calls=args.max_run_calls, max_tokens=args.max_run_tokens)
     swarm.run_swarm(run, args.agents, args.turn_s, args.budget_min * 60, propose, evaluate, emit,
-                    seed=args.seed, max_generations=args.generations, eval_name=args.eval)
+                    seed=args.seed, max_generations=args.generations, eval_name=args.eval,
+                    budget=budget if budget.capped else None, per_agent_usd_cap=args.max_budget_usd)
     from .report import render
     text = render(run)
     (store.root / "report.md").write_text(text)
@@ -215,6 +218,10 @@ def main(argv=None) -> None:
     s.add_argument("--no-descriptors", action="store_true",
                    help="new run without the exploration-exploitation layer (descriptor contract for tune, "
                         "max-min novelty selection for new_family, research landscape)")
+    s.add_argument("--max-run-usd", type=float, help="run-level spend cap (agents + describe/plan calls); "
+                   "a generation starts only if its estimated cost still fits")
+    s.add_argument("--max-run-calls", type=int, help="run-level cap on provider calls (sessions + auxiliary)")
+    s.add_argument("--max-run-tokens", type=int, help="run-level token cap (stops before the next generation)")
     s.add_argument("--describe-model", default="sonnet",
                    help="model that writes the descriptors, independent of --model so the descriptors (and the "
                         "distance thresholds tuned on them) stay comparable across runs")

@@ -17,14 +17,13 @@ distances stay comparable as the vocabulary grows.
 from __future__ import annotations
 
 import json
-import subprocess
-import tempfile
-import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 
+from .json_cache import JsonCache, cache_key, text_hash
+from .llm_calls import claude_json
 from .novelty import fingerprint
 
 TIER_SHARE = {6: 0.50, 3: 0.35, 1: 0.15}
@@ -181,62 +180,46 @@ def _validate(d: Descriptor) -> str | None:
     return None
 
 
-_CACHE_LOCK = threading.Lock()
+BACKEND_VERSION = "existing-v1"
 
 
-def _read_cache(path: Path | None) -> dict:
-    """Caller holds _CACHE_LOCK (a plain Lock: taking it again here would deadlock)."""
-    return json.loads(path.read_text()) if path and path.exists() else {}
-
-
-def _log_usage(cache_path: Path | None, cost_usd: float, calls: int, ok: bool) -> None:
-    """Append describe spend next to the cache (describe_usage.jsonl): it is not part of the agents' cost_usd."""
-    if cache_path:
-        with _CACHE_LOCK:
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            with (cache_path.parent / "describe_usage.jsonl").open("a") as f:
-                f.write(json.dumps({"cost_usd": round(cost_usd, 6), "calls": calls, "ok": ok}) + "\n")
+def describe_key(source: str, problem: str, model: str) -> str:
+    """Cache key: everything that determines the description except the growing vocabulary, which this
+    backend does not freeze (the first description of a program in a cache wins; see README)."""
+    return cache_key(fp=fingerprint(source), backend=BACKEND_VERSION, model=model, prompt=text_hash(PROMPT),
+                     system=text_hash(SYSTEM), schema=text_hash(json.dumps(DESCRIBE_SCHEMA, sort_keys=True)),
+                     problem=text_hash(problem), vocab="growing")
 
 
 def describe(source: str, vocab: Vocabulary, problem: str, *, model: str = "sonnet",
-             cache_path: Path | None = None, use_cache: bool = True, retries: int = 2) -> Descriptor:
-    """One structured `claude -p` call per program, cached by normalised-source fingerprint."""
-    key = fingerprint(source)
-    with _CACHE_LOCK:
-        cache = _read_cache(cache_path)
-    if use_cache and key in cache:
-        return Descriptor.from_dict(cache[key])
+             cache_path: Path | None = None, use_cache: bool = True, retries: int = 2,
+             usage_path: Path | None = None, kind: str = "describe", budget=None) -> Descriptor:
+    """One structured `claude -p` call per program (retried on invalid output), cached on disk.
+    Spend goes to `usage_path` (default: llm_usage.jsonl next to the cache). No lock is held during the call."""
+    cache = JsonCache(cache_path)
+    key = describe_key(source, problem, model)
+    hit = cache.get(key) if use_cache else None
+    if hit is not None:
+        return Descriptor.from_dict(hit)
+    usage_path = usage_path or (cache_path.parent / "llm_usage.jsonl" if cache_path else None)
     prompt = PROMPT.format(problem=problem, vocab=vocab.prompt_block(), source=source)
-    error, cost, calls = None, 0.0, 0
-    for _ in range(retries + 1):
+    error = None
+    for attempt in range(1, retries + 2):
         text = prompt if error is None else f"{prompt}\n\nYour previous answer was invalid: {error}."
-        # run outside the repo: from inside it, claude also loads the project CLAUDE.md (~2x the input tokens)
-        proc = subprocess.run(
-            ["claude", "-p", "--output-format", "json", "--model", model, "--tools", "",
-             "--system-prompt", SYSTEM, "--json-schema", json.dumps(DESCRIBE_SCHEMA)],
-            input=text, capture_output=True, text=True, timeout=180, cwd=tempfile.gettempdir())
-        calls += 1
+        out, rec = claude_json(text, DESCRIBE_SCHEMA, SYSTEM, model, kind=kind, usage_path=usage_path,
+                               attempt=attempt, budget=budget)
+        if rec.get("error") == "budget exhausted":
+            raise RuntimeError("describe failed: budget exhausted")
         try:
-            res = json.loads(proc.stdout)
-            cost += float(res.get("total_cost_usd") or 0.0)
-            d = Descriptor.from_dict(res["structured_output"])
-            error = _validate(d)
-        except (json.JSONDecodeError, KeyError, TypeError, ValueError, AttributeError) as e:
-            error = f"unparseable output ({e}): {proc.stderr[-300:]}"
+            d = Descriptor.from_dict(out) if out else None
+            error = _validate(d) if d else rec.get("error", "no output")
+        except (KeyError, TypeError, ValueError, AttributeError) as e:
+            error = f"invalid descriptor ({e})"
         if error is None:
             break
     else:
-        _log_usage(cache_path, cost, calls, ok=False)
         raise RuntimeError(f"describe failed: {error}")
-    _log_usage(cache_path, cost, calls, ok=True)
-    if cache_path:
-        with _CACHE_LOCK:  # re-read under the lock so concurrent describers don't drop each other's entries
-            cache = _read_cache(cache_path)
-            cache[key] = d.to_dict()
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = cache_path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(cache, indent=1))
-            tmp.replace(cache_path)  # atomic: readers never see a half-written file
+    cache.put(key, d.to_dict())
     return d
 
 
