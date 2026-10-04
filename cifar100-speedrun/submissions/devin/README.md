@@ -126,7 +126,7 @@ defaults (8.25 epochs, 24 px first quarter, max pool):
 | Seeds start | New defaults | Previous defaults |
 | --- | ---: | ---: |
 | 72402879 | **75.32%, 4.717 s** | 75.32%, 4.929 s |
-| 112574195 | **75.28%, 4.80 s** (33 of 40 trials) | 75.27%, 5.059 s |
+| 112574195 | **75.26%, 4.899 s** | 75.27%, 5.059 s |
 
 16-trial screens (same container as the previous defaults):
 - Muon on conv filters (batched Newton-Schulz, `muon_compile: "step"`), lr 0.16-0.2 at 6.5 epochs:
