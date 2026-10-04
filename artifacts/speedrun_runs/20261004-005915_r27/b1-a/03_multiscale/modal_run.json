@@ -1,0 +1,32 @@
+{
+  "returncode": 1,
+  "wall_seconds": 231.5,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T000918Z-b561e03a",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"multiscale_head\": true}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "multiscale",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"multiscale_head\": true}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"multiscale_head\": true}",
+    "delta": {
+      "multiscale_head": true
+    },
+    "hypothesis": "B: multi-scale head: max-pooled group-2 features (256) concatenated with group 3's (768) -> linear 1024 -> 100",
+    "env": {},
+    "config": "futurebiohackers {\"multiscale_head\": true}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

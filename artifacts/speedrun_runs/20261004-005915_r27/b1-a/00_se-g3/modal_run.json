@@ -1,0 +1,34 @@
+{
+  "returncode": 0,
+  "wall_seconds": 247.5,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261003T235945Z-4b23e89b",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"se_groups\": [2]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "se-g3",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"se_groups\": [2]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"se_groups\": [2]}",
+    "delta": {
+      "se_groups": [
+        2
+      ]
+    },
+    "hypothesis": "A: squeeze-and-excitation on group 3's output (768 -> 48 -> 768, sigmoid channel scale)",
+    "env": {},
+    "config": "futurebiohackers {\"se_groups\": [2]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
