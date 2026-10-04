@@ -30,7 +30,7 @@ def _render(specs: list[str], out: Path, title: str | None, open_browser: bool) 
     return 0
 
 
-def _grid(specs: list[str], out: Path, open_browser: bool) -> int:
+def _grid(specs: list[str], out: Path, title: str | None, open_browser: bool) -> int:
     from .grid import config_name, render_grid
 
     runs = load_runs(specs)
@@ -38,7 +38,7 @@ def _grid(specs: list[str], out: Path, open_browser: bool) -> int:
         print("no runs found", file=sys.stderr)
         return 1
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(render_grid(runs))
+    out.write_text(render_grid(runs, title) if title else render_grid(runs))
     for r in runs:
         s = summarize(r)
         print(f"{r.path.name:45s} {r.problem:20s} {config_name(r):8s} best={s.best_objective:>8.0f} "
@@ -115,10 +115,11 @@ def main(argv: list[str] | None = None) -> int:
     g = sub.add_parser("grid", help="compare configurations (e.g. Sonnet / Opus / Sopus) across benchmarks and repeats")
     g.add_argument("runs", nargs="+", help="run dirs or a parent dir of runs")
     g.add_argument("-o", "--out", type=Path, default=Path("artifacts/viz/grid.html"))
+    g.add_argument("--title")
     g.add_argument("--open", action="store_true", help="open the result in a browser")
     a = p.parse_args(argv)
     if a.cmd == "grid":
-        return _grid(a.runs, a.out, a.open)
+        return _grid(a.runs, a.out, a.title, a.open)
     if a.cmd == "serve":
         return _serve(a.runs, a.port, a.title, a.open)
     return _render(a.runs, a.out, a.title, a.open)

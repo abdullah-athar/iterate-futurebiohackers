@@ -284,7 +284,8 @@ def test_viz_grid():
                 run("a-sopus-s0", "p1", ["sonnet", "opus"], 75, 0.9), run("b-opus-s0", "p2", ["opus", "opus"], 70, 1.5)]
         assert [config_name(r) for r in runs] == ["Sonnet", "Sonnet", "Sopus", "Opus"]
         html = render_grid(runs)
-        assert html.count("<div class='facet'>") == 3 * 2, "one panel per benchmark in each of the three views"
+        assert html.count("<div class='facet'>") == (3 + 5 + 1) * 2, "one panel per benchmark in each scatter, per-seed and progress view"
+        assert "Sopus better on 1/1 seeds" in html, "paired head-to-head on the shared seed 0"
         assert "data-run='Sopus'" in html and 'class="pareto"' in html and "seed 1" in html
         assert "$0.60 <span class='muted'>± $0.14</span>" in html, "mean ± sd of the two Sonnet repeats"
     finally:

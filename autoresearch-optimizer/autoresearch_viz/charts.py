@@ -505,3 +505,152 @@ def scatter_chart(
         out.append(f'<text class="end" x="{cx + dx:.1f}" y="{cy - 9:.1f}" text-anchor="{anchor}" font-weight="600">{escape(g.label)}</text></g>')
     out.append("</svg>")
     return "\n".join(out)
+
+
+@dataclass
+class DotColumn:
+    label: str
+    color: str
+    points: dict[str, tuple[float, str]]  # repeat (e.g. "seed 0") -> (value, tooltip)
+
+
+def _short(tag: str) -> str:
+    return tag.replace("seed ", "s")
+
+
+def paired_dots(cols: list[DotColumn], *, unit: str = "", higher_is_better: bool = True, from_zero: bool = False,
+                width: int = 520, height: int = 320) -> str:
+    """One column per configuration, one dot per repeat, a thin grey line joining the same repeat across
+    neighbouring columns (so a seed that does well everywhere reads as a high line) and a short bar at the mean.
+    A joining line sits inside both columns' `data-run` groups, so hiding either configuration hides it."""
+    vals = [v for c in cols for v, _ in c.points.values() if math.isfinite(v)]
+    if not vals:
+        return "<p class='muted'>No finished runs.</p>"
+    ml, mr, mt, mb = 74, 18, 26, 34
+    pw, ph = width - ml - mr, height - mt - mb
+    lo, hi = (0.0 if from_zero else min(vals)), max(vals)
+    pad = (hi - lo) * 0.12 or 1
+    y_lo, y_hi = (0.0 if from_zero else lo - pad), hi + pad
+    cw = pw / len(cols)
+
+    def X(i: int) -> float:
+        return ml + cw * (i + 0.5)
+
+    def Y(v: float) -> float:
+        return mt + ph * (1 - (v - y_lo) / (y_hi - y_lo))
+
+    out = [f'<svg class="chart" viewBox="0 0 {width} {height}" role="img">']
+    for t in nice_ticks(y_lo, y_hi, 5):
+        if y_lo <= t <= y_hi:
+            out.append(f'<line class="grid" x1="{ml}" x2="{ml + pw}" y1="{Y(t):.1f}" y2="{Y(t):.1f}"/>')
+            out.append(f'<text class="tick" x="{ml - 8}" y="{Y(t) + 4:.1f}" text-anchor="end">{fmt_num(t, unit)}</text>')
+    out.append(f'<line class="axis" x1="{ml}" x2="{ml}" y1="{mt}" y2="{mt + ph}"/>')
+    out.append(f'<line class="axis" x1="{ml}" x2="{ml + pw}" y1="{mt + ph}" y2="{mt + ph}"/>')
+    out.append(f'<text class="tick" x="{ml + 6}" y="{mt - 10}">{"↑ higher is better" if higher_is_better else "↓ lower is better"} · '
+               'grey lines join the same seed</text>')
+    for i, (a, b) in enumerate(pairwise(cols)):
+        for tag in sorted(set(a.points) & set(b.points)):
+            (va, _), (vb, _) = a.points[tag], b.points[tag]
+            if not (math.isfinite(va) and math.isfinite(vb)):
+                continue
+            d = vb - va
+            better = (d > 0) == higher_is_better and d != 0
+            tip = f"{tag}: {b.label} {fmt_num(vb, unit)} vs {a.label} {fmt_num(va, unit)} ({'+' if d >= 0 else '−'}{fmt_num(abs(d), unit).lstrip('+')}, " \
+                  f"{b.label + ' better' if better else a.label + ' better' if d else 'tie'})"
+            out.append(f'<g data-run="{escape(a.label, quote=True)}"><g data-run="{escape(b.label, quote=True)}">'
+                       f'<line x1="{X(i) + 6:.1f}" x2="{X(i + 1) - 6:.1f}" y1="{Y(va):.1f}" y2="{Y(vb):.1f}" stroke="#94a3b8" '
+                       f'stroke-width="1.5" data-tip="{escape(tip, quote=True)}"/></g></g>')
+    for i, c in enumerate(cols):
+        lab = escape(c.label, quote=True)
+        out.append(f'<g data-run="{lab}"><text class="cat" x="{X(i):.1f}" y="{mt + ph + 20}" text-anchor="middle" font-weight="600">{escape(c.label)}</text>')
+        pts = sorted(((v, tag, tip) for tag, (v, tip) in c.points.items() if math.isfinite(v)), reverse=True)
+        if not pts:
+            out.append("</g>")
+            continue
+        m = sum(v for v, _, _ in pts) / len(pts)
+        out.append(f'<line x1="{X(i) - 13:.1f}" x2="{X(i) + 13:.1f}" y1="{Y(m):.1f}" y2="{Y(m):.1f}" stroke="{c.color}" stroke-width="3" '
+                   f'stroke-linecap="round" data-tip="{escape(f"{c.label}: mean of {len(pts)} = {fmt_num(m, unit)}", quote=True)}"/>')
+        out.append(f'<text class="val" x="{X(i) + 18:.1f}" y="{Y(m) + 4:.1f}" font-weight="600" fill="#0f172a">{fmt_num(m, unit)}</text>')
+        last = -math.inf
+        for v, tag, tip in sorted(pts, key=lambda p: -p[0]):  # seed labels left of the dots, pushed apart when close
+            y = max(Y(v) + 4, last + 11)
+            last = y
+            out.append(f'<text class="tick" x="{X(i) - 17:.1f}" y="{y:.1f}" text-anchor="end">{_short(tag)}</text>')
+        for v, tag, tip in pts:
+            out.append(f'<circle cx="{X(i):.1f}" cy="{Y(v):.1f}" r="5" fill="{c.color}" stroke="#fff" stroke-width="2" '
+                       f'data-tip="{escape(tip, quote=True)}"/>')
+        out.append("</g>")
+    out.append("</svg>")
+    return "\n".join(out)
+
+
+@dataclass
+class BandGroup:
+    label: str
+    color: str
+    runs: dict[str, list[float]]  # repeat -> value after step x_start, x_start + 1, ...
+
+
+def band_chart(groups: list[BandGroup], *, x_label: str, y_label: str, y_unit: str = "", x_prefix: str = "gen", x0: int = 0,
+               switches: list[tuple[float, str, str]] = (), width: int = 520, height: int = 320) -> str:
+    """Progress over discrete steps: per group a thick mean line, a light min–max band over the repeats and the
+    repeats themselves as faint lines. `switches` = [(x in steps from x_start, label, colour)] draws a dashed vertical marker (e.g. a
+    model hand-over between two generations). Step i is labelled `x0 + i`; switch positions use the same numbering."""
+    n = max((len(v) for g in groups for v in g.runs.values()), default=0)
+    vals = [y for g in groups for v in g.runs.values() for y in v if math.isfinite(y)]
+    if not vals or n < 2:
+        return "<p class='muted'>No finished runs.</p>"
+    ml, mr, mt, mb = 74, 64, 26, 46
+    pw, ph = width - ml - mr, height - mt - mb
+    pad = (max(vals) - min(vals)) * 0.06 or 1
+    y_lo, y_hi = min(vals) - pad, max(vals) + pad
+
+    def X(i: float) -> float:
+        return ml + pw * i / (n - 1)
+
+    def Y(v: float) -> float:
+        return mt + ph * (1 - (v - y_lo) / (y_hi - y_lo))
+
+    out = [f'<svg class="chart" viewBox="0 0 {width} {height}" role="img">']
+    for t in nice_ticks(y_lo, y_hi, 5):
+        if y_lo <= t <= y_hi:
+            out.append(f'<line class="grid" x1="{ml}" x2="{ml + pw}" y1="{Y(t):.1f}" y2="{Y(t):.1f}"/>')
+            out.append(f'<text class="tick" x="{ml - 8}" y="{Y(t) + 4:.1f}" text-anchor="end">{fmt_num(t, y_unit)}</text>')
+    for i in range(n):
+        out.append(f'<text class="tick" x="{X(i):.1f}" y="{mt + ph + 17}" text-anchor="middle">{"seed" if i + x0 == 0 else f"{x_prefix} {i + x0}"}</text>')
+    out.append(f'<line class="axis" x1="{ml}" x2="{ml + pw}" y1="{mt + ph}" y2="{mt + ph}"/>')
+    out.append(f'<line class="axis" x1="{ml}" x2="{ml}" y1="{mt}" y2="{mt + ph}"/>')
+    out.append(f'<text class="label" x="{ml + pw / 2:.0f}" y="{height - 8}" text-anchor="middle">{escape(x_label)}</text>')
+    out.append(f'<text class="label" transform="translate(14,{mt + ph / 2:.0f}) rotate(-90)" text-anchor="middle">{escape(y_label)}</text>')
+    for k, (x, label, color) in enumerate(switches):
+        x -= x0
+        out.append(f'<line x1="{X(x):.1f}" x2="{X(x):.1f}" y1="{mt}" y2="{mt + ph}" stroke="{color}" stroke-dasharray="5 4" stroke-width="1.5"/>'
+                   f'<text class="end" x="{X(x) + 5:.1f}" y="{mt - 10 + 13 * k}">{escape(label)}</text>')
+    ends = []
+    for g in groups:
+        runs = [v for v in g.runs.values() if len(v) == n]
+        if not runs:
+            continue
+        cols = [[r[i] for r in runs] for i in range(n)]
+        mean = [sum(c) / len(c) for c in cols]
+        lo, hi = [min(c) for c in cols], [max(c) for c in cols]
+        out.append(f'<g data-run="{escape(g.label, quote=True)}">')
+        band = [(X(i), Y(hi[i])) for i in range(n)] + [(X(i), Y(lo[i])) for i in reversed(range(n))]
+        out.append(f'<polygon points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in band)}" fill="{g.color}" fill-opacity=".12"/>')
+        for tag, r in g.runs.items():
+            if len(r) == n:
+                out.append(f'<polyline points="{" ".join(f"{X(i):.1f},{Y(v):.1f}" for i, v in enumerate(r))}" fill="none" stroke="{g.color}" '
+                           f'stroke-opacity=".35" stroke-width="1.2" data-tip="{escape(f"{g.label} · {tag}: " + " → ".join(fmt_num(v, y_unit) for v in r), quote=True)}"/>')
+        out.append(f'<polyline points="{" ".join(f"{X(i):.1f},{Y(v):.1f}" for i, v in enumerate(mean))}" fill="none" stroke="{g.color}" stroke-width="2.4"/>')
+        for i in range(n):
+            tip = (f"{g.label} · {'seed solver' if i + x0 == 0 else f'after {x_prefix} {i + x0}'}: mean {fmt_num(mean[i], y_unit)} "
+                   f"(min {fmt_num(lo[i], y_unit)}, max {fmt_num(hi[i], y_unit)}, {len(runs)} runs)")
+            out.append(f'<circle cx="{X(i):.1f}" cy="{Y(mean[i]):.1f}" r="4.5" fill="{g.color}" stroke="#fff" stroke-width="2" data-tip="{escape(tip, quote=True)}"/>')
+        out.append("</g>")
+        ends.append((Y(mean[-1]) + 4, g.label))
+    last = -math.inf
+    for y, label in sorted(ends):  # direct labels right of the last point, pushed apart when the means are close
+        last = max(y, last + 13)
+        out.append(f'<text class="end" data-run="{escape(label, quote=True)}" x="{X(n - 1) + 8:.1f}" y="{last:.1f}" font-weight="600">{escape(label)}</text>')
+    out.append("</svg>")
+    return "\n".join(out)
