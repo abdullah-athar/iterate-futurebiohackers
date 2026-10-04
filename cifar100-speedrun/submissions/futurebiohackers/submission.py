@@ -2,10 +2,12 @@
 
 Adapted from Keller Jordan's airbench (https://github.com/KellerJordan/cifar10-airbench),
 Copyright (c) 2024 Keller Jordan, released under the MIT License. Changes: 100-class
-head with widths 128/256/768 and a two-conv first group, label smoothing 0.3, an
-8.25-epoch schedule, half-precision BatchNorm, a compiled forward+loss step, the
-harness build/prepare/train split, and no test-time augmentation. The optional
-Muon optimizer follows hiverge/cifar10-speedrun (MIT); see LICENSE.hiverge.
+head, widths 64/256/768 with three convolutions per group and residual pairs through 192
+(group 2) and 512 (group 3) channels, group 1's pair as two 1x1 convolutions and group 2's as a
+3x3 then a 1x1, max + mean global pooling, label smoothing 0.25, an 11-epoch schedule with
+20 px and 24 px phases, half-precision BatchNorm, a compiled forward+loss step, the harness
+build/prepare/train split, and no test-time augmentation. The optional Muon optimizer follows
+hiverge/cifar10-speedrun (MIT); see LICENSE.hiverge.
 
 Untimed build() compiles the network and warms up every kernel on synthetic data.
 Timed prepare() resets all learned state, moves the images to the GPU, normalizes
@@ -23,7 +25,7 @@ from benchmark.api import BuildContext, TrainingData
 
 # Override any value with --params, e.g. '{"epochs": 9, "widths": [128, 384, 768]}'.
 DEFAULTS = {
-    "epochs": 9.0,
+    "epochs": 11.0,
     "batch_size": 1024,
     "lr": 11.5,  # per 1024 examples, decoupled from momentum (airbench convention)
     "momentum": 0.85,
@@ -42,7 +44,7 @@ DEFAULTS = {
     "resolution_switch": 0.5,  # fraction of steps before returning to 32 pixels
     # Multi-stage schedule, e.g. [[24, 0.33], [28, 0.67]]: resolution until that
     # fraction of steps, then 32. Overrides train_resolution/resolution_switch.
-    "resolution_schedule": [[28, 0.5]],
+    "resolution_schedule": [[20, 0.15], [24, 0.5]],
     # Batch-size schedule, e.g. [[512, 0.5]]: batch size until that fraction of the
     # training examples, then batch_size. Chosen per epoch. Weight decay per step
     # scales with the batch so the per-example decay is unchanged.
@@ -68,10 +70,22 @@ DEFAULTS = {
     "inductor_tuning": [],  # e.g. ["coordinate_descent_tuning", "aggressive_fusion"]
     "bn_recal_batches": 0,  # re-estimate BN statistics on center crops after training
     "stem": "patch2",  # "patch2": 2x2 whitening at 31x31; "patch4s2": 4x4 stride-2 at 15x15
-    "inner_kernels": [3, 3, 3],  # kernel size of conv2/conv3 in each group (1 or 3)
+    # Kernel size of conv2 / conv3 in each group: 1 or 3 for both, or [k2, k3] (each 1 or 3) to
+    # mix them. Group 1's pair (64 -> 64 -> 64, on the 15x15 map) is two 1x1 convolutions and group
+    # 2's (256 -> 192 -> 256) a 3x3 followed by a 1x1: the 1x1 has a ninth of the 3x3's FLOPs.
+    "inner_kernels": [[1, 1], [3, 1], 3],
+    # Group 3's residual pair (the two convs after conv1; the residual and the group output keep
+    # widths[2] channels): "full" = two 3x3 convs at widths[2]; "inner512" / "inner640" = the
+    # 3x3 pair through 512 / 640 channels; "bottleneck384" = 1x1 -> 384, 3x3 at 384, 1x1 back.
+    "g3_pair": "inner512",
+    # Group 2's residual pair, same scheme: "full" (256 -> 256 -> 256) or "inner192" (through 192).
+    "g2_pair": "inner192",
     # "max" is max(dim).values; adaptive_max_pool2d's backward uses slow atomics and
     # "amax" trains to NaN under torch.compile in torch 2.4.
-    "global_pool": "max",
+    # "maxmean_sum": per-channel max plus mean over positions (same width as "max");
+    # "fullpool_avgsum": the same max + mean through the pooling kernels (F.max_pool2d /
+    # F.avg_pool2d over the whole map), 0.13 s per trial faster than the compiled reductions.
+    "global_pool": "fullpool_avgsum",
     # "muon" follows hiverge/cifar10-speedrun: Muon on conv filters, SGD on biases and head.
     "optimizer": "sgd",
     "muon_lr": 0.205,
@@ -80,6 +94,16 @@ DEFAULTS = {
     "bias_lr": 0.0573,
     "head_lr": 0.5415,
 }
+
+
+# g3_pair variants: (kind, inner channels); None keeps the full-width pair.
+G3_PAIRS = {
+    "full": None,
+    "inner512": ("inner", 512),
+    "inner640": ("inner", 640),
+    "bottleneck384": ("bottleneck", 384),
+}
+G2_PAIRS = {"full": None, "inner192": ("inner", 192)}
 
 
 #############################################
@@ -126,17 +150,43 @@ class Conv(nn.Conv2d):
 
 class ConvGroup(nn.Module):
     def __init__(
-        self, channels_in, channels_out, depth, bn_momentum, act, pool_first, kernel=3, pool=True
+        self,
+        channels_in,
+        channels_out,
+        depth,
+        bn_momentum,
+        act,
+        pool_first,
+        kernel=3,
+        pool=True,
+        pair=None,
     ):
         super().__init__()
         self.conv1 = Conv(channels_in, channels_out)
         self.pool = nn.MaxPool2d(2) if pool else nn.Identity()
         self.pool_first = pool_first
         self.norm1 = BatchNorm(channels_out, bn_momentum)
-        self.conv2 = Conv(channels_out, channels_out, kernel)
-        self.norm2 = BatchNorm(channels_out, bn_momentum)
-        self.conv3 = Conv(channels_out, channels_out, kernel) if depth == 3 else None
-        self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
+        # inner_kernels: one kernel size for conv2 and conv3, or a [k2, k3] pair.
+        k2, k3 = (kernel, kernel) if isinstance(kernel, int) else tuple(kernel)
+        if pair is None:
+            self.conv2 = Conv(channels_out, channels_out, k2)
+            self.norm2 = BatchNorm(channels_out, bn_momentum)
+            self.conv3 = Conv(channels_out, channels_out, k3) if depth == 3 else None
+            self.norm3 = BatchNorm(channels_out, bn_momentum) if depth == 3 else None
+        else:
+            # A cheaper residual pair (g3_pair): the residual and the output keep channels_out.
+            kind, inner = pair
+            if kind == "bottleneck":
+                self.conv2a = Conv(channels_out, inner, 1)
+                self.norm2a = BatchNorm(inner, bn_momentum)
+                self.conv2 = Conv(inner, inner, k2)
+                self.norm2 = BatchNorm(inner, bn_momentum)
+                self.conv3 = Conv(inner, channels_out, 1)
+            else:
+                self.conv2 = Conv(channels_out, inner, k2)
+                self.norm2 = BatchNorm(inner, bn_momentum)
+                self.conv3 = Conv(inner, channels_out, k3)
+            self.norm3 = BatchNorm(channels_out, bn_momentum)
         self.act = act
 
     def forward(self, x):
@@ -145,6 +195,9 @@ class ConvGroup(nn.Module):
         if self.conv3 is None:
             return self.norm2.activate(self.conv2(x), self.act)
         x0 = x
+        conv2a = getattr(self, "conv2a", None)
+        if conv2a is not None:  # bottleneck pair: 1x1 reduction before the 3x3
+            x = self.norm2a.activate(conv2a(x), self.act)
         x = self.norm2.activate(self.conv2(x), self.act)
         return self.norm3.activate(self.conv3(x), self.act, x0)
 
@@ -162,20 +215,33 @@ class Net(nn.Module):
         stem_width = 2 * 3 * patch * patch
         self.whiten = nn.Conv2d(3, stem_width, kernel_size=patch, padding=0, bias=True)
         self.whiten.weight.requires_grad = False
-        self.layers = nn.Sequential(
-            *(
-                ConvGroup(c_in, c_out, depth, bn_momentum, self.act, pool_first, kernel, pool)
-                for c_in, c_out, depth, pool_first, kernel, pool in zip(
-                    (stem_width, w1, w2),
-                    (w1, w2, w3),
-                    depths,
-                    hyp["pool_first"],
-                    hyp["inner_kernels"],
-                    (self.whiten_stride == 1, True, True),
-                    strict=True,
+        pairs = (None, G2_PAIRS[hyp["g2_pair"]], G3_PAIRS[hyp["g3_pair"]])
+        groups = []
+        for index, (c_in, c_out, depth, pool_first, kernel, pool) in enumerate(
+            zip(
+                (stem_width, w1, w2),
+                (w1, w2, w3),
+                depths,
+                hyp["pool_first"],
+                hyp["inner_kernels"],
+                (self.whiten_stride == 1, True, True),
+                strict=True,
+            )
+        ):
+            groups.append(
+                ConvGroup(
+                    c_in,
+                    c_out,
+                    depth,
+                    bn_momentum,
+                    self.act,
+                    pool_first,
+                    kernel,
+                    pool,
+                    pair=pairs[index],
                 )
             )
-        )
+        self.layers = nn.Sequential(*groups)
         self.head = nn.Linear(w3, num_classes, bias=False)
         self.scaling_factor = hyp["scaling_factor"]
         self.muon_head = hyp["optimizer"] == "muon"
@@ -210,6 +276,15 @@ class Net(nn.Module):
             x = F.adaptive_max_pool2d(x, 1).flatten(1)
         elif self.global_pool == "amax":
             x = x.flatten(2).amax(2)
+        elif self.global_pool == "maxmean_sum":
+            flat = x.flatten(2)
+            x = flat.max(2).values + flat.mean(2)
+        elif self.global_pool == "fullpool_avgsum":
+            # max and mean through the pooling kernels: 0.13 s per trial faster than the
+            # reduction kernels torch.compile generates for max(dim).values and mean.
+            flat = x.flatten(2)
+            x4, kernel = flat.view(flat.shape[0], flat.shape[1], -1, 1), (flat.shape[2], 1)
+            x = (F.max_pool2d(x4, kernel) + F.avg_pool2d(x4, kernel)).flatten(1)
         else:
             x = x.flatten(2).max(2).values
         if self.muon_head:
@@ -367,6 +442,18 @@ def indexed_crop(images, crop_size):
 #############################################
 
 
+def _kernel_ok(k) -> bool:
+    """inner_kernels entry: 1 or 3, or a [k2, k3] list of 1 or 3."""
+    if type(k) is int:
+        return k in (1, 3)
+    return isinstance(k, list) and len(k) == 2 and all(type(v) is int and v in (1, 3) for v in k)
+
+
+def _pair_kernel_ok(k) -> bool:
+    """A narrowed residual pair needs 3x3 or mixed [k2, k3] inner kernels (not plain 1x1)."""
+    return k == 3 or isinstance(k, list)
+
+
 def build(context: BuildContext):
     hyp = {**DEFAULTS, **context.parameters}
     unknown = set(hyp) - set(DEFAULTS)
@@ -401,14 +488,28 @@ def build(context: BuildContext):
         hyp["resolution_schedule"] = [[hyp["train_resolution"], hyp["resolution_switch"]]]
     if any(r not in (16, 20, 24, 28) or not 0 <= f <= 1 for r, f in hyp["resolution_schedule"]):
         raise ValueError("resolution_schedule entries must be [16|20|24|28, fraction]")
-    if len(hyp["inner_kernels"]) != 3 or any(k not in (1, 3) for k in hyp["inner_kernels"]):
-        raise ValueError("inner_kernels must contain three values of 1 or 3")
+    if len(hyp["inner_kernels"]) != 3 or not all(_kernel_ok(k) for k in hyp["inner_kernels"]):
+        raise ValueError(
+            "inner_kernels must contain three values of 1 or 3, or [k2, k3] pairs of 1 or 3"
+        )
+    if not isinstance(hyp["g3_pair"], str) or hyp["g3_pair"] not in G3_PAIRS:
+        raise ValueError(f"g3_pair must be one of {sorted(G3_PAIRS)}")
+    if hyp["g3_pair"] != "full" and (
+        depths[2] != 3 or not _pair_kernel_ok(hyp["inner_kernels"][2])
+    ):
+        raise ValueError("g3_pair variants need group 3 at depth 3 with 3x3 inner kernels")
+    if not isinstance(hyp["g2_pair"], str) or hyp["g2_pair"] not in G2_PAIRS:
+        raise ValueError(f"g2_pair must be one of {sorted(G2_PAIRS)}")
+    if hyp["g2_pair"] != "full" and (
+        depths[1] != 3 or not _pair_kernel_ok(hyp["inner_kernels"][1])
+    ):
+        raise ValueError("g2_pair variants need group 2 at depth 3 with 3x3 inner kernels")
     if hyp["stem"] not in ("patch2", "patch4s2"):
         raise ValueError("stem must be patch2 or patch4s2")
     if any(b <= 0 or not 0 <= f <= 1 for b, f in hyp["batch_schedule"]):
         raise ValueError("batch_schedule entries must be [positive batch, fraction]")
-    if hyp["global_pool"] not in ("adaptive", "amax", "max"):
-        raise ValueError("global_pool must be adaptive, amax, or max")
+    if hyp["global_pool"] not in ("adaptive", "amax", "max", "maxmean_sum", "fullpool_avgsum"):
+        raise ValueError("global_pool must be adaptive, amax, max, maxmean_sum, or fullpool_avgsum")
     if hyp["optimizer"] not in ("sgd", "muon") or len(hyp["color_jitter"]) != 2:
         raise ValueError("optimizer must be sgd or muon; color_jitter needs two ranges")
     device = context.device
@@ -480,7 +581,13 @@ def build(context: BuildContext):
         crop_kernel=crop_kernel,
     )
     if hyp["hard_fraction"] < 1:
-        proxy_hyp = {**hyp, "widths": hyp["proxy_widths"], "depths": [2, 2, 2]}
+        proxy_hyp = {
+            **hyp,
+            "widths": hyp["proxy_widths"],
+            "depths": [2, 2, 2],
+            "g3_pair": "full",
+            "g2_pair": "full",
+        }
         proxy = Net(proxy_hyp, context.num_classes).to(
             device, dtype, memory_format=torch.channels_last
         )
