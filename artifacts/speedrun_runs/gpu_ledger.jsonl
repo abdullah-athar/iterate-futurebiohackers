@@ -423,3 +423,7 @@
 {"time": "2026-10-04T02:49:08", "label": "r37/g1-a", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 428.6, "gpu_minutes": 7.39, "note": ""}
 {"time": "2026-10-04T02:49:30", "label": "r38/cdt-32", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 296.4, "gpu_minutes": 5.19, "note": ""}
 {"time": "2026-10-04T02:50:55", "label": "r39/kaudit-a", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 408.8, "gpu_minutes": 7.06, "note": ""}
+{"time": "2026-10-04T02:52:18", "label": "r40/confirm16-r24 (gpu-guard miss 1)", "gpu": "NVIDIA A100 80GB PCIe", "power": "300.00 W", "container_seconds": 0.1, "gpu_minutes": 0.25, "note": "aborted before build: GPU 'NVIDIA A100 80GB PCIe' is not 'NVIDIA A100-SXM4-80GB'"}
+{"time": "2026-10-04T02:53:48", "label": "cold4cpu-cdt32 @4cpu", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 518.1, "gpu_minutes": 8.88, "note": ""}
+{"time": "2026-10-04T02:53:48", "label": "r38/cdt-all", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 435.5, "gpu_minutes": 7.51, "note": ""}
+{"time": "2026-10-04T02:59:11", "label": "r40/confirm16-r24", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 403.4, "gpu_minutes": 6.97, "note": ""}
