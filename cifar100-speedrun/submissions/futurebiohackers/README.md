@@ -46,8 +46,8 @@ last group; max + mean pooling through the pooling kernels; 11 epochs), 4 Octobe
 seed set, the 75% target enforced, Modal NVIDIA A100-SXM4-80GB at the 400 W power limit ("A100 SXM
 400 W"). Cards at the same power limit differ by one to two percent in speed, so each seed set ran
 this recipe and the previous one (PR #28) back to back in one container, both compiled cold (fresh
-Inductor cache) under a hard four-CPU limit, the judges' quota; the build times in the table are
-those real cold builds. Official judging runs on an A100 80GB PCIe, where times are higher (about 8%
+Inductor cache) under a hard four-CPU limit, the judges' quota; the build times of the first four rows are
+those real cold builds (the older rows' cold builds ran in 20-CPU containers). Official judging runs on an A100 80GB PCIe, where times are higher (about 8-9%
 on the earlier recipe); the ranking between recipes carries over.
 
 | Seeds | Recipe | Mean accuracy | Min / max trial | Mean preparation + training | Qualified |
@@ -69,8 +69,8 @@ Paired differences against PR #28 on the same seeds and card: seeds 0-39 +0.13 +
 pairs). All 160 trials of the two containers finished and qualified, none below 74.63%, so none
 diverged (this file carries no device-side non-finite counter).
 
-Why this recipe: two changes on PR #28 and one more epoch, every comparison made with both recipes
-compiled cold in one container (which removes the one-to-two-percent speed differences between cards
+Why this recipe: two changes on PR #28 and one more epoch, every comparison below made with both
+recipes compiled cold in one container unless stated otherwise (which removes the one-to-two-percent speed differences between cards
 and any kernel choice inherited from a warm compile cache). (1) The first resolution phase trains at
 20 px instead of 24 px and ends at 15% of the examples, and the 24 px phase then runs to the half in
 place of the 28 px phase; on this recipe at 10.5 epochs the schedule alone measured -0.04 +- 0.05
@@ -80,8 +80,9 @@ net gain, since the epoch ladder is linear at about 1.05 points per second. Sche
 28 px phase (20 -> 24 -> 28 -> 32) save less and need eight compiled graphs, whose four-CPU cold
 build measured 441 s on a sibling schedule ([[20, 0.15], [24, 0.3], [28, 0.5]]). (2) The residual pairs of groups 1 and 2 become a 3x3 followed by a
 1x1 at full width: group 1's pair on PR #27 -0.13 s at +0.02 +- 0.13 points (8 paired trials), group
-2's on this recipe about -0.25 s for roughly -0.05 points (10.5 epochs: +0.02 +- 0.10 points /
--0.07 s; 10.75 epochs: +0.19 +- 0.06 / +0.04 s, 16 trials each, against the 10-epoch control).
+2's about -0.25 s for roughly -0.05 points at 10 epochs (40 paired trials per seed set on PR #25's
+recipe, warm compile cache; on this recipe, cold, 10.5 epochs: +0.02 +- 0.10 points / -0.07 s and
+10.75 epochs: +0.19 +- 0.06 / +0.04 s, 16 trials each, against the 10-epoch control).
 Stacked, the three changes measured -0.06 +- 0.09 points / -0.41 s at 10.5 epochs and -0.05 +- 0.11 /
 -0.33 s at 10.75 (16 paired trials each), so the submitted recipe takes 11 epochs for the accuracy
 margin. Without group 2's pair, the schedule plus group 1's pair at 10.5 epochs measured
@@ -92,7 +93,7 @@ instead of the first quarter, so the 28 px phase shrinks from a quarter to 15%. 
 0.14 s per trial for -0.01 +- 0.05 / -0.07 +- 0.06 points on the two seed sets (-0.04 +- 0.04 over
 the 80 paired trials); the screens before it: -0.12 s at +0.15 +- 0.09 points over 8 paired trials
 and -0.13 s at -0.01 +- 0.06 over 16 on the group-2-pair recipe of PR #26, -0.15 s at -0.07 +- 0.08
-over 16 on this recipe. The 35% point comes from the schedule ladder: on the 9-epoch PR #14 recipe a 24 px first half saved
+over 16 on PR #25's recipe. The 35% point comes from the schedule ladder: on the 9-epoch PR #14 recipe a 24 px first half saved
 0.73 s for 0.34 +- 0.11 points (8 paired trials, below 75%), and a 28 px phase to 60% was neutral on
 PR #26's recipe. On PR #26's recipe the
 same change lands at 75.07% on seeds 40-79, below that PR's floor, so it is proposed on this one.
@@ -153,7 +154,7 @@ Tested in same-GPU comparisons against a control (8 to 40 paired trials each):
 | `batch_size: 768, lr: 14`, 8.5 epochs | 2% faster at equal accuracy |
 | `batch_schedule` (512 during the 28 px phase) | pending |
 | `resolution_schedule: [[20, 0.15], [24, 0.5]]` (this PR) | 20 px for the first 15% of the examples, 24 px to the half, 32 px after: on this recipe at 10.5 epochs -0.04 +- 0.05 points / -0.11 s (16 paired trials, cold); on PR #27's recipe at 10 epochs -0.23 / -0.40 s (8 trials); 20 -> 24 -> 28 -> 32 (eight graphs): less saving and a 441 s four-CPU build |
-| `inner_kernels: [[3, 1], [3, 1], 3]` (this PR) | groups 1 and 2 as 3x3 then 1x1 at full width: group 2's alone about -0.25 s at 10 epochs for roughly -0.05 points; the full stack with the schedule -0.06 +- 0.09 / -0.41 s at 10.5 epochs, -0.05 +- 0.11 / -0.33 s at 10.75 (16 paired trials each, cold) |
+| `inner_kernels: [[3, 1], [3, 1], 3]` (this PR) | groups 1 and 2 as 3x3 then 1x1 at full width: group 2's alone about -0.25 s at 10 epochs for roughly -0.05 points (40 paired trials per seed set on PR #25's recipe, warm cache); the full stack with the schedule -0.06 +- 0.09 / -0.41 s at 10.5 epochs, -0.05 +- 0.11 / -0.33 s at 10.75 (16 paired trials each, cold) |
 | `resolution_schedule: [[24, 0.35], [28, 0.5]]` (PR #28) | -0.15 / -0.14 s at -0.01 / -0.07 points over 40 paired trials per seed set vs PR #25 (warm cache; -0.14 / -0.15 s cold at 4 CPUs) |
 | `resolution_schedule: [[24, 0.33], [28, 0.67]]` (9-epoch recipe) | 24 px costs 0.8 pt at 10.5 epochs; worse than cutting epochs on CIFAR-100 |
 | `resolution_schedule: [[28, 0.6]]`, 9.25 epochs | same as 28 px for half |
