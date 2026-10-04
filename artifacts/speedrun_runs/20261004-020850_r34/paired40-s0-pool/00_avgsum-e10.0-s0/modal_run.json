@@ -1,0 +1,32 @@
+{
+  "returncode": 0,
+  "wall_seconds": 315.0,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T010922Z-1be5f467",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 40 --params '{\"count_nonfinite\": true, \"global_pool\": \"fullpool_avgsum\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "avgsum-e10.0-s0",
+    "n": 40,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "40",
+      "--params",
+      "{\"count_nonfinite\": true, \"global_pool\": \"fullpool_avgsum\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"global_pool\": \"fullpool_avgsum\"}",
+    "delta": {
+      "global_pool": "fullpool_avgsum"
+    },
+    "hypothesis": "SAFE finalist: the record with max + mean pooling through ATen max_pool2d / avg_pool2d (Round 32 n=16: +0.11 +- 0.09 pp, -0.12 s); paired n=40 in one container vs the record",
+    "env": {},
+    "config": "futurebiohackers {\"global_pool\": \"fullpool_avgsum\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

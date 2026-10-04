@@ -382,3 +382,8 @@
 {"time": "2026-10-04T02:13:20", "label": "cold4cpu-g2-avgsum @4cpu (gpu-guard miss 10)", "gpu": "NVIDIA A100-SXM4-80GB", "power": "500.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: power limit 500.00 W is not 400 W"}
 {"time": "2026-10-04T02:13:23", "label": "cold4cpu-g2-avgsum @4cpu (gpu-guard miss 11)", "gpu": "NVIDIA A100-SXM4-80GB", "power": "500.00 W", "container_seconds": 0.0, "gpu_minutes": 0.25, "note": "aborted before build: power limit 500.00 W is not 400 W"}
 {"time": "2026-10-04T02:15:01", "label": "cold4cpu-avgsum @4cpu", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 283.4, "gpu_minutes": 4.97, "note": ""}
+{"time": "2026-10-04T02:18:55", "label": "r34/paired40-s0-pool", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 600.6, "gpu_minutes": 10.26, "note": ""}
+{"time": "2026-10-04T02:19:04", "label": "cold4cpu-g2-avgsum @4cpu", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 309.0, "gpu_minutes": 5.4, "note": ""}
+{"time": "2026-10-04T02:19:20", "label": "r34/paired40-s40-stack", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 576.4, "gpu_minutes": 9.86, "note": ""}
+{"time": "2026-10-04T02:20:24", "label": "r34/paired40-s0-stack", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 683.2, "gpu_minutes": 11.64, "note": ""}
+{"time": "2026-10-04T02:21:14", "label": "r34/paired40-s40-pool", "gpu": "NVIDIA A100-SXM4-80GB", "power": "400.00 W", "container_seconds": 694.1, "gpu_minutes": 11.82, "note": ""}

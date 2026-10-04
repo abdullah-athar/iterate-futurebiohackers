@@ -1,0 +1,34 @@
+{
+  "returncode": 0,
+  "wall_seconds": 292.0,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T011008Z-d902b59d",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 40 --params '{\"count_nonfinite\": true, \"epochs\": 10.0, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\"}' --seed 40 --build-timeout 600.0",
+  "spec": {
+    "label": "g2-192-avgsum-e10.0-s40",
+    "n": 40,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "40",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 10.0, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\"}",
+      "--seed",
+      "40",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 10.0, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\"}",
+    "delta": {
+      "g2_pair": "inner192",
+      "global_pool": "fullpool_avgsum",
+      "epochs": 10.0
+    },
+    "hypothesis": "AGGRESSIVE finalist: group 2 pair through 192 + the kernel-based max + mean pooling (Round 32 n=16: -0.06 +- 0.11 pp, -0.24 s); paired n=40 in one container vs the record",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 10.0, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
