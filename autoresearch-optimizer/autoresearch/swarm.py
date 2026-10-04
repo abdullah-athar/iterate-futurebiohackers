@@ -261,6 +261,8 @@ def format_event(r: dict) -> str:
         return f"gen {r['gen']} w{r['worker']:02d} [{r['mode']}] drifted {r['from_family']} -> {r['to_family']} (d={r['distance']})"
     if k == "plan":
         return f"gen {r['gen']} w{r['worker']:02d} plan {r['status']} after {r['attempts']} attempt(s): {r.get('summary', '')[:80]}"
+    if k == "plan_divergence":
+        return f"gen {r['gen']} w{r['worker']:02d} code differs from its plan (d={r['distance']}): plan-only {r['only_plan']}, code-only {r['only_code']}"
     if k == "budget_stop":
         return f"budget stop before gen {r['gen']}: {r['reason']}"
     if k == "holdout":

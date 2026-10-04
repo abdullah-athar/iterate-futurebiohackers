@@ -576,12 +576,55 @@ def test_rejections_count_in_bandit_and_cost():
     print("  accounting: rejected and empty sessions are bandit tries and their cost is counted")
 
 
+def test_plan_first_regenerates_and_hands_back():
+    from autoresearch.loop import LoopConfig, ResearchRun
+    from autoresearch.ledger import RunStore
+    from autoresearch.scheduler import DiversityLayer
+    from autoresearch.swarm import Assignment
+
+    def answer(prompt):
+        refused = "previous plan was refused" in prompt
+        if "mode `new_family`" in prompt:  # always proposes the seed's own family
+            return {"paradigm": "local_search", "mechanisms": ["substitution_moves"], "details": [], "summary": "again",
+                    "change": {"kind": "paradigm", "target": "local_search", "description": "same thing"}}
+        target = "block_moves" if refused else "indel_moves"
+        return {"paradigm": "local_search", "mechanisms": ["substitution_moves", target], "details": [],
+                "summary": f"add {target}", "change": {"kind": "mechanism", "target": target, "description": f"add {target}"}}
+    tmp = tmpdir("plan")
+    try:
+        with patched_describer():
+            cfg = LoopConfig(problem="median_string", descriptors=False, semantic_retry_before_codegen=True,
+                             distance_policy="soft", archive_threshold=0.5, batch_threshold=0.2)
+            run = ResearchRun.create(RunStore(tmp / "run"), cfg, seed_source=world_source("local_search", 10000, 0),
+                                     evaluate=fake_evaluate)
+            layer = DiversityLayer(run)
+            events = []
+            with patched_claude(FakeClaude(answer)) as fake:
+                out = layer.plan([Assignment(0, "tune", [0]), Assignment(1, "tune", [0]), Assignment(2, "new_family", [0])],
+                                 1, __import__("random").Random(0), lambda kind, **d: events.append({"type": kind, **d}))
+        plans = {e["worker"]: e for e in events if e["type"] == "plan"}
+        statuses = sorted((w, p["status"], p["attempts"]) for w, p in plans.items())
+        assert [s[1] for s in statuses] == ["accepted", "accepted", "dropped"], statuses
+        assert sorted(p["attempts"] for w, p in plans.items() if w in (0, 1)) == [1, 2]  # one regenerated once
+        assert plans[2]["attempts"] == 3  # 1 + max_proposal_regenerations, then handed back
+        assert [a.worker for a in out] == [0, 1]  # the dropped task's agent is not run
+        targets = {a.meta["plan_change"]["target"] for a in out}
+        assert targets == {"indel_moves", "block_moves"}, targets
+        usage = [json.loads(l) for l in (run.store.root / "llm_usage.jsonl").read_text().splitlines()]
+        assert sum(1 for u in usage if u["kind"] == "plan") == len(fake.prompts) == 6  # every plan call is paid
+        assert any("too close" in p for p in fake.prompts)  # the feedback names the neighbour
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  plan-first: a repeated plan is regenerated with feedback; a persistent repeat is handed back, not run")
+
+
 TESTS = [test_describe_miss_then_hit, test_describe_cache_invalidation, test_unknown_cost_is_not_zero,
          test_cache_concurrent_processes_and_threads, test_budget_caps_with_calls_in_flight,
          test_vocabulary_synonyms, test_distance_properties, test_entropy_cases, test_family_record_rule,
          test_grace_budget_cap_and_expiry, test_grace_not_renewed_by_renaming, test_reservations_atomic,
          test_world_slow_family_gets_its_refinements, test_controller_moves_budget_on_concentration_and_stagnation,
-         test_all_off_is_the_reference, test_distance_policy_per_mode, test_rejections_count_in_bandit_and_cost]
+         test_all_off_is_the_reference, test_distance_policy_per_mode, test_rejections_count_in_bandit_and_cost,
+         test_plan_first_regenerates_and_hands_back]
 
 if __name__ == "__main__":
     for t in TESTS:

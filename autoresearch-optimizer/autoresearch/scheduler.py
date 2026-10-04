@@ -488,6 +488,12 @@ class DiversityLayer:
                 pf = archive.family_of(parent)
                 u["parent_family"] = pf
                 u["family_change"] = bool(sig and pf and sig.family != pf)
+            if a.meta.get("plan_signature") and sig is not None:  # the code's description is authoritative
+                gap = self.metric.distance(Signature.from_dict(a.meta["plan_signature"]), sig)
+                u["plan_code_distance"] = gap.value
+                if gap.available and gap.value > 0 and emit:
+                    emit("plan_divergence", gen=gen, worker=a.worker, distance=round(gap.value, 4),
+                         only_plan=gap.components.get("only_a"), only_code=gap.components.get("only_b"))
             if cfg.distance_policy == "off":
                 continue
             decision, info = self._decide(a, sig, archive, refs, ref_ids, batch, merges_before)
