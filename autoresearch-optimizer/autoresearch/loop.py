@@ -84,6 +84,37 @@ class LoopConfig:
     describe_model: str = "sonnet"
     # accounting (reference fix, applies to every configuration): every agent session is a bandit try
     bandit_counts_all_attempts: bool = True
+    # ----- diversity extension (autoresearch/scheduler.py); everything off = the reference behaviour -----
+    descriptor_backend: str = "canonical"     # canonical (frozen vocabulary ids) | existing (Johann's descriptors)
+    distance_metric: str = "weighted_jaccard"  # weighted_jaccard | minilm (existing backend only)
+    distance_policy: str = "off"              # off | observe (log only) | soft (+ family landscape, plan retry) | strict
+    family_diagnostics: bool = False          # describe candidates for family stats even with every policy off
+    diverse_parent_selection: bool = False
+    semantic_retry_before_codegen: bool = False
+    entropy_controller: bool = False
+    family_grace: bool = False
+    grace_min_evaluations: int = 2            # first candidate + one refinement
+    grace_max_evaluations: int = 6            # evaluations funded by the new-family budget, at most
+    grace_patience: int = 1                   # funded refinements beyond the minimum even without progress (0 = off)
+    # objective units a family record must improve by to fund one more refinement: just above the largest
+    # re-scoring range measured on the validate split (88 for a time-bounded annealer, 0 for the seed;
+    # scripts/measure_eval_noise.py), so evaluation noise alone never extends a protection
+    grace_epsilon: float = 90.0
+    max_protected_families: int = 2
+    max_proposal_regenerations: int = 2
+    top_k: int = 10
+    allocation_window: int = 50               # recent finished tries for the effort entropy
+    stagnation_generations: int = 2           # generations without a new global best = stagnating
+    family_stagnation_trials: int = 6         # tries since a family's last record = heavily explored without progress
+    concentration_threshold: float = 0.5      # normalised top-k entropy at or below which the top is concentrated
+    concentration_release: float = 0.7
+    explore_boost_fraction: float = 0.25      # share of the agents moved to exploration while concentrated+stagnating
+    max_override_fraction: float = 0.5        # cap on slots changed by grace + controller together
+    parent_quality_margin: float = 0.05       # diverse parents: at most this much worse than the best (relative)
+    max_family_refs: int = 30                 # family representatives compared against (one per family)
+    archive_threshold: float | None = None    # new_family: min distance to family representatives (uncalibrated)
+    batch_threshold: float | None = None      # min distance between proposals of one batch (uncalibrated)
+    drift_threshold_max: float | None = None  # tune: distance to the parent above which a mode drift is logged
 
     def to_dict(self) -> dict:
         return self.__dict__.copy()

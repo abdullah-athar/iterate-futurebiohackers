@@ -20,7 +20,7 @@ import tempfile
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from .budget import run_spend
@@ -37,6 +37,9 @@ class Assignment:
     parent_ids: list[int]
     direction: str = ""
     notes: str = ""  # extra STATUS.md section (exploration-exploitation layer: descriptor contract, research landscape)
+    # diversity scheduler decisions copied into the entry's usage: ucb_mode, override (reason), target_family,
+    # grace_family, focus, parent_reason ... (empty when the scheduler is off)
+    meta: dict = field(default_factory=dict)
 
 
 def allocate(run: ResearchRun, n: int, rng: random.Random) -> list[Assignment]:
@@ -242,6 +245,24 @@ def format_event(r: dict) -> str:
     if k == "descriptor_gate":
         return (f"gen {r['gen']} descriptors: tune {r['tune_kept']} kept, {r['drifted']} drifted to new_family; "
                 f"new_family pool {r['pool']} -> {r['selected']}/{r['slots']} selected (min dist {r['min_dists']})")
+    if k == "schedule":
+        ov = "; ".join(f"w{o['worker']} {o['from']}->{o['to']} ({o['reason']})" for o in r["overrides"] if "worker" in o)
+        ctl = r.get("controller") or {}
+        return (f"gen {r['gen']} schedule: ucb {dict(Counter(r['ucb_modes']))}; overrides: {ov or 'none'}"
+                + (f"; controller {'ON' if ctl.get('active') else 'off'} ({ctl.get('why')})" if ctl else ""))
+    if k == "distance_gate":
+        return (f"gen {r['gen']} distance [{r['policy']}, {r['metric']}]: {r['decisions']}; described {r['described']}, "
+                f"undescribed {r['undescribed']}")
+    if k == "families":
+        top, rec = r["top"], r["recent"]
+        return (f"gen {r['gen']} families: {r['families']} known, new {r['new_families'] or '-'}; top-{top['n']} "
+                f"H={top['H']:.2f} ({top['families']} fam); recent H={rec['H']:.2f} ({rec['families']} fam)")
+    if k == "mode_drift":
+        return f"gen {r['gen']} w{r['worker']:02d} [{r['mode']}] drifted {r['from_family']} -> {r['to_family']} (d={r['distance']})"
+    if k == "plan":
+        return f"gen {r['gen']} w{r['worker']:02d} plan {r['status']} after {r['attempts']} attempt(s): {r.get('summary', '')[:80]}"
+    if k == "budget_stop":
+        return f"budget stop before gen {r['gen']}: {r['reason']}"
     if k == "holdout":
         return f"holdout: seed {r['seed']:g} -> best #{r['best_id']} {r['best']:g} (baseline {r['baseline']:g})"
     if k == "run_end":
@@ -264,9 +285,13 @@ def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propo
         from .exploration_exploitation import ExplorationExploitation
         layer = ExplorationExploitation(run)
         layer.describer.budget = budget
-    describe_s = 60.0 if layer else 0.0
+    div = None
+    from .scheduler import DiversityLayer, needs_families
+    if needs_families(run.config):
+        div = DiversityLayer(run, budget)
+    describe_s = 60.0 if (layer or div) else 0.0
     emit("run_start", agents=agents, budget_s=int(budget_s), turn_s=turn_s,
-         eval=eval_name + (", descriptors" if layer else ""),
+         eval=eval_name + (", descriptors" if layer else "") + (", diversity" if div else ""),
          caps={} if budget is None else {"usd": budget.max_usd, "calls": budget.max_calls, "tokens": budget.max_tokens})
     stop = ""
     while (time.time() - t0 + turn_s + describe_s + eval_s + 30 <= budget_s
@@ -281,6 +306,8 @@ def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propo
         assignments = allocate(run, agents, rng)
         if layer:
             assignments = layer.prepare(assignments, rng)
+        if div:
+            assignments = div.plan(assignments, gen, rng, emit)
         best = run.archive().global_best
         emit("gen_start", gen=gen, mix=", ".join(f"{m} {c}" for m, c in Counter(a.mode for a in assignments).items()),
              best_id=best.id, best=best.objective, assignments=[{**asdict(a), "notes": ""} for a in assignments])
@@ -295,9 +322,12 @@ def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propo
             exact = layer is not None and r["assignment"].mode == "tune"
             r["pre"] = run.precheck(r["source"], extra_prior=arrivals, threshold=1.0 if exact else None)
             arrivals.append((next_id + i, r["source"]))
-        if layer:
+        if layer or div:
             td = time.time()
-            layer.gate(results, gen, emit)
+            if layer:
+                layer.gate(results, gen, emit)
+            if div:
+                div.after_precheck(results, gen, emit)
             describe_s = max(30.0, time.time() - td)
         emit("eval_start", gen=gen, n=len(passed(results)), dup=sum(1 for r in results if r.get("pre") and r["pre"][1].is_duplicate),
              guard=sum(1 for r in results if r.get("pre") and r["pre"][0]), empty=sum(1 for r in results if not r["source"]))
@@ -305,6 +335,8 @@ def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propo
         if budget is not None:
             budget.release_generation()
         proposals += n
+        if div:
+            div.after_generation(gen, emit)
         emit_gen_end(run, gen, tg, emit, **({"vocab": layer.describer.end_generation()} if layer else {}))
         gen += 1
         generations += 1
@@ -343,6 +375,8 @@ def evaluate_and_record(run: ResearchRun, gen: int, results: list[dict], evaluat
     n = 0
     for r in results:
         a, u = r["assignment"], r["usage"]
+        for k, v in a.meta.items():
+            u.setdefault(k, v)
         common = dict(generation=gen, usage=u, elapsed=u.get("seconds", 0.0),
                       prompt_tokens=u.get("prompt_tokens", 0), completion_tokens=u.get("completion_tokens", 0))
         if not r["source"]:  # the session cost money and was a try of its mode: keep it in the ledger

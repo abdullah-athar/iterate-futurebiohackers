@@ -113,10 +113,14 @@ def cmd_swarm(args) -> None:
             deploy()
     store = RunStore(args.run)
     if not store.exists:
-        run = ResearchRun.create(store, LoopConfig(problem=args.problem, time_budget_ms=args.budget_ms,
-                                                   modes=args.modes, exploit=args.exploit,
-                                                   descriptors=not args.no_descriptors,
-                                                   describe_model=args.describe_model))
+        cfg = LoopConfig(problem=args.problem, time_budget_ms=args.budget_ms, modes=args.modes, exploit=args.exploit,
+                         descriptors=not args.no_descriptors, describe_model=args.describe_model,
+                         **{f: getattr(args, f) for f in DIVERSITY_FLAGS if getattr(args, f, None) is not None})
+        from .scheduler import validate_config
+        errs = validate_config(cfg)
+        if errs:
+            sys.exit("invalid configuration: " + "; ".join(errs))
+        run = ResearchRun.create(store, cfg)
         print(f"Initialised run at {store.root}\n" + ResearchRun.describe_entry(run.entries()[0]))
     run = ResearchRun(store)
     emit = swarm.Events(run, time.time())
@@ -163,6 +167,48 @@ def _ablation_args(s) -> None:
     s.add_argument("--exploit", type=float, default=LoopConfig.exploit,
                    help=f"probability the parent is the global best rather than a front member (default {LoopConfig.exploit}; "
                         "1.0 = no per-instance archive)")
+
+
+DIVERSITY_FLAGS = (
+    "descriptor_backend", "distance_metric", "distance_policy", "family_diagnostics", "diverse_parent_selection",
+    "semantic_retry_before_codegen", "entropy_controller", "family_grace", "grace_min_evaluations",
+    "grace_max_evaluations", "grace_patience", "grace_epsilon", "max_protected_families", "max_proposal_regenerations",
+    "top_k", "allocation_window", "stagnation_generations", "explore_boost_fraction", "max_override_fraction",
+    "archive_threshold", "batch_threshold", "drift_threshold_max", "bandit_counts_all_attempts",
+)
+
+
+def _diversity_args(s) -> None:
+    """Diversity extension (autoresearch/scheduler.py), new run only; everything off = the reference."""
+    g = s.add_argument_group("diversity (all off by default; see README)")
+    g.add_argument("--descriptor-backend", dest="descriptor_backend", choices=["canonical", "existing"])
+    g.add_argument("--distance-metric", dest="distance_metric", choices=["weighted_jaccard", "minilm"])
+    g.add_argument("--distance-policy", dest="distance_policy", choices=["off", "observe", "soft", "strict"])
+    g.add_argument("--family-diagnostics", dest="family_diagnostics", action="store_true", default=None,
+                   help="describe candidates for family statistics with every policy off (cost logged as diagnostic)")
+    g.add_argument("--diverse-parents", dest="diverse_parent_selection", action="store_true", default=None)
+    g.add_argument("--plan-first", dest="semantic_retry_before_codegen", action="store_true", default=None,
+                   help="structured plan + distance check + reservation before each agent session (one extra call each)")
+    g.add_argument("--entropy-controller", dest="entropy_controller", action="store_true", default=None)
+    g.add_argument("--family-grace", dest="family_grace", action="store_true", default=None)
+    g.add_argument("--grace-min", dest="grace_min_evaluations", type=int)
+    g.add_argument("--grace-max", dest="grace_max_evaluations", type=int)
+    g.add_argument("--grace-patience", dest="grace_patience", type=int)
+    g.add_argument("--grace-epsilon", dest="grace_epsilon", type=float)
+    g.add_argument("--max-protected", dest="max_protected_families", type=int)
+    g.add_argument("--max-regenerations", dest="max_proposal_regenerations", type=int)
+    g.add_argument("--top-k", dest="top_k", type=int)
+    g.add_argument("--allocation-window", dest="allocation_window", type=int)
+    g.add_argument("--stagnation-generations", dest="stagnation_generations", type=int)
+    g.add_argument("--explore-boost", dest="explore_boost_fraction", type=float)
+    g.add_argument("--max-override", dest="max_override_fraction", type=float)
+    g.add_argument("--archive-threshold", dest="archive_threshold", type=float,
+                   help="calibrated min distance of a new_family proposal to family representatives")
+    g.add_argument("--batch-threshold", dest="batch_threshold", type=float,
+                   help="calibrated min distance between proposals of one batch")
+    g.add_argument("--drift-threshold-max", dest="drift_threshold_max", type=float)
+    g.add_argument("--legacy-bandit-counting", dest="bandit_counts_all_attempts", action="store_false", default=None,
+                   help="do not count duplicates/guard rejections/empty sessions as bandit tries (old behaviour)")
 
 
 def main(argv=None) -> None:
@@ -213,6 +259,7 @@ def main(argv=None) -> None:
     s.add_argument("--max-budget-usd", type=float, help="per-session spend cap passed to claude")
     s.add_argument("--problem", default="median_string", help="problem for a new run")
     _ablation_args(s)
+    _diversity_args(s)
     s.add_argument("--budget-ms", type=int, default=1000, help="CPU ms per instance for a new run")
     s.add_argument("--seed", type=int, default=0)
     s.add_argument("--no-descriptors", action="store_true",
