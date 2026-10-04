@@ -1,0 +1,45 @@
+{
+  "round": "r39",
+  "n": 8,
+  "seed": 0,
+  "control": {
+    "g2_pair": "inner192",
+    "global_pool": "fullpool_avgsum"
+  },
+  "jobs": [
+    {
+      "name": "kaudit-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "contig-batches",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "batch_order": "contiguous"
+          },
+          "hypothesis": "kernel audit (user direction a): the per-step batch gather is an ATen index kernel of ~0.08 ms/step (0.04 s per trial); folding the shuffle into the per-epoch crop gather makes each batch a free slice"
+        },
+        {
+          "label": "contig-batches-r24x0.35",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "batch_order": "contiguous",
+            "resolution_schedule": [
+              [
+                24,
+                0.35
+              ],
+              [
+                28,
+                0.5
+              ]
+            ]
+          },
+          "hypothesis": "contiguous batches stacked with the longer 24 px phase from Round 36 (+0.15 +- 0.09 pp, -0.12 s)"
+        }
+      ]
+    }
+  ]
+}

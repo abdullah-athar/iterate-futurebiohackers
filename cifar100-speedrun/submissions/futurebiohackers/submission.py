@@ -49,6 +49,9 @@ DEFAULTS = {
     # scales with the batch so the per-example decay is unchanged.
     "batch_schedule": [],
     "crop_mode": "indexed",  # one gather per epoch; "masked" is airbench's 25 masked copies
+    # "gather": every step gathers its batch with an index kernel; "contiguous": the epoch's
+    # shuffle is folded into the per-epoch crop gather and each step slices the next batch.
+    "batch_order": "gather",
     "fused_sgd": True,  # one fused CUDA kernel for the SGD step
     "compile_loss": False,
     "hard_fraction": 1.0,  # <1 enables a freshly trained small proxy
@@ -67,6 +70,9 @@ DEFAULTS = {
     "bn_dtype": "half",  # BatchNorm in the network dtype; "float" keeps fp32 BN
     "color_jitter": [0.2, 0.2],  # per-image brightness and contrast ranges
     "inductor_tuning": [],  # e.g. ["coordinate_descent_tuning", "aggressive_fusion"]
+    # Training resolutions whose graphs get the inductor_tuning flags; [] = every graph. [32]
+    # tunes only the second-half graphs and keeps the cold build shorter.
+    "inductor_tuning_resolutions": [],
     "bn_recal_batches": 0,  # re-estimate BN statistics on center crops after training
     "stem": "patch2",  # "patch2": 2x2 whitening at 31x31; "patch4s2": 4x4 stride-2 at 15x15
     "inner_kernels": [3, 3, 3],  # kernel size of conv2/conv3 in each group (1 or 3)
@@ -78,6 +84,9 @@ DEFAULTS = {
     # Group 2's residual pair, the same way: "full" = two 3x3 convs at widths[1]; "inner192" =
     # the 3x3 pair through 192 channels (the residual and the output keep widths[1]).
     "g2_pair": "full",
+    # Group 1's residual pair: "full" = two 3x3 convs at widths[0]; "inner48" / "inner40" = the
+    # 3x3 pair through that many channels (the residual and the output keep widths[0]).
+    "g1_pair": "full",
     # "max" is max(dim).values; adaptive_max_pool2d's backward uses slow atomics and
     # "amax" trains to NaN under torch.compile in torch 2.4. "maxmean_cat" feeds the head the
     # per-channel max and mean concatenated (twice the channels); "maxmean_sum" adds them.
@@ -142,6 +151,7 @@ G3_PAIRS = {
     "inner640": ("inner", 640),
     "bottleneck384": ("bottleneck", 384),
 }
+G1_PAIRS = {"full": None, "inner48": ("inner", 48), "inner40": ("inner", 40)}
 G2_PAIRS = {
     "full": None,
     "inner192": ("inner", 192),
@@ -300,7 +310,7 @@ class Net(nn.Module):
         stem_width = 2 * 3 * patch * patch
         self.whiten = nn.Conv2d(3, stem_width, kernel_size=patch, padding=0, bias=True)
         self.whiten.weight.requires_grad = False
-        pairs = (None, G2_PAIRS[hyp["g2_pair"]], G3_PAIRS[hyp["g3_pair"]])
+        pairs = (G1_PAIRS[hyp["g1_pair"]], G2_PAIRS[hyp["g2_pair"]], G3_PAIRS[hyp["g3_pair"]])
         groups = []
         for index, (c_in, c_out, depth, pool_first, kernel, pool) in enumerate(
             zip(
@@ -515,11 +525,12 @@ def batch_cutout(images, size):
     return images.masked_fill(mask, 0)
 
 
-def indexed_crop(images, crop_size):
-    """One gather per epoch, with the same uniform crop distribution as batch_crop."""
+def indexed_crop(images, crop_size, order=None):
+    """One gather per epoch, with the same uniform crop distribution as batch_crop; `order`
+    (a permutation) writes the crops in that order at no extra cost."""
     n, _, h, w = images.shape
     shifts = torch.randint(0, w - crop_size + 1, (n, 2), device=images.device)
-    batch = torch.arange(n, device=images.device).view(n, 1, 1)
+    batch = (torch.arange(n, device=images.device) if order is None else order).view(n, 1, 1)
     rows = shifts[:, 0, None, None] + torch.arange(crop_size, device=images.device).view(1, -1, 1)
     cols = shifts[:, 1, None, None] + torch.arange(crop_size, device=images.device).view(1, 1, -1)
     return images.permute(0, 2, 3, 1)[batch, rows, cols].permute(0, 3, 1, 2)
@@ -578,6 +589,8 @@ def build(context: BuildContext):
         )
     if hyp["crop_mode"] not in ("masked", "indexed", "triton"):
         raise ValueError("crop_mode must be masked, indexed, or triton")
+    if hyp["batch_order"] not in ("gather", "contiguous"):
+        raise ValueError("batch_order must be gather or contiguous")
     if hyp["epochs"] <= 0 or hyp["batch_size"] <= 0:
         raise ValueError("epochs and batch_size must be positive")
     if not 0 < hyp["hard_fraction"] <= 1 or hyp["proxy_every"] < 1:
@@ -606,6 +619,13 @@ def build(context: BuildContext):
         raise ValueError(f"g2_pair must be one of {sorted(G2_PAIRS)}")
     if hyp["g2_pair"] != "full" and (depths[1] != 3 or hyp["inner_kernels"][1] != 3):
         raise ValueError("g2_pair variants need group 2 at depth 3 with 3x3 inner kernels")
+    if not isinstance(hyp["g1_pair"], str) or hyp["g1_pair"] not in G1_PAIRS:
+        raise ValueError(f"g1_pair must be one of {sorted(G1_PAIRS)}")
+    if hyp["g1_pair"] != "full" and (depths[0] != 3 or hyp["inner_kernels"][0] != 3):
+        raise ValueError("g1_pair variants need group 1 at depth 3 with 3x3 inner kernels")
+    tuned = hyp["inductor_tuning_resolutions"]
+    if not isinstance(tuned, list) or any(r not in (16, 20, 24, 28, 32) for r in tuned):
+        raise ValueError("inductor_tuning_resolutions must list training resolutions (16-32)")
     if hyp["stem"] not in ("patch2", "patch4s2"):
         raise ValueError("stem must be patch2 or patch4s2")
     if any(b <= 0 or not 0 <= f <= 1 for b, f in hyp["batch_schedule"]):
@@ -799,8 +819,12 @@ def build(context: BuildContext):
         batches = sorted({b for b, _ in hyp["batch_schedule"]} | {hyp["batch_size"]})
         resolutions = sorted({r for r, _ in hyp["resolution_schedule"]} | {32})
         skip_warmup = _skip_warmup(hyp)
+        tuned = hyp["inductor_tuning_resolutions"]  # [] = the flags apply to every graph
         for batch in batches:
             for resolution in resolutions:
+                if tuned:  # the flags are read when each (batch, resolution) graph compiles
+                    for flag in hyp["inductor_tuning"]:
+                        setattr(inductor_config, flag, resolution in tuned)
                 state.warmup_batch, state.warmup_resolution = batch, resolution
                 state.warmup_skip = False
                 for _ in range(2):
@@ -815,6 +839,9 @@ def build(context: BuildContext):
                         state.whiten_bias_steps = skip_warmup[batch, resolution]
                         _fit(state, total_steps=6)
         del state.warmup_batch, state.warmup_resolution, state.warmup_skip
+        if tuned:  # the evaluation graphs are not timed: compile them without the tuning
+            for flag in hyp["inductor_tuning"]:
+                setattr(inductor_config, flag, False)
         state.classifier.eval()
         with torch.inference_mode():
             for size in (context.eval_batch_size, 10_000 % context.eval_batch_size, 1):
@@ -1058,6 +1085,8 @@ def _fit(state, total_steps, proxy_only=False):
         images = None
         current_view = None
         order = torch.randperm(len(labels), device=labels.device)
+        contiguous = hyp["batch_order"] == "contiguous"
+        epoch_labels = labels[order] if contiguous else labels
         for i in range(steps_per_epoch):
             if seen >= total_examples:
                 break
@@ -1070,6 +1099,7 @@ def _fit(state, total_steps, proxy_only=False):
             augment = progress < aug_until
             if (resolution, augment) != current_view:
                 source = state.small_images[resolution] if resolution < 32 else state.images
+                shuffled = False  # whether `order` is already folded into `images`
                 if not augment:
                     # The finish: center crops, mirrored on odd epochs like everything else.
                     images = center_crop(source, resolution, hyp)
@@ -1078,6 +1108,9 @@ def _fit(state, total_steps, proxy_only=False):
                 else:
                     if state.crop_kernel is not None:
                         images = state.crop_kernel(source, resolution, flip=epoch % 2 == 1)
+                    elif contiguous and hyp["translate"] and hyp["crop_mode"] == "indexed":
+                        images = indexed_crop(source, resolution, order)
+                        shuffled = True
                     else:
                         crop = batch_crop if hyp["crop_mode"] == "masked" else indexed_crop
                         images = crop(source, resolution) if hyp["translate"] else source
@@ -1087,9 +1120,16 @@ def _fit(state, total_steps, proxy_only=False):
                         images = batch_cutout(images, hyp["cutout"])
                     if any(hyp["color_jitter"]):
                         images = color_jitter(images, *hyp["color_jitter"])
+                if contiguous and not shuffled:
+                    images = images[order]
                 current_view = (resolution, augment)
-            idx = order[i * batch_size : (i + 1) * batch_size]
-            inputs, targets = images[idx], labels[idx]
+            if contiguous:
+                low = i * batch_size
+                inputs = images[low : low + batch_size]
+                targets = epoch_labels[low : low + batch_size]
+            else:
+                idx = order[i * batch_size : (i + 1) * batch_size]
+                inputs, targets = images[idx], labels[idx]
             offline_main = (
                 state.proxy is not None
                 and hyp["proxy_mode"] == "offline"

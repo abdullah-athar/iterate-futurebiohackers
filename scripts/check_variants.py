@@ -136,6 +136,14 @@ OWN_SWITCHES = {
         "muon_momentum": 0.6,
     },
     "fullpool": {"global_pool": "fullpool"},
+    "batch_order_contiguous": {"batch_order": "contiguous"},
+    # group 1 residual pair through 48 / 40; inductor flags restricted to the 32 px graphs
+    "g1_pair_inner48": {"g1_pair": "inner48"},
+    "g1_pair_inner40_g2_192": {"g1_pair": "inner40", "g2_pair": "inner192"},
+    "cdt_32px_only": {
+        "inductor_tuning": ["coordinate_descent_tuning"],
+        "inductor_tuning_resolutions": [32],
+    },
     "fullpool_sum": {"global_pool": "fullpool_sum"},
     "fullpool_avgsum": {"global_pool": "fullpool_avgsum"},
     # cheaper residual pair in group 3 (residual and output stay at widths[2])
@@ -1054,6 +1062,21 @@ def main() -> int:
     )
 
     # 7. Combinations build must reject.
+    # g1_pair: group 1's conv2 / conv3 go through the inner width, residual and output stay at w1.
+    for name, run in runs.items():
+        hyp, net = run.state.hyp, run.state.net
+        if hyp["g1_pair"] != "full":
+            inner = int(hyp["g1_pair"][5:])
+            g1 = net.layers[0]
+            check(
+                f"{name}: group 1 pair conv2 {hyp['widths'][0]}->{inner}, conv3 {inner}->{hyp['widths'][0]}, "
+                "BatchNorm widths match",
+                tuple(g1.conv2.weight.shape[:2]) == (inner, hyp["widths"][0])
+                and tuple(g1.conv3.weight.shape[:2]) == (hyp["widths"][0], inner)
+                and g1.norm2.num_features == inner
+                and g1.norm3.num_features == hyp["widths"][0],
+            )
+
     # devin/ ports: muon_airbench (filters on Muon, the rest on SGD) and fullpool (== max).
     for name, run in runs.items():
         hyp, net = run.state.hyp, run.state.net
@@ -1111,6 +1134,13 @@ def main() -> int:
             "muon_ns_steps": 0,
         },
         "global_pool fullpool2 (unknown)": {"global_pool": "fullpool2"},
+        "batch_order shuffled (unknown)": {"batch_order": "shuffled"},
+        "g1_pair inner32 (unknown variant)": {"g1_pair": "inner32"},
+        "g1_pair inner48 with group 1 at depth 2": {"g1_pair": "inner48", "depths": [2, 3, 3]},
+        "inductor_tuning_resolutions [48] (no such resolution)": {
+            "inductor_tuning": ["coordinate_descent_tuning"],
+            "inductor_tuning_resolutions": [48],
+        },
         "optimizer muon_airbench with muon_groups [] (empty)": {
             "optimizer": "muon_airbench",
             "muon_groups": [],

@@ -1,0 +1,48 @@
+{
+  "round": "r38",
+  "n": 8,
+  "seed": 0,
+  "control": {
+    "g2_pair": "inner192",
+    "global_pool": "fullpool_avgsum"
+  },
+  "jobs": [
+    {
+      "name": "cdt-32",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "cdt-32px-only",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "inductor_tuning": [
+              "coordinate_descent_tuning"
+            ],
+            "inductor_tuning_resolutions": [
+              32
+            ]
+          },
+          "hypothesis": "coordinate-descent autotuning (user direction e): only the 32 px training graphs are tuned (second half of training); 4-CPU build measured separately"
+        }
+      ]
+    },
+    {
+      "name": "cdt-all",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "cdt-all",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "inductor_tuning": [
+              "coordinate_descent_tuning"
+            ]
+          },
+          "hypothesis": "coordinate-descent autotuning (user direction e): every graph tuned (Round 25 on PR #23's recipe: -0.09 s but a 523 s 4-CPU build): same-recipe reference"
+        }
+      ]
+    }
+  ]
+}

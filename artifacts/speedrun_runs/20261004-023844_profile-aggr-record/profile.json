@@ -1,0 +1,222 @@
+{
+  "params": {
+    "g2_pair": "inner192",
+    "global_pool": "fullpool_avgsum"
+  },
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "eager": false,
+  "build_s": 338.59,
+  "prepare_s": 0.1143,
+  "prepare_pieces_s": {
+    "reset": 0.0026,
+    "h2d_normalize": 0.0403,
+    "whitening_init": 0.0019,
+    "flip": 0.0016,
+    "downsample_24px_matmul_pad": 0.0032,
+    "downsample_28px_matmul_pad": 0.0037,
+    "pad_32px": 0.0026,
+    "ema_copy": 0.0001
+  },
+  "per_epoch_augmentation_s": {
+    "24px_crop_flip_jitter": 0.0035,
+    "28px_crop_flip_jitter": 0.0045,
+    "32px_crop_flip_jitter": 0.0061,
+    "randperm": 0.00025
+  },
+  "epochs": 10.0,
+  "total_steps": 480,
+  "train_wall_s": 4.163,
+  "gpu_busy_s": 4.126,
+  "gpu_busy_fraction": 0.991,
+  "idle_s": 0.037,
+  "idle_per_step_ms": 0.076,
+  "idle_gaps": {
+    ">=50us": {
+      "count": 8,
+      "total_ms": 0.84
+    },
+    ">=200us": {
+      "count": 0,
+      "total_ms": 0.0
+    },
+    ">=1000us": {
+      "count": 0,
+      "total_ms": 0.0
+    }
+  },
+  "largest_gaps_ms_at_s": [
+    [
+      0.182,
+      0.005
+    ],
+    [
+      0.176,
+      0.004
+    ],
+    [
+      0.14,
+      0.004
+    ],
+    [
+      0.075,
+      0.004
+    ],
+    [
+      0.07,
+      0.004
+    ],
+    [
+      0.069,
+      0.004
+    ],
+    [
+      0.065,
+      0.004
+    ],
+    [
+      0.06,
+      0.004
+    ]
+  ],
+  "cuda_kernel_events": 85642,
+  "host_syncs": {
+    "cudaStreamSynchronize": 0,
+    "cudaDeviceSynchronize": 2,
+    "cudaEventSynchronize": 0,
+    "aten::item/_local_scalar_dense": 0
+  },
+  "memcpy_dtoh_events": 0,
+  "cpu_op_events_per_step": 354.1,
+  "top_kernels": [
+    {
+      "name": "void cutlass__5x_cudnn::Kernel<cutlass_tensorop_f16_s16816fprop_optimized_f16_128x128_32x3",
+      "calls": 2160,
+      "device_ms": 642.5,
+      "share_of_busy": 0.156
+    },
+    {
+      "name": "_ZN17cutlass__5x_cudnn6KernelINS_4conv6kernel23ImplicitGemmConvolutionINS1_11threadblock22",
+      "calls": 2160,
+      "device_ms": 642.2,
+      "share_of_busy": 0.156
+    },
+    {
+      "name": "void cutlass__5x_cudnn::Kernel<cutlass_tensorop_f16_s16816dgrad_optimized_f16_128x128_32x4",
+      "calls": 1680,
+      "device_ms": 525.4,
+      "share_of_busy": 0.127
+    },
+    {
+      "name": "sm80_xmma_dgrad_implicit_gemm_f16f16_f16f32_f32_nhwckrsc_nhwc_tilesize256x64x32_stage3_war",
+      "calls": 1800,
+      "device_ms": 296.3,
+      "share_of_busy": 0.072
+    },
+    {
+      "name": "sm80_xmma_fprop_implicit_gemm_f16f16_f16f32_f32_nhwckrsc_nhwc_tilesize256x64x32_stage3_war",
+      "calls": 1320,
+      "device_ms": 162.9,
+      "share_of_busy": 0.039
+    },
+    {
+      "name": "sm80_xmma_wgrad_implicit_gemm_indexed_f16f16_f16f32_f32_nhwckrsc_nhwc_tilesize128x128x32_s",
+      "calls": 600,
+      "device_ms": 127.8,
+      "share_of_busy": 0.031
+    },
+    {
+      "name": "sm80_xmma_wgrad_implicit_gemm_indexed_f16f16_f16f32_f32_nhwckrsc_nhwc_tilesize64x64x64_sta",
+      "calls": 960,
+      "device_ms": 104.3,
+      "share_of_busy": 0.025
+    },
+    {
+      "name": "void cutlass__5x_cudnn::Kernel<cutlass_tensorop_f16_s16816fprop_optimized_f16_256x64_32x4_",
+      "calls": 480,
+      "device_ms": 103.6,
+      "share_of_busy": 0.025
+    },
+    {
+      "name": "_ZN17cutlass__5x_cudnn6KernelINS_4conv6kernel23ImplicitGemmConvolutionINS1_11threadblock22",
+      "calls": 480,
+      "device_ms": 95.9,
+      "share_of_busy": 0.023
+    },
+    {
+      "name": "triton_poi_fused__native_batch_norm_legit_functional_max_pool2d_with_indices_max_pool2d_wi",
+      "calls": 480,
+      "device_ms": 57.7,
+      "share_of_busy": 0.014
+    },
+    {
+      "name": "triton_poi_fused__native_batch_norm_legit_functional_max_pool2d_with_indices_max_pool2d_wi",
+      "calls": 480,
+      "device_ms": 53.5,
+      "share_of_busy": 0.013
+    },
+    {
+      "name": "Optimizer.step#SGD.step",
+      "calls": 480,
+      "device_ms": 41.7,
+      "share_of_busy": 0.01
+    },
+    {
+      "name": "void at::native::(anonymous namespace)::multi_tensor_apply_kernel<at::native::(anonymous n",
+      "calls": 960,
+      "device_ms": 41.2,
+      "share_of_busy": 0.01
+    },
+    {
+      "name": "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native:",
+      "calls": 491,
+      "device_ms": 40.5,
+      "share_of_busy": 0.01
+    },
+    {
+      "name": "triton_poi_fused__native_batch_norm_legit_functional_add_gelu_gelu_backward_39",
+      "calls": 480,
+      "device_ms": 40.3,
+      "share_of_busy": 0.01
+    }
+  ],
+  "conv_backend_ms": {
+    "cudnn_or_xmma": 3657.6000000000004,
+    "triton_conv_templates": 178.2,
+    "implicit_gemm_other": 794.3
+  },
+  "bn_gelu_fusion": {
+    "fused_bn_gelu_kernels": 41,
+    "fused_calls_per_step": 47.0,
+    "bn_without_gelu_kernels": 23,
+    "bn_without_gelu_calls_per_step": 31.0,
+    "gelu_without_bn_kernels": 4,
+    "gelu_without_bn_calls_per_step": 2.6,
+    "examples": [
+      "triton_poi_fused__native_batch_norm_legit_functional_gelu_5",
+      "triton_poi_fused__native_batch_norm_legit_functional_add_gelu_6",
+      "triton_poi_fused__native_batch_norm_legit_functional_gelu_11",
+      "triton_red_fused__native_batch_norm_legit_functional_2",
+      "triton_red_fused__native_batch_norm_legit_functional_3",
+      "triton_per_fused__native_batch_norm_legit_functional__to_copy_4",
+      "triton_poi_fused_convolution_gelu_0",
+      "triton_poi_fused_gelu_gelu_backward_max_pool2d_with_indices_max_pool2d_with_indi",
+      "triton_red_fused_convolution_backward_gelu_gelu_backward_43"
+    ]
+  },
+  "kernels_per_step": 178.4,
+  "environment": {
+    "task_id": "ta-01M428MY944Y2MB71BSBG6H0ER",
+    "hostname": "modal",
+    "region": "us-central",
+    "cloud": "CLOUD_PROVIDER_GCP",
+    "cpu_count": 20,
+    "affinity_cpus": 20,
+    "cgroup_cpu_max": "20000000",
+    "compile_threads_env": null,
+    "gpu_name": "NVIDIA A100-SXM4-80GB",
+    "gpu_memory": "81920 MiB",
+    "gpu_power_limit": "400.00 W",
+    "driver": "580.95.05",
+    "mig": "Disabled"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "round": "r37",
+  "n": 8,
+  "seed": 0,
+  "control": {
+    "g2_pair": "inner192",
+    "global_pool": "fullpool_avgsum"
+  },
+  "jobs": [
+    {
+      "name": "g1-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "g1-48-e10.0",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "g1_pair": "inner48"
+          },
+          "hypothesis": "group 1 residual pair narrowed on the AGGRESSIVE record (user direction b): group 1 runs at 31x31 / 15x15 where each channel is expensive and cuDNN efficiency is low; 64 -> 48 -> 64 at 10 ep"
+        },
+        {
+          "label": "g1-48-e9.75",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "g1_pair": "inner48",
+            "epochs": 9.75
+          },
+          "hypothesis": "group 1 residual pair narrowed on the AGGRESSIVE record (user direction b): group 1 runs at 31x31 / 15x15 where each channel is expensive and cuDNN efficiency is low; 64 -> 48 -> 64, quarter epoch less"
+        }
+      ]
+    },
+    {
+      "name": "g1-b",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "g1-40-e10.0",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "g1_pair": "inner40"
+          },
+          "hypothesis": "group 1 residual pair narrowed on the AGGRESSIVE record (user direction b): group 1 runs at 31x31 / 15x15 where each channel is expensive and cuDNN efficiency is low; 64 -> 40 -> 64 at 10 ep"
+        },
+        {
+          "label": "g1-40-e10.25",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "g1_pair": "inner40",
+            "epochs": 10.25
+          },
+          "hypothesis": "group 1 residual pair narrowed on the AGGRESSIVE record (user direction b): group 1 runs at 31x31 / 15x15 where each channel is expensive and cuDNN efficiency is low; 64 -> 40 -> 64, quarter epoch more"
+        }
+      ]
+    }
+  ]
+}

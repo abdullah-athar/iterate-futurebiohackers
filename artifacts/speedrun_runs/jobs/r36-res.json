@@ -1,0 +1,168 @@
+{
+  "round": "r36",
+  "n": 8,
+  "seed": 0,
+  "control": {
+    "g2_pair": "inner192",
+    "global_pool": "fullpool_avgsum"
+  },
+  "jobs": [
+    {
+      "name": "res-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "e9.75",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "epochs": 9.75
+          },
+          "hypothesis": "resolution schedule / epochs re-tuned on the AGGRESSIVE record (user direction d): epoch ladder down (k calibration on the new record)"
+        },
+        {
+          "label": "e10.25",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "epochs": 10.25
+          },
+          "hypothesis": "resolution schedule / epochs re-tuned on the AGGRESSIVE record (user direction d): epoch ladder up"
+        }
+      ]
+    },
+    {
+      "name": "res-b",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "r24x0.35-e10.0",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "resolution_schedule": [
+              [
+                24,
+                0.35
+              ],
+              [
+                28,
+                0.5
+              ]
+            ]
+          },
+          "hypothesis": "resolution schedule / epochs re-tuned on the AGGRESSIVE record (user direction d): longer 24 px phase (35% instead of 25%)"
+        },
+        {
+          "label": "r24x0.35-e10.25",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "resolution_schedule": [
+              [
+                24,
+                0.35
+              ],
+              [
+                28,
+                0.5
+              ]
+            ],
+            "epochs": 10.25
+          },
+          "hypothesis": "resolution schedule / epochs re-tuned on the AGGRESSIVE record (user direction d): longer 24 px phase, quarter epoch more"
+        }
+      ]
+    },
+    {
+      "name": "res-c",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "r28x0.6-e10.0",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "resolution_schedule": [
+              [
+                24,
+                0.25
+              ],
+              [
+                28,
+                0.6
+              ]
+            ]
+          },
+          "hypothesis": "resolution schedule / epochs re-tuned on the AGGRESSIVE record (user direction d): longer 28 px phase (to 60%)"
+        },
+        {
+          "label": "r28x0.6-e10.25",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "resolution_schedule": [
+              [
+                24,
+                0.25
+              ],
+              [
+                28,
+                0.6
+              ]
+            ],
+            "epochs": 10.25
+          },
+          "hypothesis": "resolution schedule / epochs re-tuned on the AGGRESSIVE record (user direction d): longer 28 px phase, quarter epoch more"
+        }
+      ]
+    },
+    {
+      "name": "res-d",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "r20-24-28-e10.0",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "resolution_schedule": [
+              [
+                20,
+                0.15
+              ],
+              [
+                24,
+                0.3
+              ],
+              [
+                28,
+                0.5
+              ]
+            ]
+          },
+          "hypothesis": "resolution schedule / epochs re-tuned on the AGGRESSIVE record (user direction d): 20 px start (adds a 4th resolution = 2 more graphs: 4-CPU build must be measured if it wins)"
+        },
+        {
+          "label": "r20x0.25-28-e10.25",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "resolution_schedule": [
+              [
+                20,
+                0.25
+              ],
+              [
+                28,
+                0.5
+              ]
+            ],
+            "epochs": 10.25
+          },
+          "hypothesis": "resolution schedule / epochs re-tuned on the AGGRESSIVE record (user direction d): 20 px instead of 24 px for the first quarter, quarter epoch more (same graph count)"
+        }
+      ]
+    }
+  ]
+}

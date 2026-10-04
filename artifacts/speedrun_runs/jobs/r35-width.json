@@ -1,0 +1,111 @@
+{
+  "round": "r35",
+  "n": 8,
+  "seed": 0,
+  "control": {
+    "g2_pair": "inner192",
+    "global_pool": "fullpool_avgsum"
+  },
+  "jobs": [
+    {
+      "name": "width-a",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "w896-e10.0",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "widths": [
+              64,
+              256,
+              896
+            ]
+          },
+          "hypothesis": "width rebalance with narrow pairs on the AGGRESSIVE record (user direction c): group 3 at 896 (pair still through 512): more accuracy for more time; ladder tells the exchange"
+        },
+        {
+          "label": "w896-e9.5",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "widths": [
+              64,
+              256,
+              896
+            ],
+            "epochs": 9.5
+          },
+          "hypothesis": "width rebalance with narrow pairs on the AGGRESSIVE record (user direction c): group 3 at 896, half an epoch less"
+        }
+      ]
+    },
+    {
+      "name": "width-b",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "w896-e9.0",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "widths": [
+              64,
+              256,
+              896
+            ],
+            "epochs": 9.0
+          },
+          "hypothesis": "width rebalance with narrow pairs on the AGGRESSIVE record (user direction c): group 3 at 896, one epoch less"
+        },
+        {
+          "label": "w288-e10.0",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "widths": [
+              64,
+              288,
+              768
+            ]
+          },
+          "hypothesis": "width rebalance with narrow pairs on the AGGRESSIVE record (user direction c): group 2 at 288 (pair through 192)"
+        }
+      ]
+    },
+    {
+      "name": "width-c",
+      "control_index": 1,
+      "variants": [
+        {
+          "label": "w288-e9.5",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "widths": [
+              64,
+              288,
+              768
+            ],
+            "epochs": 9.5
+          },
+          "hypothesis": "width rebalance with narrow pairs on the AGGRESSIVE record (user direction c): group 2 at 288, half an epoch less"
+        },
+        {
+          "label": "w288-g896-e9.5",
+          "params": {
+            "g2_pair": "inner192",
+            "global_pool": "fullpool_avgsum",
+            "widths": [
+              64,
+              288,
+              896
+            ],
+            "epochs": 9.5
+          },
+          "hypothesis": "width rebalance with narrow pairs on the AGGRESSIVE record (user direction c): both wider, half an epoch less"
+        }
+      ]
+    }
+  ]
+}

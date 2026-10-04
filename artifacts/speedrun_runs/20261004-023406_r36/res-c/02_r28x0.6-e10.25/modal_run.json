@@ -1,0 +1,44 @@
+{
+  "returncode": 0,
+  "wall_seconds": 78.7,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T013933Z-cb5f56fa",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 10.25, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"resolution_schedule\": [[24, 0.25], [28, 0.6]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "r28x0.6-e10.25",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 10.25, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"resolution_schedule\": [[24, 0.25], [28, 0.6]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 10.25, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"resolution_schedule\": [[24, 0.25], [28, 0.6]]}",
+    "delta": {
+      "g2_pair": "inner192",
+      "global_pool": "fullpool_avgsum",
+      "resolution_schedule": [
+        [
+          24,
+          0.25
+        ],
+        [
+          28,
+          0.6
+        ]
+      ],
+      "epochs": 10.25
+    },
+    "hypothesis": "resolution schedule / epochs re-tuned on the AGGRESSIVE record (user direction d): longer 28 px phase, quarter epoch more",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 10.25, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"resolution_schedule\": [[24, 0.25], [28, 0.6]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

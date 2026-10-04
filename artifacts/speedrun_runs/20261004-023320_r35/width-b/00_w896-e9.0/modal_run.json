@@ -1,0 +1,39 @@
+{
+  "returncode": 1,
+  "wall_seconds": 216.7,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T013357Z-a0180915",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"epochs\": 9.0, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"widths\": [64, 256, 896]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "w896-e9.0",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"epochs\": 9.0, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"widths\": [64, 256, 896]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"epochs\": 9.0, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"widths\": [64, 256, 896]}",
+    "delta": {
+      "g2_pair": "inner192",
+      "global_pool": "fullpool_avgsum",
+      "widths": [
+        64,
+        256,
+        896
+      ],
+      "epochs": 9.0
+    },
+    "hypothesis": "width rebalance with narrow pairs on the AGGRESSIVE record (user direction c): group 3 at 896, one epoch less",
+    "env": {},
+    "config": "futurebiohackers {\"epochs\": 9.0, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"widths\": [64, 256, 896]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

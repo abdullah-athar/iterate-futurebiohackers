@@ -1,6 +1,6 @@
 # Speedrun plan and state
 
-Written 4 Oct 2026, 02:20 London, before a context compaction. Source of truth for the pending
+Written 4 Oct 2026, 02:20 London, before a context compaction; updated 02:55 London (PRs #25 / #26 open). Source of truth for the pending
 plan; numbers in `LOG.md` (narrative + one row per GPU run), `registry.jsonl`, `leaderboard.md`.
 The machine clock is London time (Git Bash `date` prints "GMT" but shows local time).
 
@@ -14,10 +14,12 @@ The machine clock is London time (Git Bash `date` prints "GMT" but shows local t
 
 ## Records, tracks, floors (SXM 400 W, official 75% target, n=40 on seeds 0-39 AND 40-79, zero
 ## non-finite losses, all trials complete, real 4-CPU cold build < 400 s)
-- SAFE track: mean >= 75.15% on both seed sets. Record = PR #23 (candidate B + g3 pair 512 + 10 ep):
-  75.19% / 75.25%, 4.56 / 4.49 s standalone (4.46 s in the Round 31/34 containers), 4-CPU build 268 s.
-- AGGRESSIVE track: mean >= 75.10% on both. Record = PR #24 (PR #23 + g2 pair 192 + maxmean_sum,
-  10 ep): 75.13% / 75.20%, 4.34 / 4.33 s paired (-0.12 / -0.14 s vs #23), 4-CPU build 280 s.
+- SAFE track: mean >= 75.15% on both seed sets. Record = PR #25 (PR #23 recipe + max + mean pooling
+  written as F.max_pool2d / F.avg_pool2d, lowered by torch.compile to pointwise kernels): 75.24% / 75.31%,
+  4.33 / 4.23 s paired (-0.13 s vs PR #23 on both seed sets), 4-CPU build 263 s.
+- AGGRESSIVE track: mean >= 75.10% on both. Record = PR #26 (PR #24 recipe = g2 pair 192 + that pooling):
+  75.16% / 75.19%, 4.23 / 4.15 s paired (-0.26 / -0.27 s vs PR #23, -0.13 s vs PR #24), 4-CPU build 289 s;
+  SAFE floor met by only +0.01 / +0.04 (not sold as safe). Previous: PR #23 (SAFE), PR #24 (AGGRESSIVE).
 - Cushions at n=16: ~75.20 SAFE, ~75.15 AGGRESSIVE. Exchange rate k ~= 1.05 pp/s (linear, 8.5-10.5 ep).
 - RECORD RULE: a recipe that sets a new record on either track -> stop, tell the user at once with
   the PR draft ready (title "Speed up CIFAR-100 with <change> (<track>, >= floor%): -X s vs PR #N at
@@ -30,45 +32,38 @@ The machine clock is London time (Git Bash `date` prints "GMT" but shows local t
   the changes of #22 and #23 (not merged yet) ..."; no personal names (refer to PR numbers); run the
   3-lens adversarial review workflow first and relay findings.
 - Open PRs, all targeting main, unmerged (main at c4438c4): #21 safety 9.5 ep (75.28 / 75.32, 4.96 s),
-  #22 candidate B (24/28 px, 9.5 ep), #23 SAFE record, #24 AGGRESSIVE record. Drafts (gitignored):
+  #22 candidate B (24/28 px, 9.5 ep), #23 (ex SAFE record), #24 (ex AGGRESSIVE record), #25 SAFE record,
+  #26 AGGRESSIVE record. Drafts (gitignored):
   `artifacts/pr_drafts/`.
 - Working recipe (`crossary`) defaults = PR #23 recipe (control `{}` is the record); every extra
   switch default-off; `scripts/check_variants.py` compares against `origin/speedrun-g3-512-10ep`
   (211/211 at c35bb25). Judging note for every result: "A100 SXM 400 W"; official judging is on an
   A100 80GB PCIe (times ~8% higher).
 
-## Round 34 RESULTS (02:21 London) and NEXT STEPS (first thing after compaction)
-Both finalists passed (details in LOG.md "Round 34"): SAFE candidate `{"global_pool": "fullpool_avgsum"}`
-75.24% / 75.31% at -0.13 / -0.13 s vs PR #23 (+0.03 / +0.09 pp), 4-CPU build 263 s; AGGRESSIVE
-candidate `{"g2_pair": "inner192", "global_pool": "fullpool_avgsum", "epochs": 10.0}` 75.16% / 75.19% at
--0.26 / -0.27 s (-0.05 / -0.02 pp), 4-CPU build 289 s (also meets the SAFE floor by only +0.01 / +0.04).
-0 non-finite in all 320 trials. Both are records (SAFE and AGGRESSIVE). The record rule applies: the
-user was told at 02:25 London and asked "Open these PRs?"; NOTHING may be pushed or opened without a
-yes in chat.
-Next steps, in order:
-1. Prepare PR branch A (SAFE): worktree off `origin/speedrun-g3-512-10ep` (PR #23), e.g.
-   `C:/dev/iterate-fb-kpool`, branch `speedrun-kernel-pool-10ep`: in the Net forward replace the plain
-   max pooling by `x4 = x.flatten(2).unsqueeze(-1)` (view [N, C, HW, 1]), `kernel = (HW, 1)`,
-   `(F.max_pool2d(x4, kernel) + F.avg_pool2d(x4, kernel)).flatten(1)`; keep the structure of PR #23's
-   file (a `global_pool` option "fullpool_avgsum" as the default, validation list extended); README:
-   model paragraph (max + mean head input), implementation bullet (pooling kernels instead of
-   Inductor's max(dim) reduction: -0.13 s), results table with the paired rows, build 263 s,
-   experiments table rows (fullpool -0.14 s / 0 pp; fullpool_sum -0.07 s; maxmean_sum via the
-   compiled reduction 0 s). Title above; body per the PR #24 template (independence line, track and
-   margins +0.09 / +0.16, paired numbers, failure risk well under 0.1% (mean 75.27% over 80 trials),
-   build, test plan).
-2. Prepare PR branch B (AGGRESSIVE): worktree off PR #24's branch `speedrun-g2-192-maxmean-10ep`
-   (e.g. `C:/dev/iterate-fb-kstack`, branch `speedrun-g2-192-kernel-pool-10ep`): change the pooling
-   implementation to the kernel version (default "fullpool_avgsum"), README numbers (75.16 / 75.19,
-   4.23 / 4.15 s, -0.26 / -0.27 s, build 289 s; margins +0.06 / +0.09 aggressive, +0.01 / +0.04 safe
-   stated honestly as too thin), independence line mentioning #22, #23 and #24.
-3. For each branch: CPU smoke, ruff, crossary `scripts/check_reset.py` against the folder, `git diff
-   --stat` (folder only), adversarial review workflow (wiring / rules / docs + refutation), relay
-   findings, then open ONLY on the user's yes (API as for PR #24), update LOG/PLAN/memory.
-4. Working recipe (crossary) defaults stay = PR #23 until the user says otherwise (check_variants
-   reference `origin/speedrun-g3-512-10ep`). If the user wants the baseline moved to the new records,
-   change DEFAULTS, REFERENCE_REF and the launcher's MEASURED_4CPU_BUILDS/graph defaults together.
-5. Then: Muon CUDA-graph track if approved; otherwise remaining ideas need the user's go.
+## Exploration round on the AGGRESSIVE record (user's directions a-f, started 02:35 London)
+Control for every screen: `{"g2_pair": "inner192", "global_pool": "fullpool_avgsum"}` (= PR #26, 10 ep),
+paired n=8, dtime_adj at k 1.05. The working recipe's DEFAULTS are still PR #23's (check_variants
+reference origin/speedrun-g3-512-10ep); moving them to PR #26's recipe (and the reference to
+origin/speedrun-g2-192-kernel-pool-10ep, MEASURED_4CPU_BUILDS + 263/289) is pending until the Muon
+diff is merged, to avoid conflicts.
+- (a) kernel audit: profile of the record (artifacts/speedrun_runs/*_profile-aggr-record): GPU busy
+  99.1%, convs ~75%, Inductor BN+GELU pointwise ~20%, fused SGD 0.09 ms/step, per-step batch gather
+  0.08 ms/step. Swap under test: `batch_order: "contiguous"` (Round 39, with and without the longer
+  24 px phase). No other compiled-vs-ATen swap candidate found (BN/GELU already fused; the pooling
+  speedup is pointwise-vs-reduction lowering inside Inductor).
+- (b) group 1 pair 48 / 40 (Round 37): no gain (closed).
+- (c) widths 896 / 288 (Round 35): all slower (closed).
+- (d) resolution / epochs (Round 36): epochs on the line; 24 px phase to 35% +0.15 +- 0.09 pp / -0.12 s at
+  10 ep (adj -0.27) but +0.03 / -0.01 s at 10.25 ep -> candidate for n=16 (stacked in Round 39); 28 px to
+  60% neutral; 20 px start -0.05 / -0.12 s with two extra graphs (adj -0.08), 20 instead of 24 neutral.
+- (e) coordinate descent on the 32 px graphs only (Round 38): +0.00 s (no gain); cdt-all reference and
+  the cdt32 4-CPU build pending.
+- (f) Muon acceleration: an agent is implementing `muon_impl: "batched"` (batched Newton-Schulz per
+  weight shape + torch.compile) in an isolated worktree with a CPU equivalence check; its diff lands in
+  the scratchpad (muon_batched.diff) -> apply, smoke, check_variants, screen lr 0.24 / ns 3 / 7.5-8.5 ep
+  vs the record (and muon_groups [2]); 4-CPU build if it wins.
+- Next finalist candidates: 24 px phase to 35% (+ contiguous batches) -> n=16 paired, then n=40 both
+  seed sets, 4-CPU build, record rule.
 
 ## Round 34 setup (for reference)
 Jobs `jobs/r34-paired40-s0.json` and `-s40.json`, paired n=40 vs the record in one container per

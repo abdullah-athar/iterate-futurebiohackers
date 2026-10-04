@@ -1,0 +1,47 @@
+{
+  "returncode": 0,
+  "wall_seconds": 211.7,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T014035Z-44af1c4d",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"resolution_schedule\": [[20, 0.15], [24, 0.3], [28, 0.5]]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "r20-24-28-e10.0",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"resolution_schedule\": [[20, 0.15], [24, 0.3], [28, 0.5]]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"resolution_schedule\": [[20, 0.15], [24, 0.3], [28, 0.5]]}",
+    "delta": {
+      "g2_pair": "inner192",
+      "global_pool": "fullpool_avgsum",
+      "resolution_schedule": [
+        [
+          20,
+          0.15
+        ],
+        [
+          24,
+          0.3
+        ],
+        [
+          28,
+          0.5
+        ]
+      ]
+    },
+    "hypothesis": "resolution schedule / epochs re-tuned on the AGGRESSIVE record (user direction d): 20 px start (adds a 4th resolution = 2 more graphs: 4-CPU build must be measured if it wins)",
+    "env": {},
+    "config": "futurebiohackers {\"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"resolution_schedule\": [[20, 0.15], [24, 0.3], [28, 0.5]]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

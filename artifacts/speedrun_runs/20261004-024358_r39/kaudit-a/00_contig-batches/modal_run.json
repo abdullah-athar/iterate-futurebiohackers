@@ -1,0 +1,34 @@
+{
+  "returncode": 0,
+  "wall_seconds": 133.6,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T014441Z-fc0bf0fe",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"batch_order\": \"contiguous\", \"count_nonfinite\": true, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\"}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "contig-batches",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"batch_order\": \"contiguous\", \"count_nonfinite\": true, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\"}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"batch_order\": \"contiguous\", \"count_nonfinite\": true, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\"}",
+    "delta": {
+      "g2_pair": "inner192",
+      "global_pool": "fullpool_avgsum",
+      "batch_order": "contiguous"
+    },
+    "hypothesis": "kernel audit (user direction a): the per-step batch gather is an ATen index kernel of ~0.08 ms/step (0.04 s per trial); folding the shuffle into the per-epoch crop gather makes each batch a free slice",
+    "env": {},
+    "config": "futurebiohackers {\"batch_order\": \"contiguous\", \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\"}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}

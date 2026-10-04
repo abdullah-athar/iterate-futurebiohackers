@@ -1,0 +1,39 @@
+{
+  "returncode": 0,
+  "wall_seconds": 159.5,
+  "deadline_hit": false,
+  "result_rel": "futurebiohackers/20261004T014501Z-4190306f",
+  "command": "/.uv/.venv/bin/python -m benchmark.run --data-root /data --results-root /results --submission futurebiohackers --n 8 --params '{\"count_nonfinite\": true, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"inductor_tuning\": [\"coordinate_descent_tuning\"], \"inductor_tuning_resolutions\": [32]}' --seed 0 --build-timeout 600.0",
+  "spec": {
+    "label": "cdt-32px-only",
+    "n": 8,
+    "args": [
+      "--submission",
+      "futurebiohackers",
+      "--n",
+      "8",
+      "--params",
+      "{\"count_nonfinite\": true, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"inductor_tuning\": [\"coordinate_descent_tuning\"], \"inductor_tuning_resolutions\": [32]}",
+      "--seed",
+      "0",
+      "--build-timeout",
+      "600.0"
+    ],
+    "params": "{\"count_nonfinite\": true, \"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"inductor_tuning\": [\"coordinate_descent_tuning\"], \"inductor_tuning_resolutions\": [32]}",
+    "delta": {
+      "g2_pair": "inner192",
+      "global_pool": "fullpool_avgsum",
+      "inductor_tuning": [
+        "coordinate_descent_tuning"
+      ],
+      "inductor_tuning_resolutions": [
+        32
+      ]
+    },
+    "hypothesis": "coordinate-descent autotuning (user direction e): only the 32 px training graphs are tuned (second half of training); 4-CPU build measured separately",
+    "env": {},
+    "config": "futurebiohackers {\"g2_pair\": \"inner192\", \"global_pool\": \"fullpool_avgsum\", \"inductor_tuning\": [\"coordinate_descent_tuning\"], \"inductor_tuning_resolutions\": [32]}"
+  },
+  "nonfinite": 0,
+  "build_mode": "warm"
+}
