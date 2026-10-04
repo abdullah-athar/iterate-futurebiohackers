@@ -90,6 +90,18 @@ autoresearch-viz *args:
 autoresearch-swarm *args:
     PYTHONUNBUFFERED=1 uv run python -m autoresearch swarm "$@"
 
+# Benchmark initial vs Johann's layer vs this branch (frozen commits, same seeds): just autoresearch-bench bench1
+[working-directory: justfile_directory() / "autoresearch-optimizer"]
+[positional-arguments]
+autoresearch-bench *args:
+    scripts/bench.sh "$@"
+
+# Benchmark report (mean ± sd per arm): just autoresearch-bench-report bench1
+[working-directory: justfile_directory() / "autoresearch-optimizer"]
+[positional-arguments]
+autoresearch-bench-report *args:
+    uv run python scripts/bench_report.py "$@"
+
 # Swarm smoke test: 2 agents, 1 generation
 [working-directory: justfile_directory() / "autoresearch-optimizer"]
 autoresearch-swarm-smoke:
