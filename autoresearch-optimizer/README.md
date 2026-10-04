@@ -101,7 +101,22 @@ identical descriptors are at distance 0. The bandit still decides how many agent
 
 `scripts/validate_descriptors.py` checks the descriptors themselves (self-distance test on the
 solvers in `scripts/descriptor_fixtures/`, plus embedding sanity). The run directory also gets
-`descriptors.json` and `vocab.json` (vocabulary size per generation).
+`descriptors.json` and `vocab.json` (vocabulary size per generation), and `describe_usage.jsonl`
+(spend of the describe calls, which is not part of the agents' `cost_usd`).
+
+### Benchmark: initial vs exploration-exploitation vs this branch
+
+`scripts/bench.sh TAG` (or `just autoresearch-bench TAG`) runs three arms on the same problems, model
+and seeds: `initial` (main at the layer's merge base, `c4438c4`), `johann` (tag `bench-johann`: the
+layer plus only the cache-deadlock fix and describe-cost logging) and `mine` (this branch's HEAD;
+commit before running). Each arm runs from a frozen worktree of its commit under
+`../iterate-futurebiohackers-bench/`, refs resolved once at start; runs are sequential, arms
+interleaved per seed, and finished runs are skipped. Defaults: Sonnet, 8 agents x 3 generations,
+seeds 0 1 2, `median_string`, overridable with `MODEL`, `AGENTS`, `GENERATIONS`, `SEEDS`, `PROBLEMS`,
+`ARMS` (`name=ref[,flags]`); `DRY_RUN=1` prints the plan. `scripts/bench_report.py TAG` writes
+`artifacts/bench/TAG.md`: per arm, mean ± sd of the gain and the held-out gain, the held-out
+difference to `initial` with its standard error, cost including describe calls, wall-clock, and
+proposals the descriptor gate dropped unevaluated.
 
 ### Problems
 
