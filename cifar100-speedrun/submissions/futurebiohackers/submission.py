@@ -73,9 +73,12 @@ DEFAULTS = {
     # widths[2] channels): "full" = two 3x3 convs at widths[2]; "inner512" / "inner640" = the
     # 3x3 pair through 512 / 640 channels; "bottleneck384" = 1x1 -> 384, 3x3 at 384, 1x1 back.
     "g3_pair": "inner512",
+    # Group 2's residual pair, same scheme: "full" (256 -> 256 -> 256) or "inner192" (through 192).
+    "g2_pair": "inner192",
     # "max" is max(dim).values; adaptive_max_pool2d's backward uses slow atomics and
     # "amax" trains to NaN under torch.compile in torch 2.4.
-    "global_pool": "max",
+    # "maxmean_sum": per-channel max plus mean over positions (same width as "max").
+    "global_pool": "maxmean_sum",
     # "muon" follows hiverge/cifar10-speedrun: Muon on conv filters, SGD on biases and head.
     "optimizer": "sgd",
     "muon_lr": 0.205,
@@ -93,6 +96,7 @@ G3_PAIRS = {
     "inner640": ("inner", 640),
     "bottleneck384": ("bottleneck", 384),
 }
+G2_PAIRS = {"full": None, "inner192": ("inner", 192)}
 
 
 #############################################
@@ -202,7 +206,7 @@ class Net(nn.Module):
         stem_width = 2 * 3 * patch * patch
         self.whiten = nn.Conv2d(3, stem_width, kernel_size=patch, padding=0, bias=True)
         self.whiten.weight.requires_grad = False
-        pair = G3_PAIRS[hyp["g3_pair"]]
+        pairs = (None, G2_PAIRS[hyp["g2_pair"]], G3_PAIRS[hyp["g3_pair"]])
         groups = []
         for index, (c_in, c_out, depth, pool_first, kernel, pool) in enumerate(
             zip(
@@ -225,7 +229,7 @@ class Net(nn.Module):
                     pool_first,
                     kernel,
                     pool,
-                    pair=pair if index == 2 else None,
+                    pair=pairs[index],
                 )
             )
         self.layers = nn.Sequential(*groups)
@@ -263,6 +267,9 @@ class Net(nn.Module):
             x = F.adaptive_max_pool2d(x, 1).flatten(1)
         elif self.global_pool == "amax":
             x = x.flatten(2).amax(2)
+        elif self.global_pool == "maxmean_sum":
+            flat = x.flatten(2)
+            x = flat.max(2).values + flat.mean(2)
         else:
             x = x.flatten(2).max(2).values
         if self.muon_head:
@@ -460,12 +467,16 @@ def build(context: BuildContext):
         raise ValueError(f"g3_pair must be one of {sorted(G3_PAIRS)}")
     if hyp["g3_pair"] != "full" and (depths[2] != 3 or hyp["inner_kernels"][2] != 3):
         raise ValueError("g3_pair variants need group 3 at depth 3 with 3x3 inner kernels")
+    if not isinstance(hyp["g2_pair"], str) or hyp["g2_pair"] not in G2_PAIRS:
+        raise ValueError(f"g2_pair must be one of {sorted(G2_PAIRS)}")
+    if hyp["g2_pair"] != "full" and (depths[1] != 3 or hyp["inner_kernels"][1] != 3):
+        raise ValueError("g2_pair variants need group 2 at depth 3 with 3x3 inner kernels")
     if hyp["stem"] not in ("patch2", "patch4s2"):
         raise ValueError("stem must be patch2 or patch4s2")
     if any(b <= 0 or not 0 <= f <= 1 for b, f in hyp["batch_schedule"]):
         raise ValueError("batch_schedule entries must be [positive batch, fraction]")
-    if hyp["global_pool"] not in ("adaptive", "amax", "max"):
-        raise ValueError("global_pool must be adaptive, amax, or max")
+    if hyp["global_pool"] not in ("adaptive", "amax", "max", "maxmean_sum"):
+        raise ValueError("global_pool must be adaptive, amax, max, or maxmean_sum")
     if hyp["optimizer"] not in ("sgd", "muon") or len(hyp["color_jitter"]) != 2:
         raise ValueError("optimizer must be sgd or muon; color_jitter needs two ranges")
     device = context.device
@@ -537,7 +548,13 @@ def build(context: BuildContext):
         crop_kernel=crop_kernel,
     )
     if hyp["hard_fraction"] < 1:
-        proxy_hyp = {**hyp, "widths": hyp["proxy_widths"], "depths": [2, 2, 2], "g3_pair": "full"}
+        proxy_hyp = {
+            **hyp,
+            "widths": hyp["proxy_widths"],
+            "depths": [2, 2, 2],
+            "g3_pair": "full",
+            "g2_pair": "full",
+        }
         proxy = Net(proxy_hyp, context.num_classes).to(
             device, dtype, memory_format=torch.channels_last
         )
