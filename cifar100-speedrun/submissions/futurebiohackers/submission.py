@@ -2,9 +2,10 @@
 
 Adapted from Keller Jordan's airbench (https://github.com/KellerJordan/cifar10-airbench),
 Copyright (c) 2024 Keller Jordan, released under the MIT License. Changes: 100-class
-head with widths 128/256/768 and a two-conv first group, label smoothing 0.3, an
-8.25-epoch schedule, half-precision BatchNorm, a compiled forward+loss step, the
-harness build/prepare/train split, and no test-time augmentation. The optional
+head, widths 64/256/768 with three convolutions per group and the last group's residual
+pair through 512 channels, max + mean global pooling, label smoothing 0.25, a 10-epoch
+schedule with 24 px and 28 px phases, half-precision BatchNorm, a compiled forward+loss
+step, the harness build/prepare/train split, and no test-time augmentation. The optional
 Muon optimizer follows hiverge/cifar10-speedrun (MIT); see LICENSE.hiverge.
 
 Untimed build() compiles the network and warms up every kernel on synthetic data.
@@ -75,7 +76,9 @@ DEFAULTS = {
     "g3_pair": "inner512",
     # "max" is max(dim).values; adaptive_max_pool2d's backward uses slow atomics and
     # "amax" trains to NaN under torch.compile in torch 2.4.
-    "global_pool": "max",
+    # "fullpool_avgsum": per-channel max plus mean over positions, both through the pooling
+    # kernels (F.max_pool2d / F.avg_pool2d over the whole map); "max" is max(dim).values.
+    "global_pool": "fullpool_avgsum",
     # "muon" follows hiverge/cifar10-speedrun: Muon on conv filters, SGD on biases and head.
     "optimizer": "sgd",
     "muon_lr": 0.205,
@@ -263,6 +266,12 @@ class Net(nn.Module):
             x = F.adaptive_max_pool2d(x, 1).flatten(1)
         elif self.global_pool == "amax":
             x = x.flatten(2).amax(2)
+        elif self.global_pool == "fullpool_avgsum":
+            # max and mean through the pooling kernels: 0.13 s per trial faster than the
+            # reduction kernels torch.compile generates for max(dim).values and mean.
+            flat = x.flatten(2)
+            x4, kernel = flat.view(flat.shape[0], flat.shape[1], -1, 1), (flat.shape[2], 1)
+            x = (F.max_pool2d(x4, kernel) + F.avg_pool2d(x4, kernel)).flatten(1)
         else:
             x = x.flatten(2).max(2).values
         if self.muon_head:
@@ -464,8 +473,8 @@ def build(context: BuildContext):
         raise ValueError("stem must be patch2 or patch4s2")
     if any(b <= 0 or not 0 <= f <= 1 for b, f in hyp["batch_schedule"]):
         raise ValueError("batch_schedule entries must be [positive batch, fraction]")
-    if hyp["global_pool"] not in ("adaptive", "amax", "max"):
-        raise ValueError("global_pool must be adaptive, amax, or max")
+    if hyp["global_pool"] not in ("adaptive", "amax", "max", "fullpool_avgsum"):
+        raise ValueError("global_pool must be adaptive, amax, max, or fullpool_avgsum")
     if hyp["optimizer"] not in ("sgd", "muon") or len(hyp["color_jitter"]) != 2:
         raise ValueError("optimizer must be sgd or muon; color_jitter needs two ranges")
     device = context.device
