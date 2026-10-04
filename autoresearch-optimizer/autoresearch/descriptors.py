@@ -180,7 +180,7 @@ def _validate(d: Descriptor) -> str | None:
     return None
 
 
-_CACHE_LOCK = threading.Lock()
+_CACHE_LOCK = threading.RLock()  # re-entrant: the write path re-reads under the lock
 
 
 def _read_cache(path: Path | None) -> dict:
