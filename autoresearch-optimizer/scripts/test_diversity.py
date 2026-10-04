@@ -19,6 +19,9 @@ if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
 from autoresearch.json_cache import JsonCache  # noqa: E402
+from offline_world import World, fake_evaluate, patched_describer, sig, world_source  # noqa: E402
+from offline_world import fake_holdout as _no_holdout  # noqa: E402
+from offline_world import world_run as _world_run  # noqa: E402
 
 DESCRIPTOR_OUT = {"terms": [{"term": "hill climbing", "tier": 6}], "new_terms": [], "summary": "s"}
 
@@ -179,11 +182,6 @@ def test_vocabulary_synonyms():
     print("  vocabulary: synonyms and spellings map to one id; unknown paradigms stay provisional")
 
 
-def sig(paradigm, mechs=(), details=(), raw="", unknown=()):
-    from autoresearch.families import Signature
-    return Signature(paradigm, raw, tuple(mechs), tuple(details), tuple(unknown))
-
-
 def test_distance_properties():
     import math
     import random
@@ -324,107 +322,10 @@ def test_reservations_atomic():
     print("  reservations: 8 simultaneous tasks, exactly one gets the plan; release frees it")
 
 
-# ----- synthetic world: scheduler end to end through run_swarm ------------------------------------------
+# ----- synthetic world: scheduler end to end through run_swarm (scripts/offline_world.py) ------------
 
-WORDS = "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau".split()
-
-
-def world_source(fam: str, score: float, uid: int, invalid: bool = False) -> str:
-    import random
-    rng = random.Random(uid)
-    body = " ".join(rng.choice(WORDS) + str(rng.randint(0, 999)) for _ in range(60))
-    return (f"# family={fam}\n# score={score:.1f}\n" + ("# invalid\n" if invalid else "")
-            + f"NOISE = {body.split()!r}\n\n\ndef solve(instance):\n    return {uid!r}\n")
-
-
-def fake_evaluate(problem_name, problem, source, split, budget_ms):
-    import re
-
-    from autoresearch.problem import EvalResult
-    m = re.search(r"# score=([\d.]+)", source)
-    score = float(m.group(1)) if m else 20000.0
-    if "# invalid" in source:
-        return EvalResult(split, 21000.0, 20000.0, error="crash")
-    if split == "screen":
-        return EvalResult(split, 0.0, 1.0)
-    return EvalResult(split, score, 20000.0)
-
-
-class World:
-    """Fake agents: tune/fix_losers/merge stay in the parent's family; new_family takes the next family of
-    `discoveries`. Each family's score moves by `step[family]` per refinement of its parent."""
-
-    def __init__(self, first: dict, step: dict, discoveries: list[str]):
-        self.first, self.step, self.discoveries, self.uid = first, step, list(discoveries), 0
-
-    def propose_many(self, run, gen, assignments):
-        import re
-        by_id = {e.id: e for e in run.entries()}
-        out = []
-        for a in assignments:
-            parent = by_id[a.parent_ids[0]]
-            src = run.store.read_candidate(parent)
-            pfam = re.search(r"# family=(\S+)", src).group(1)
-            pscore = float(re.search(r"# score=([\d.]+)", src).group(1))
-            if a.mode == "new_family" and not a.meta.get("target_family") and self.discoveries:
-                fam = self.discoveries.pop(0)
-                score = self.first[fam]
-            else:
-                fam = a.meta.get("target_family") or pfam
-                score = pscore + self.step[fam]
-            self.uid += 1
-            out.append({"assignment": a, "source": world_source(fam, score, self.uid), "hypothesis": f"{a.mode} {fam}",
-                        "usage": {"model": "fake", "seconds": 1.0, "outcome": "ok", "cost_usd": 0.01}})
-        return out
-
-
-class patched_describer:  # noqa: N801
-    """FamilyDescriber.describe_one reads the family from the source comment (no LLM)."""
-
-    def __init__(self, fail: bool = False):
-        self.fail, self.calls = fail, 0
-
-    def __enter__(self):
-        import re
-
-        from autoresearch import families
-        self.cls, self.real = families.FamilyDescriber, families.FamilyDescriber.describe_one
-
-        def fake(describer, source):
-            self.calls += 1
-            if self.fail:
-                raise AssertionError("describe must not be called")
-            m = re.search(r"# family=(\S+)", source)
-            fam = m.group(1) if m else "local_search"
-            return sig(fam, ["substitution_moves"] if fam == "local_search" else ["column_vote"])
-        self.cls.describe_one = fake
-        return self
-
-    def __exit__(self, *exc):
-        self.cls.describe_one = self.real
-
-
-def world_run(tmp: Path, cfg, world: World, agents: int = 4, generations: int = 6, seed: int = 0):
-    from autoresearch import swarm
-    from autoresearch.ledger import RunStore
-    from autoresearch.loop import ResearchRun, evaluate_candidate
-    run = ResearchRun.create(RunStore(tmp / "run"), cfg, seed_source=world_source("local_search", 10000, 0),
-                             evaluate=fake_evaluate)
-    emit = swarm.Events(run, 0.0, log=lambda line: None)
-    swarm.run_swarm(run, agents, 1, 1e9, world.propose_many,
-                    lambda srcs: [evaluate_candidate("median_string", s, 1000, fake_evaluate) for s in srcs],
-                    emit, seed=seed, max_generations=generations)
-    run.write_holdout_disabled = True
-    events = [json.loads(l) for l in (run.store.root / "events.jsonl").read_text().splitlines()]
-    return run, events
-
-
-def _no_holdout():
-    """write_holdout evaluates with the real evaluator; the synthetic world has none."""
-    from autoresearch import swarm
-    real = swarm.write_holdout
-    swarm.write_holdout = lambda run, emit: None
-    return lambda: setattr(swarm, "write_holdout", real)
+def world_run(tmp: Path, cfg, world, **kw):
+    return _world_run(tmp / "run", cfg, world, **kw)
 
 
 SLOW = {"first": {"alignment_consensus": 10600.0, "beam_search": 11000.0},
@@ -618,13 +519,74 @@ def test_plan_first_regenerates_and_hands_back():
     print("  plan-first: a repeated plan is regenerated with feedback; a persistent repeat is handed back, not run")
 
 
+def test_calibration_report_outside_repo():
+    import importlib.util
+    import re
+    spec = importlib.util.spec_from_file_location("calibrate_distance", repo_root / "scripts" / "calibrate_distance.py")
+    cal = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cal)
+    keywords = [("beam", "beam_search"), ("tabu", "tabu_search"), ("temperature", "simulated_annealing"),
+                ("crossover", "population_search"), ("perturb", "iterated_local_search"), ("star", "alignment_consensus"),
+                ("Counter", "positional_consensus"), ("random.choice", "random_sampling")]
+
+    def answer(prompt):
+        code = prompt.split("Program:", 1)[1]
+        fam = next((f for k, f in keywords if re.search(k, code)), "local_search")
+        return {"paradigm": fam, "mechanisms": ["substitution_moves"], "details": [], "summary": fam}
+    out = tmpdir("calibration-out")  # outside the repository
+    try:
+        with patched_claude(FakeClaude(answer)):
+            cal.main(["--out", str(out)])
+        report = json.loads(next(out.glob("calibration-*.json")).read_text())
+        m = report["metrics"]["canonical/weighted_jaccard"]
+        assert m["relations"]["dev:redescription"]["max"] == 0.0  # the fake describer is deterministic
+        assert "suggested_repeat_threshold" in m and next(out.glob("calibration-*.md")).exists()
+        assert report["undescribed"]["canonical"] == 0
+    finally:
+        shutil.rmtree(out, ignore_errors=True)
+    print("  calibration: full pipeline with a fake describer, report written to an --out outside the repo")
+
+
+def test_diverse_parents_are_good_and_different():
+    import random
+
+    from autoresearch.ledger import RunStore
+    from autoresearch.loop import LoopConfig, ResearchRun, evaluate_candidate
+    from autoresearch.novelty import NoveltyVerdict
+    from autoresearch.scheduler import DiversityLayer
+    from autoresearch.swarm import Assignment
+    tmp = tmpdir("parents")
+    try:
+        with patched_describer():
+            cfg = LoopConfig(problem="median_string", descriptors=False, diverse_parent_selection=True,
+                             parent_quality_margin=0.05)
+            run = ResearchRun.create(RunStore(tmp / "run"), cfg, seed_source=world_source("local_search", 10000, 0),
+                                     evaluate=fake_evaluate)
+            layer = DiversityLayer(run)
+            ok = ([], NoveltyVerdict("x", 0.1, None, False))
+            for uid, fam, score in ((1, "alignment_consensus", 10300), (2, "beam_search", 12000)):
+                src = world_source(fam, score, uid)
+                run.record(src, fam, "new_family", [0], "x", evaluate_candidate("median_string", src, 1000, fake_evaluate),
+                           ok, generation=1, usage={"family": fam, "signature": sig(fam, ["column_vote"]).to_dict()})
+            slots = [Assignment(i, "tune", [0]) for i in range(3)]
+            layer.plan(slots, 2, random.Random(0))
+        parents = [a.parent_ids[0] for a in slots]
+        # within 5% of the best: the alignment-consensus program (#1) is used; beam search (#2, 20% worse) is not
+        assert parents == [0, 1, 0], parents
+        assert slots[1].meta["parent_reason"].startswith("diverse: alignment_consensus")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  diverse parents: tune slots alternate between good programs of different families, never a weak one")
+
+
 TESTS = [test_describe_miss_then_hit, test_describe_cache_invalidation, test_unknown_cost_is_not_zero,
          test_cache_concurrent_processes_and_threads, test_budget_caps_with_calls_in_flight,
          test_vocabulary_synonyms, test_distance_properties, test_entropy_cases, test_family_record_rule,
          test_grace_budget_cap_and_expiry, test_grace_not_renewed_by_renaming, test_reservations_atomic,
          test_world_slow_family_gets_its_refinements, test_controller_moves_budget_on_concentration_and_stagnation,
          test_all_off_is_the_reference, test_distance_policy_per_mode, test_rejections_count_in_bandit_and_cost,
-         test_plan_first_regenerates_and_hands_back]
+         test_plan_first_regenerates_and_hands_back, test_calibration_report_outside_repo,
+         test_diverse_parents_are_good_and_different]
 
 if __name__ == "__main__":
     for t in TESTS:

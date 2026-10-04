@@ -103,6 +103,24 @@ autoresearch-bench *args:
 autoresearch-bench-report *args:
     uv run python scripts/bench_report.py "$@"
 
+# Diversity benchmark (A reference, B distance, C entropy+grace, D both; equal money cap): just autoresearch-bench-policies div1
+[working-directory: justfile_directory() / "autoresearch-optimizer"]
+[positional-arguments]
+autoresearch-bench-policies *args:
+    scripts/bench_policies.sh "$@"
+
+# Synthetic A-D runs through the real loop, no LLM (a functional check, not measurements)
+[working-directory: justfile_directory() / "autoresearch-optimizer"]
+[positional-arguments]
+autoresearch-offline *args:
+    uv run python scripts/offline_world.py "$@"
+
+# Distance calibration (paid; --dry-run prints the plan): just autoresearch-calibrate --dry-run
+[working-directory: justfile_directory() / "autoresearch-optimizer"]
+[positional-arguments]
+autoresearch-calibrate *args:
+    uv run python scripts/calibrate_distance.py "$@"
+
 # Swarm smoke test: 2 agents, 1 generation
 [working-directory: justfile_directory() / "autoresearch-optimizer"]
 autoresearch-swarm-smoke:

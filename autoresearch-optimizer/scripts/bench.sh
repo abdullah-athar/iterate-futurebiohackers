@@ -28,7 +28,7 @@ BENCH_CODE=${BENCH_CODE:-$(dirname "$REPO")/iterate-futurebiohackers-bench}
 DRY_RUN=${DRY_RUN:-0}
 
 if [[ " $ARMS " == *"=HEAD"* ]] && [ -n "$(git status --porcelain -- .)" ]; then
-  echo "warning: uncommitted changes in autoresearch-optimizer are NOT part of arm 'mine' (it runs HEAD)"
+  echo "warning: uncommitted changes in autoresearch-optimizer are NOT benchmarked (arms on HEAD run the last commit)"
 fi
 
 # resolve every arm once to name=sha[,flags] and freeze its code in a worktree
@@ -38,7 +38,7 @@ for arm in $ARMS; do
   ref=${spec%%,*} flags=""
   [[ $spec == *,* ]] && flags=${spec#*,}
   sha=$(git rev-parse --short=10 "$ref^{commit}")
-  code=$BENCH_CODE/$name-$sha
+  code=$BENCH_CODE/$sha   # one frozen checkout per commit, shared by every arm on it
   echo "arm $name = $ref ($sha) ${flags//,/ } -> $code"
   RESOLVED="$RESOLVED $name=$sha${flags:+,$flags}"
   if [ "$DRY_RUN" != 1 ] && [ ! -d "$code" ]; then
@@ -69,7 +69,7 @@ for seed in $SEEDS; do
       [ -e "$dir" ] && mv "$dir" "$dir.unfinished-$(date +%H%M%S)"
       log=$OPT/artifacts/bench-logs/$TAG-$problem-$name-s$seed.log
       # shellcheck disable=SC2086
-      (cd "$BENCH_CODE/$name-$sha/autoresearch-optimizer" && PYTHONUNBUFFERED=1 uv run python -m autoresearch \
+      (cd "$BENCH_CODE/$sha/autoresearch-optimizer" && PYTHONUNBUFFERED=1 uv run python -m autoresearch \
         --run "$dir" swarm --problem "$problem" --agents "$AGENTS" --generations "$GENERATIONS" \
         --budget-min "$BUDGET_MIN" --eval local --max-budget-usd "$MAX_USD" --seed "$seed" --model "$MODEL" \
         $flags) >"$log" 2>&1 || true

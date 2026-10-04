@@ -26,6 +26,7 @@ class Spend:
     calls: int = 0                 # provider calls: agent sessions + auxiliary calls
     tokens: int = 0
     by_kind: dict[str, float] = field(default_factory=dict)   # "agent", "describe", "plan", ...
+    diagnostic_usd: float = 0.0    # describe:diagnostic calls (family stats in a reference arm): reported, not capped
 
 
 def run_spend(store: RunStore) -> Spend:
@@ -49,8 +50,10 @@ def run_spend(store: RunStore) -> Spend:
             s.unknown_cost += 1
         else:
             s.usd += float(cost)
-            kind = rec.get("kind", "describe").split(":")[0]
+            kind = rec.get("kind", "describe")
             s.by_kind[kind] = s.by_kind.get(kind, 0.0) + float(cost)
+            if kind.endswith(":diagnostic"):
+                s.diagnostic_usd += float(cost)
     return s
 
 
@@ -72,8 +75,11 @@ class RunBudget:
 
     def _fits(self, s: Spend, usd: float, calls: int) -> str | None:
         """None if `usd`/`calls` more (on top of spend and reservations) stay within every cap."""
-        if self.max_usd is not None and s.usd + self._reserved_usd + usd > self.max_usd + 1e-9:
-            return f"cost cap ${self.max_usd:g} (spent ${s.usd:.2f}, in flight ${self._reserved_usd:.2f}, next ${usd:.2f})"
+        # diagnostic describe calls only measure a reference arm: excluded from its cap so they cannot shrink
+        # the arm's search budget (they stay visible in the report)
+        capped = s.usd - s.diagnostic_usd
+        if self.max_usd is not None and capped + self._reserved_usd + usd > self.max_usd + 1e-9:
+            return f"cost cap ${self.max_usd:g} (spent ${capped:.2f}, in flight ${self._reserved_usd:.2f}, next ${usd:.2f})"
         if self.max_calls is not None and s.calls + self._reserved_calls + calls > self.max_calls:
             return f"call cap {self.max_calls} (made {s.calls}, in flight {self._reserved_calls}, next {calls})"
         if self.max_tokens is not None and s.tokens >= self.max_tokens:
@@ -107,7 +113,7 @@ class RunBudget:
 
     # ----- auxiliary calls (llm_calls.claude_json) -----------------------------------------
     def reserve_aux(self, kind: str):
-        if not self.capped:
+        if not self.capped or kind.endswith(":diagnostic"):
             return (0.0, 0)
         est = self.aux_estimate(kind)
         with self._lock:

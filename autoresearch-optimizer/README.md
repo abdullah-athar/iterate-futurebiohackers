@@ -118,6 +118,124 @@ seeds 0 1 2, `median_string`, overridable with `MODEL`, `AGENTS`, `GENERATIONS`,
 difference to `initial` with its standard error, cost including describe calls, wall-clock, and
 proposals the descriptor gate dropped unevaluated.
 
+### Diversity extension: families, distances, entropy and a minimal budget per family (all off by default)
+
+Goal: better best solutions at a given budget, by not collapsing early onto one approach, not paying twice
+for the same proposal, and giving an initially weaker approach a real chance to improve by refinement.
+Three signals keep separate jobs: a **distance** estimates how different two programs (or plans) are; an
+**entropy** describes how families are spread in a precisely defined set; **score progress** says whether a
+family still benefits from more tries. A large distance does not make a solution promising, a high entropy
+does not make families relevant, and a small distance does not mean equal behaviour or performance.
+
+**Reference fixes (every configuration, including the reference arm).** The describe cache
+([json_cache.py](autoresearch/json_cache.py)) holds a thread lock and an `fcntl` lock per read-modify-write
+(no lost update across threads or processes), writes atomically, and never holds a lock during an LLM
+call; keys hash the code fingerprint, backend, model, prompt, system prompt, schema, problem text and
+the vocabulary version. Every auxiliary call ([llm_calls.py](autoresearch/llm_calls.py)) is logged to
+`llm_usage.jsonl` (kind, model, seconds, the provider's token categories, cost; an unreported cost is
+`null`, never 0) and runs from the temp dir (inside the repo `claude` also loads `CLAUDE.md`: 1374 vs
+615 input tokens). An agent session that wrote nothing is kept as a `no_output` entry (its cost and its
+try used to vanish), and the bandit counts every session as a try of its mode: duplicates, guard
+rejections, gate drops and empty sessions are zero-gain tries (no benchmark score is invented for them;
+`--legacy-bandit-counting` restores the old counting). Run-level caps `--max-run-usd`, `--max-run-calls`,
+`--max-run-tokens` ([budget.py](autoresearch/budget.py)) reserve the estimated cost of a generation's
+sessions and of every describe/plan call in flight before starting them.
+
+**Program, lineage, family, proposal** ([families.py](autoresearch/families.py)). A *program* is a ledger
+entry. A *lineage* follows genealogy only (first parent; a `new_family` proposal founds one). A *family* is
+the canonical paradigm id of the program's signature: the LLM describes the code with ids of a frozen
+vocabulary ([vocab/median_string_v1.json](autoresearch/vocab/median_string_v1.json): 14 paradigms, 30
+mechanisms, 9 details, each with a definition and synonyms, built from the seed, the classical solvers,
+the descriptor fixtures, the problem's directions and 342 earlier agent proposals); the code maps it to ids
+and assigns the family. Hybrids get one principal paradigm (what produces the returned string / uses most of
+the budget) plus mechanism tags. A paradigm outside the vocabulary becomes `provisional:<name>`: kept
+apart from every other provisional family and never granted the new-family budget. A rewording maps to the
+same id, so it cannot buy a new family. Limits: the classification is as coarse as the paradigm list (every
+vote-guided descent is `local_search`), and many genuinely different programs share a signature.
+
+**Distances** ([distance.py](autoresearch/distance.py)), one interface (value, nearest neighbour,
+contributing terms, metric version, availability): `weighted_jaccard` (default, interpretable),
+`d(A,B) = 1 - Σ min(wA, wB) / Σ max(wA, wB)` over canonical terms with role weights paradigm 6, mechanism 3,
+detail 1, unknown term 1; and `minilm`, Johann's distance (audited: centred embeddings are re-normalised and
+cosines clipped to [0, 1], so it is already in [0, 1] and symmetric; no rescaling). A missing or empty
+signature is *unavailable*, never a duplicate; exact duplication stays with the code novelty gate.
+**Thresholds are not calibrated yet**: `--archive-threshold` / `--batch-threshold` default to none, strict
+rejection refuses to start without one, and the 0.116 / 0.18 / 0.3 values of other metrics are not reused.
+`scripts/calibrate_distance.py` builds the pairs (redescriptions, renamings and parameter changes by
+controlled transformation; curated same-family / paradigm-change fixture pairs; optional parent/child
+pairs from `--runs`), splits dev/test by source program and reports the distributions, a suggested repeat
+threshold, missed repeats, distinct programs rejected and useful improvements a filter would have blocked.
+
+**Entropy and stagnation.** `H = -Σ p log p` (natural log) of the families of the top-k programs
+(concentration of the best) and of the last `--allocation-window` finished tries (effort; rejected and
+empty tries included). Empty set: H = 0 with `empty`; normalised H uses `log(min(k, number of vocabulary
+paradigms))` and is undefined when that is ≤ 1; counts and `exp(H)` are logged. Stagnation is the global
+best not improving for `--stagnation-generations`; a family's own stagnation counts its own tries.
+
+**Policies** ([scheduler.py](autoresearch/scheduler.py)); the UCB bandit still allocates the four modes, each
+policy only rewrites slots it already allocated (budget moved, never added), at most `max_override_fraction`
+of them together, and every change is logged next to the bandit's `ucb_mode`:
+- `--family-grace`: a new admissible family (valid first program, not provisional, not known at the start,
+  budget left for one refinement) gets funded `tune` refinements of its best program: at least
+  `--grace-min` 2 evaluations, +1 per record that beats the previous one by more than `--grace-epsilon`
+  (90 objective units: just above the 88 re-scoring range measured on validate,
+  `scripts/measure_eval_noise.py`), +`--grace-patience` 1 without progress, at most `--grace-max` 6.
+  Every funded try counts, also invalid ones, so failing families lose it; expiry is final (a rename,
+  a new lineage or a return from dormancy never renews it); at most `--max-protected` 2 at once, oldest
+  obligation first. Progress is `max(0, record_before - new)` in objective units (no division by a score).
+- `--entropy-controller`: when the top-k is concentrated (one family, or normalised H ≤ 0.5) **and** the
+  best stagnates, a quarter of the slots refine under-explored families or ask for a new approach; off again
+  on a new best or once normalised H > 0.7. A family already tried a lot without progress is skipped.
+- `--diverse-parents`: tune parents are good (within 5% of the best) *and* different (greedy max-min on the
+  distance); merges prefer the most distant complementary member and untried pairs; two slots on one parent
+  get different mechanisms to work on.
+- `--distance-policy observe|soft|strict` (after the code is written; the code's description is the one the
+  archive keeps): `new_family` is compared with family representatives (dormant ones included) and with the
+  batch; `tune` closeness is expected and a large distance is only logged as a mode drift; `merge` is
+  flagged when the same pair repeats a combination; `fix_losers` is never judged on descriptors. `soft` also
+  shows `new_family` agents the family landscape. Convention: too close ⟺ distance < threshold.
+- `--plan-first` ([planner.py](autoresearch/planner.py)): one structured plan call per task before its
+  session, checked against representatives and the batch's reserved plans, regenerated with the neighbour
+  and the dimension to change (at most `--max-regenerations` 2, same mode), reserved atomically; a
+  persistent repeat is handed back and its agent is not run. Plan calls are logged as `kind=plan`.
+- `--family-diagnostics`: describe candidates for the family statistics with every policy off; logged as
+  `describe:diagnostic` and excluded from the run's money cap.
+
+Everything is reconstructible from the run directory: `schedule` events (bandit decision, overrides with
+reasons, protections, controller state, entropies), `distance_gate`, `families`, `plan`, `mode_drift`,
+`plan_divergence` events, each entry's `usage` (signature, family, parent family, lineage, target family,
+override, grace counters, distance decision with neighbour, metric, version and threshold) and
+`llm_usage.jsonl`. With every option off the run is the reference (tested: no describe call, no event).
+Johann's layer (`descriptors`) and this scheduler are separate arms and refuse to be combined.
+
+**Protocol** (`scripts/bench_policies.sh TAG`): A reference, B distance only (`--distance-policy soft
+--diverse-parents`), C entropy + grace, D = B + C, all on one commit with the same seeds, model, agents,
+per-session cap and run-level money cap (`MAX_RUN_USD`, default 3, which includes describe/plan calls);
+`WITH_SPLIT=1` adds grace-only and controller-only arms (C alone cannot say which part helps),
+`WITH_JOHANN=1` adds Johann's layer. Prompt differences between arms: B/D add the family landscape to
+`new_family` agents and a mechanism focus when two agents share a parent; grace and controller slots carry a
+short note naming their family or the untried paradigms. `scripts/bench_report.py TAG --html --target-gain
+G` (fix G before the runs) writes Markdown, JSON, CSV and an HTML page: best gain vs cumulative spend and vs
+wall-clock for every seed, tries and spend per family, top-k entropy per generation, family records with the
+funded tries, the calibration distributions (`--calibration`) and a decision log.
+
+```bash
+uv run python scripts/test_diversity.py                         # offline tests (fake LLM at the subprocess boundary)
+uv run python scripts/offline_world.py --tag offline            # synthetic A-D runs through the real loop (not measurements)
+uv run python scripts/bench_report.py offline --html --target-gain 8
+uv run python scripts/measure_eval_noise.py                     # evaluator noise (local CPU, free)
+uv run python scripts/calibrate_distance.py --dry-run           # pairs and number of describe calls; drop --dry-run to pay for it
+just autoresearch-swarm --run artifacts/runs/div-smoke --agents 2 --generations 1 --eval local --model haiku \
+  --no-descriptors --family-grace --entropy-controller --distance-policy observe --max-run-usd 0.5   # paid smoke test
+MAX_RUN_USD=3 SEEDS="0 1 2" scripts/bench_policies.sh div1      # paid benchmark: 4 arms x 3 seeds
+uv run python scripts/bench_report.py div1 --html --target-gain 17
+```
+
+Limits: thresholds are uncalibrated until `calibrate_distance.py` has run (so B uses distances for
+selection and logging, not rejection); the savings of `--plan-first` are not demonstrated (it costs one call
+per task); the vocabulary is fixed per version (`median_string-v1`) and coarse; families come from an LLM
+reading the code and are not ground truth; with 3-5 seeds results are a first signal, not significance.
+
 ### Problems
 
 | Problem | Objective instances | Notes |
