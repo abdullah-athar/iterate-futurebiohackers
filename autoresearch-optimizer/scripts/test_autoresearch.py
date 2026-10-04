@@ -160,14 +160,182 @@ def test_swarm():
                         max_generations=2)
         entries = run.entries()
         assert [e.id for e in entries] == list(range(len(entries))), [e.id for e in entries]
-        assert [e.status for e in entries if e.generation == 1] == [STATUS_KEPT, STATUS_REJECTED_DUPLICATE]
-        assert all(e.status == STATUS_REJECTED_DUPLICATE for e in entries if e.generation == 2)
+        # the empty session (worker 2) is kept as a no_output try instead of vanishing with its cost
+        assert [e.status for e in entries if e.generation == 1] == [STATUS_KEPT, STATUS_REJECTED_DUPLICATE, "no_output"]
+        assert [e.status for e in entries if e.generation == 2] == [STATUS_REJECTED_DUPLICATE] * 2 + ["no_output"]
+        assert entries[2].novelty.get("nearest_id") in (0, 1), entries[2].novelty  # ids line up with empty slots
         kinds = [json.loads(l)["type"] for l in (run.store.root / "events.jsonl").read_text().splitlines()]
         assert kinds.count("gen_end") == 2 and kinds[-1] == "run_end", kinds
         assert (run.store.root / "holdout.json").exists()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print("  Swarm test passed!")
+
+
+def _ee_swarm(tmp: Path, fail: tuple[str, ...] = ()):
+    """One 6-agent generation with the layer on (fake proposer and describer); `fail` = fixture files whose
+    describe call raises. Returns (run, assignments seen by the proposer, the descriptor_gate event, gen-1 entries)."""
+    from autoresearch import exploration_exploitation as ee
+    from autoresearch import swarm
+    from autoresearch.descriptors import Descriptor
+
+    fixtures = repo_root / "scripts" / "descriptor_fixtures"
+    failing = {(fixtures / f).read_text() for f in fail}
+    seed = get_problem("median_string").seed_source()
+    hill = ("hill climbing", ["substitution moves", "set median initialisation", "first-improvement selection"])
+    by_worker = [  # bandit gives 2 agents each to tune, fix_losers, new_family -> workers in that order
+        (seed.replace("range(50)", "range(60)"), hill),                                            # tune: keeps descriptor
+        ((fixtures / "editop_voting.py").read_text(), ("consensus voting", ["edit-operation voting"])),  # tune: drifts
+        ((fixtures / "positional_vote.py").read_text(), None),                                     # fix_losers
+        (mp.FAST_INDEL_SEARCH, None),                                                              # fix_losers
+        ((fixtures / "hill_climb.py").read_text(), hill),                                          # new_family: same as seed
+        ((fixtures / "center_star_consensus.py").read_text(), ("center-star alignment", ["column-wise majority vote"])),
+    ]
+    labels = {seed: hill} | {src: lab for src, lab in by_worker if lab}
+    seen_assignments = []
+
+    def fake_describe(source, vocab, problem, **kw):
+        if source in failing:
+            raise RuntimeError("describe failed: fake")
+        core, mids = labels.get(source, ("greedy construction", ["column-wise majority vote"]))
+        return Descriptor([(core, 6)] + [(t, 3) for t in mids], summary=core)
+
+    def propose_many(run, gen, assignments):
+        seen_assignments.extend(assignments)
+        return [{"assignment": a, "source": by_worker[a.worker][0], "hypothesis": f"w{a.worker}",
+                 "usage": {"model": "fake", "seconds": 1.0, "outcome": "ok", "cost_usd": 0.01}} for a in assignments]
+
+    real_describe, ee.describe = ee.describe, fake_describe
+    try:
+        run = ResearchRun.create(RunStore(tmp / "run"), LoopConfig(problem="median_string", descriptors=True))
+        emit = swarm.Events(run, 0.0, log=lambda line: None)
+        swarm.run_swarm(run, 6, 1, 1e9, propose_many, swarm.local_evaluator("median_string", 1000), emit,
+                        max_generations=1)
+    finally:
+        ee.describe = real_describe
+    events = [json.loads(l) for l in (run.store.root / "events.jsonl").read_text().splitlines()]
+    gate = next(e for e in events if e["type"] == "descriptor_gate")
+    return run, seen_assignments, gate, [e for e in run.entries() if e.generation == 1]
+
+
+def test_exploration_exploitation():
+    print("Testing the exploration-exploitation layer in the swarm (fake proposer and describer, local evaluation)...")
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-ee-"))
+    try:
+        run, seen_assignments, g, gen1 = _ee_swarm(tmp)
+        modes = [a.mode for a in seen_assignments]
+        assert modes == ["tune", "tune", "fix_losers", "fix_losers", "new_family", "new_family"], modes
+        assert all("Descriptor contract" in a.notes for a in seen_assignments if a.mode == "tune")
+        assert all("Research landscape" in a.notes for a in seen_assignments)
+        branch = [e.usage.get("branch") for e in gen1]
+        assert branch == ["K", "K->L", None, None, "L", "L"], branch
+        assert gen1[0].evals, "tune child that kept its descriptor must be evaluated"
+        assert gen1[1].evals and gen1[5].evals, [e.note for e in gen1]
+        dup = gen1[4]  # hill-climb descriptor identical to the seed's
+        assert dup.status == STATUS_REJECTED_DUPLICATE and "not selected by max-min" in dup.note, dup.note
+        assert dup.usage["min_dist"] < run.config.desc_threshold
+        assert all(e.usage["min_dist"] >= run.config.desc_threshold for e in (gen1[1], gen1[5]))
+        assert (g["tune_kept"], g["drifted"], g["pool"], g["slots"], g["selected"], g["undescribed"]) == (1, 1, 3, 3, 2, 0), g
+        events = [json.loads(l) for l in (run.store.root / "events.jsonl").read_text().splitlines()]
+        assert next(e for e in events if e["type"] == "gen_end")["vocab"] > 0
+        # the bandit counts the gate-dropped proposal as a zero-reward new_family try
+        assert dup.usage.get("gate_dropped") is True
+        entries = run.entries()
+        score = lambda: run.mode_scores(entries, run.archive(entries))["new_family"]  # noqa: E731
+        counted = score()
+        next(e for e in entries if e.id == dup.id).usage.pop("gate_dropped")
+        assert score() == counted  # default: every session is a try, flag or not
+        run.config.bandit_counts_all_attempts = False  # legacy counting: only the gate flag keeps it
+        assert counted < score()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Exploration-exploitation test passed!")
+
+
+def test_gate_describe_failure():
+    print("Testing that a candidate whose describe call fails is evaluated, not dropped...")
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-ee-"))
+    try:
+        run, _, g, gen1 = _ee_swarm(tmp, fail=("center_star_consensus.py",))
+        star = gen1[5]  # new_family, describe raised
+        assert star.status != STATUS_REJECTED_DUPLICATE and star.evals, (star.status, star.note)
+        assert star.usage["descriptor"] is None and not star.usage.get("gate_dropped")
+        assert (g["pool"], g["selected"], g["undescribed"]) == (3, 1, 1), g
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Describe-failure test passed!")
+
+def test_lineage_parents():
+    import autoresearch.exploration_exploitation as ee
+    from autoresearch.ledger import Entry
+
+    def mk(i, parent, branch, obj):
+        return Entry(id=i, parent_ids=[parent] if parent is not None else [], mode="x", hypothesis="",
+                     status="scored", objective=obj, usage={"branch": branch} if branch else {})
+    # 0 seed; 1 founds lineage A (L); 2, 3 refine it (K); 4 drifted off 2 (K->L) founds lineage B
+    es = [mk(0, None, None, 9), mk(1, 0, "L", 5), mk(2, 1, "K", 3), mk(3, 2, "K", 1), mk(4, 2, "K->L", 2)]
+    by_id = {e.id: e for e in es}
+    assert [ee.lineage_root(e, by_id) for e in es] == [0, 1, 1, 1, 4]
+    elites = [(e, None) for e in sorted(es, key=lambda e: e.objective)]  # 3, 4, 2, 1, 0
+    assert [p.id for p, _ in ee.lineage_parents(elites, es, 3)] == [3, 4, 0]
+    print("  Lineage-parents test passed!")
+
+
+def test_gap_directions():
+    import autoresearch.exploration_exploitation as ee
+    from autoresearch.descriptors import Descriptor
+    from autoresearch.ledger import Entry
+
+    sa = Descriptor([("simulated annealing", 6), ("block moves", 3)])
+    ga = Descriptor([("genetic algorithm", 6), ("center-star alignment", 3)])
+    e1, e2 = (Entry(id=i, parent_ids=[], mode="x", hypothesis="", status="kept") for i in (1, 2))
+    rng = random.Random(0)
+    # a lone strong solver has no untried pairing of its own parts
+    assert ee.gap_directions([(e1, sa)], [sa], 5, rng) == []
+    gaps = ee.gap_directions([(e1, sa), (e2, ga)], [sa, ga], 5, rng)
+    assert len(gaps) == 2 and any("simulated annealing" in g and "center-star alignment" in g for g in gaps), gaps
+    # a pairing that already exists anywhere in the described pool is not a gap
+    tried = Descriptor([("simulated annealing", 6), ("center-star alignment", 3)])
+    gaps = ee.gap_directions([(e1, sa), (e2, ga)], [sa, ga, tried], 5, rng)
+    assert len(gaps) == 1 and "genetic algorithm" in gaps[0] and "block moves" in gaps[0], gaps
+    print("  Gap-directions test passed!")
+
+
+def test_describe_cache():
+    print("Testing describe() through the on-disk cache, in parallel (fake claude)...")
+    import types
+    from concurrent.futures import ThreadPoolExecutor
+
+    import autoresearch.descriptors as D
+    import autoresearch.llm_calls as L
+
+    calls = []
+
+    def fake_run(cmd, input, **kw):
+        assert kw.get("cwd") == tempfile.gettempdir(), kw.get("cwd")  # outside the repo: no project CLAUDE.md
+        calls.append(1)
+        out = {"total_cost_usd": 0.01, "structured_output": {
+            "terms": [{"term": "hill climbing", "tier": 6}], "new_terms": [], "summary": "s"}}
+        return types.SimpleNamespace(stdout=json.dumps(out), stderr="")
+
+    real, L.subprocess = L.subprocess, types.SimpleNamespace(run=fake_run, TimeoutExpired=TimeoutError)
+    tmp = Path(tempfile.mkdtemp(prefix="autoresearch-describe-"))
+    try:
+        cache = tmp / "descriptors.json"
+        sources = [f"def solve(instance):\n    return '{c}'\n" for c in "abcdef"]
+        with ThreadPoolExecutor(6) as pool:  # concurrent cache writes: the path that deadlocked
+            futures = [pool.submit(D.describe, s, D.Vocabulary(), "p", cache_path=cache) for s in sources]
+            descs = [f.result(timeout=10) for f in futures]
+        assert all(d.core == "hill climbing" for d in descs)
+        assert len(json.loads(cache.read_text())) == 6
+        D.describe(sources[0], D.Vocabulary(), "p", cache_path=cache)  # cache hit: no new call
+        assert len(calls) == 6, len(calls)
+        usage = [json.loads(l) for l in (tmp / "llm_usage.jsonl").read_text().splitlines()]
+        assert len(usage) == 6 and abs(sum(u["cost_usd"] for u in usage) - 0.06) < 1e-9, usage
+    finally:
+        L.subprocess = real
+        shutil.rmtree(tmp, ignore_errors=True)
+    print("  Describe-cache test passed!")
 
 
 def test_viz_lineage():
@@ -214,5 +382,10 @@ if __name__ == "__main__":
     test_evaluator_boundary()
     test_agent_run()
     test_swarm()
+    test_exploration_exploitation()
+    test_lineage_parents()
+    test_gap_directions()
+    test_gate_describe_failure()
+    test_describe_cache()
     test_viz_lineage()
     print("\nAll autoresearch tests passed!")

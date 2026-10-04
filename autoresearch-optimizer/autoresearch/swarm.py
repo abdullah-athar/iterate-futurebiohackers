@@ -20,9 +20,10 @@ import tempfile
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from .budget import run_spend
 from .loop import ResearchRun, evaluate_candidate
 from .prompts import MODES, build_user_prompt
 
@@ -35,6 +36,10 @@ class Assignment:
     mode: str
     parent_ids: list[int]
     direction: str = ""
+    notes: str = ""  # extra STATUS.md section (exploration-exploitation layer: descriptor contract, research landscape)
+    # diversity scheduler decisions copied into the entry's usage: ucb_mode, override (reason), target_family,
+    # grace_family, focus, parent_reason ... (empty when the scheduler is off)
+    meta: dict = field(default_factory=dict)
 
 
 def allocate(run: ResearchRun, n: int, rng: random.Random) -> list[Assignment]:
@@ -93,7 +98,12 @@ PROMPT = "Read AGENT.md and STATUS.md in the current directory and follow them. 
 def write_workspace(run: ResearchRun, a: Assignment, gen: int, n: int, mix: str, turn_s: int, ws: Path,
                     eval_backend: str) -> None:
     ctx = run.context(mode=a.mode, parent_ids=a.parent_ids)
-    (ws / "STATUS.md").write_text(build_user_prompt(run.problem.describe(), ctx))
+    warn = ("\n\n## Duplicate check\nOnly an exact copy of an earlier candidate is refused, but the check runs on the "
+            "normalised source: renaming variables, reformatting or editing comments leaves it an exact copy, which is "
+            "refused without evaluation. Make a real change to the algorithm or its parameters."
+            if run.config.tune_exact_only and a.mode == "tune" else "")
+    (ws / "STATUS.md").write_text(build_user_prompt(run.problem.describe(), ctx, run.config.descriptors)
+                                  + (f"\n\n{a.notes}" if a.notes else "") + warn)
     (ws / "AGENT.md").write_text(AGENT_MD.format(worker=a.worker, gen=gen, mode=a.mode, n=n, mix=mix,
                                                  turn_s=turn_s, half=turn_s // 2,
                                                  direction=a.direction or "your choice"))
@@ -129,11 +139,12 @@ def run_claude(ws: Path, turn_s: int, model: str, max_budget_usd: float | None =
                 os.killpg(proc.pid, signal.SIGKILL)
                 proc.wait()
             outcome = "timeout"
-    usage = {"model": model, "seconds": round(time.time() - t0, 1), "outcome": outcome}
+    # cost_usd stays None (unknown) unless the session reported it: a killed session may still have spent
+    usage = {"model": model, "seconds": round(time.time() - t0, 1), "outcome": outcome, "cost_usd": None}
     try:
         res = json.loads((ws / "agent.json").read_text())
         u = res.get("usage", {})
-        usage.update(cost_usd=res.get("total_cost_usd", 0.0), num_turns=res.get("num_turns"),
+        usage.update(cost_usd=res.get("total_cost_usd"), num_turns=res.get("num_turns"),
                      prompt_tokens=u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0)
                      + u.get("cache_creation_input_tokens", 0),
                      completion_tokens=u.get("output_tokens", 0))
@@ -235,6 +246,29 @@ def format_event(r: dict) -> str:
     if k == "gen_end":
         return (f"gen {r['gen']} end: best #{r['best_id']}={r['best']:g}; {r['evaluated']} evaluated, {r['kept']} kept; "
                 f"{r['seconds']:.0f}s; cost so far ${r['cost_usd']:.2f}")
+    if k == "descriptor_gate":
+        return (f"gen {r['gen']} descriptors: tune {r['tune_kept']} kept, {r['drifted']} drifted to new_family; "
+                f"new_family pool {r['pool']} -> {r['selected']}/{r['slots']} selected (min dist {r['min_dists']})")
+    if k == "schedule":
+        ov = "; ".join(f"w{o['worker']} {o['from']}->{o['to']} ({o['reason']})" for o in r["overrides"] if "worker" in o)
+        ctl = r.get("controller") or {}
+        return (f"gen {r['gen']} schedule: ucb {dict(Counter(r['ucb_modes']))}; overrides: {ov or 'none'}"
+                + (f"; controller {'ON' if ctl.get('active') else 'off'} ({ctl.get('why')})" if ctl else ""))
+    if k == "distance_gate":
+        return (f"gen {r['gen']} distance [{r['policy']}, {r['metric']}]: {r['decisions']}; described {r['described']}, "
+                f"undescribed {r['undescribed']}")
+    if k == "families":
+        top, rec = r["top"], r["recent"]
+        return (f"gen {r['gen']} families: {r['families']} known, new {r['new_families'] or '-'}; top-{top['n']} "
+                f"H={top['H']:.2f} ({top['families']} fam); recent H={rec['H']:.2f} ({rec['families']} fam)")
+    if k == "mode_drift":
+        return f"gen {r['gen']} w{r['worker']:02d} [{r['mode']}] drifted {r['from_family']} -> {r['to_family']} (d={r['distance']})"
+    if k == "plan":
+        return f"gen {r['gen']} w{r['worker']:02d} plan {r['status']} after {r['attempts']} attempt(s): {r.get('summary', '')[:80]}"
+    if k == "plan_divergence":
+        return f"gen {r['gen']} w{r['worker']:02d} code differs from its plan (d={r['distance']}): plan-only {r['only_plan']}, code-only {r['only_code']}"
+    if k == "budget_stop":
+        return f"budget stop before gen {r['gen']}: {r['reason']}"
     if k == "holdout":
         return f"holdout: seed {r['seed']:g} -> best #{r['best_id']} {r['best']:g} (baseline {r['baseline']:g})"
     if k == "run_end":
@@ -243,54 +277,141 @@ def format_event(r: dict) -> str:
 
 
 def run_swarm(run: ResearchRun, agents: int, turn_s: int, budget_s: float, propose_many, evaluate_many, emit,
-              seed: int = 0, max_generations: int | None = None, eval_name: str = "") -> None:
+              seed: int = 0, max_generations: int | None = None, eval_name: str = "", budget=None,
+              per_agent_usd_cap: float | None = None) -> None:
+    """`budget` (RunBudget) adds run-level caps on cost/calls/tokens; a generation starts only if its
+    estimated spend (last generation's mean session cost, else `per_agent_usd_cap`) still fits."""
     rng = random.Random(seed)
     t0 = time.time()
     entries = run.entries()
     gen = max((e.generation or 0 for e in entries), default=0) + 1
     eval_s, generations, proposals = 60.0, 0, 0
-    emit("run_start", agents=agents, budget_s=int(budget_s), turn_s=turn_s, eval=eval_name)
-    while time.time() - t0 + turn_s + eval_s + 30 <= budget_s and (max_generations is None or generations < max_generations):
+    layer = None
+    if run.config.descriptors:
+        from .exploration_exploitation import ExplorationExploitation
+        layer = ExplorationExploitation(run)
+        layer.describer.budget = budget
+    div = None
+    from .scheduler import DiversityLayer, needs_families
+    if needs_families(run.config):
+        div = DiversityLayer(run, budget)
+    describe_s = 60.0 if (layer or div) else 0.0
+    emit("run_start", agents=agents, budget_s=int(budget_s), turn_s=turn_s,
+         eval=eval_name + (", descriptors" if layer else "") + (", diversity" if div else ""),
+         caps={} if budget is None else {"usd": budget.max_usd, "calls": budget.max_calls, "tokens": budget.max_tokens})
+    stop = ""
+    while (time.time() - t0 + turn_s + describe_s + eval_s + 30 <= budget_s
+           and (max_generations is None or generations < max_generations)):
+        if budget is not None:
+            ok, why = budget.reserve_generation(agents, _per_agent_estimate(run, per_agent_usd_cap))
+            if not ok:
+                stop = why
+                emit("budget_stop", gen=gen, reason=why)
+                break
         tg = time.time()
         assignments = allocate(run, agents, rng)
+        if layer:
+            assignments = layer.prepare(assignments, rng)
+        if div:
+            assignments = div.plan(assignments, gen, rng, emit)
         best = run.archive().global_best
         emit("gen_start", gen=gen, mix=", ".join(f"{m} {c}" for m, c in Counter(a.mode for a in assignments).items()),
-             best_id=best.id, best=best.objective, assignments=[asdict(a) for a in assignments])
+             best_id=best.id, best=best.objective, assignments=[{**asdict(a), "notes": ""} for a in assignments])
         results = propose_many(run, gen, assignments)
         results.sort(key=lambda r: r["assignment"].worker)
         next_id = run.store.next_id()
         arrivals: list[tuple[int, str]] = []
-        for r in (r for r in results if r["source"]):
-            r["pre"] = run.precheck(r["source"], extra_prior=arrivals)
-            arrivals.append((next_id + len(arrivals), r["source"]))
-        todo = [r for r in results if r["source"] and not r["pre"][0] and not r["pre"][1].is_duplicate]
-        emit("eval_start", gen=gen, n=len(todo), dup=sum(1 for r in results if r.get("pre") and r["pre"][1].is_duplicate),
+        for i, r in enumerate(results):  # every result becomes the entry next_id + i (empty sessions too)
+            if not r["source"]:
+                continue
+            # with descriptors, tune children only lose to exact copies (refinement is the point)
+            exact = (layer is not None or run.config.tune_exact_only) and r["assignment"].mode == "tune"
+            r["pre"] = run.precheck(r["source"], extra_prior=arrivals, threshold=1.0 if exact else None)
+            arrivals.append((next_id + i, r["source"]))
+        if layer or div:
+            td = time.time()
+            if layer:
+                layer.gate(results, gen, emit)
+            if div:
+                div.after_precheck(results, gen, emit)
+            describe_s = max(30.0, time.time() - td)
+        emit("eval_start", gen=gen, n=len(passed(results)), dup=sum(1 for r in results if r.get("pre") and r["pre"][1].is_duplicate),
              guard=sum(1 for r in results if r.get("pre") and r["pre"][0]), empty=sum(1 for r in results if not r["source"]))
-        te = time.time()
-        for r, ev in zip(todo, evaluate_many([r["source"] for r in todo])):
-            r["evals"] = ev if isinstance(ev, dict) else {}
-            if not isinstance(ev, dict):
-                r["usage"]["eval_error"] = repr(ev)[:300]
-        eval_s = max(30.0, time.time() - te)
-        for r in (r for r in results if r["source"]):
-            a, u = r["assignment"], r["usage"]
-            e = run.record(r["source"], r["hypothesis"], a.mode, a.parent_ids, f"claude-code:{u.get('model', '?')}",
-                           r.get("evals", {}), r["pre"], generation=gen, usage=u, elapsed=u.get("seconds", 0.0),
-                           prompt_tokens=u.get("prompt_tokens", 0), completion_tokens=u.get("completion_tokens", 0))
-            emit("entry", gen=gen, id=e.id, worker=a.worker, mode=a.mode, status=e.status, verdict=e.verdict,
-                 objective=None if not e.scored else e.objective, new_best=e.improved_global)
-            proposals += 1
-        entries = run.entries()
-        best = run.archive(entries).global_best
-        gen_entries = [e for e in entries if e.generation == gen]
-        emit("gen_end", gen=gen, best_id=best.id, best=best.objective, seconds=round(time.time() - tg, 1),
-             evaluated=sum(1 for e in gen_entries if e.evals), kept=sum(1 for e in gen_entries if e.status == "kept"),
-             cost_usd=round(sum(e.usage.get("cost_usd", 0.0) or 0.0 for e in entries), 2))
+        eval_s, n = evaluate_and_record(run, gen, results, evaluate_many, emit)
+        if budget is not None:
+            budget.release_generation()
+        proposals += n
+        if div:
+            div.after_generation(gen, emit)
+        emit_gen_end(run, gen, tg, emit, **({"vocab": layer.describer.end_generation()} if layer else {}))
         gen += 1
         generations += 1
     write_holdout(run, emit)
     best = run.archive().global_best
-    emit("run_end", generations=generations, proposals=proposals, best_id=best.id, best=best.objective)
+    emit("run_end", generations=generations, proposals=proposals, best_id=best.id, best=best.objective,
+         **({"stopped_by": stop} if stop else {}))
+
+
+def _per_agent_estimate(run: ResearchRun, cap: float | None) -> float | None:
+    """What a generation reserves per agent session. With a per-session cap (--max-budget-usd) it is that cap,
+    the worst case, so a run-level cap is never passed by a generation that costs more than the last one.
+    Without one: the mean reported cost of the last generation's sessions (None before any)."""
+    if cap is not None:
+        return cap
+    entries = run.entries()
+    last = max((e.generation or 0 for e in entries), default=0)
+    costs = [e.usage["cost_usd"] for e in entries
+             if e.generation == last and last and e.usage.get("cost_usd") is not None]
+    if costs:
+        return sum(costs) / len(costs)
+    return cap
+
+
+def passed(results: list[dict]) -> list[dict]:
+    """Results with a source that passed the import guard and the novelty gate."""
+    return [r for r in results if r["source"] and not r["pre"][0] and not r["pre"][1].is_duplicate]
+
+
+def evaluate_and_record(run: ResearchRun, gen: int, results: list[dict], evaluate_many, emit) -> tuple[float, int]:
+    """Evaluate the results that passed the gates, then record every result with a source in list order.
+    Returns (evaluation wall-clock seconds, number recorded)."""
+    todo = passed(results)
+    te = time.time()
+    for r, ev in zip(todo, evaluate_many([r["source"] for r in todo]) if todo else []):
+        r["evals"] = ev if isinstance(ev, dict) else {}
+        if not isinstance(ev, dict):
+            r["usage"]["eval_error"] = repr(ev)[:300]
+    eval_s = max(30.0, time.time() - te)
+    n = 0
+    for r in results:
+        a, u = r["assignment"], r["usage"]
+        for k, v in a.meta.items():
+            u.setdefault(k, v)
+        common = dict(generation=gen, usage=u, elapsed=u.get("seconds", 0.0),
+                      prompt_tokens=u.get("prompt_tokens", 0), completion_tokens=u.get("completion_tokens", 0))
+        if not r["source"]:  # the session cost money and was a try of its mode: keep it in the ledger
+            e = run.record_no_output(a.mode, a.parent_ids, f"claude-code:{u.get('model', '?')}",
+                                     r.get("hypothesis", ""), **common)
+        else:
+            e = run.record(r["source"], r["hypothesis"], a.mode, a.parent_ids, f"claude-code:{u.get('model', '?')}",
+                           r.get("evals", {}), r["pre"], note=r.get("note", ""), **common)
+        emit("entry", gen=gen, id=e.id, worker=a.worker, mode=a.mode, status=e.status, verdict=e.verdict,
+             objective=None if not e.scored else e.objective, new_best=e.improved_global)
+        n += 1
+    return eval_s, n
+
+
+def emit_gen_end(run: ResearchRun, gen: int, tg: float, emit, **extra) -> None:
+    entries = run.entries()
+    best = run.archive(entries).global_best
+    gen_entries = [e for e in entries if e.generation == gen]
+    spend = run_spend(run.store)
+    # cost_usd = agent sessions (as before); total_usd adds describe/plan calls; unknown = unreported costs
+    emit("gen_end", gen=gen, best_id=best.id, best=best.objective, seconds=round(time.time() - tg, 1),
+         evaluated=sum(1 for e in gen_entries if e.evals), kept=sum(1 for e in gen_entries if e.status == "kept"),
+         cost_usd=round(spend.by_kind.get("agent", 0.0), 4), total_usd=round(spend.usd, 4),
+         spend_by_kind={k: round(v, 4) for k, v in spend.by_kind.items()}, unknown_cost=spend.unknown_cost,
+         calls=spend.calls, tokens=spend.tokens, **extra)
 
 
 def write_holdout(run: ResearchRun, emit) -> None:

@@ -20,9 +20,10 @@ STATUS_REJECTED_DUPLICATE = "rejected_duplicate"
 STATUS_REJECTED_SCREEN = "rejected_screen"
 STATUS_FAILED = "failed"
 STATUS_REJECTED_GUARD = "rejected_guard"
+STATUS_NO_OUTPUT = "no_output"
 
 STATUS_ORDER = [STATUS_KEPT, STATUS_EVALUATED, STATUS_REJECTED_SCREEN, STATUS_REJECTED_DUPLICATE,
-                STATUS_REJECTED_GUARD, STATUS_FAILED]
+                STATUS_REJECTED_GUARD, STATUS_FAILED, STATUS_NO_OUTPUT]
 STATUS_LABELS = {
     STATUS_SEED: "seed",
     STATUS_KEPT: "kept (improved)",
@@ -31,6 +32,7 @@ STATUS_LABELS = {
     STATUS_REJECTED_DUPLICATE: "duplicate (not evaluated)",
     STATUS_FAILED: "crashed / over budget",
     STATUS_REJECTED_GUARD: "disallowed import (not evaluated)",
+    STATUS_NO_OUTPUT: "agent wrote nothing",
 }
 
 

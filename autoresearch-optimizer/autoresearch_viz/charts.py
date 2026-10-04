@@ -180,7 +180,8 @@ def grouped_hbars(
     return "\n".join(out)
 
 
-def stacked_hbars(rows: list[tuple[str, list[tuple[str, str, float]]]], *, width: int = 920, as_share: bool = False) -> str:
+def stacked_hbars(rows: list[tuple[str, list[tuple[str, str, float]]]], *, width: int = 920, as_share: bool = False,
+                  unit: str = "proposals") -> str:
     """rows = [(row label, [(segment label, color, value)])]."""
     ml, mr, mt, mb = 190, 110, 10, 10
     bar_h, gap = 26, 12
@@ -202,7 +203,7 @@ def stacked_hbars(rows: list[tuple[str, list[tuple[str, str, float]]]], *, width
             if w > 22:
                 out.append(f'<text class="seg" x="{x + w / 2:.1f}" y="{y + bar_h / 2 + 4:.1f}" text-anchor="middle">{v:g}</text>')
             x += w
-        out.append(f'<text class="val" x="{x + 6:.1f}" y="{y + bar_h / 2 + 4:.1f}">{total:g} proposals</text>')
+        out.append(f'<text class="val" x="{x + 6:.1f}" y="{y + bar_h / 2 + 4:.1f}">{total:g} {unit}</text>')
     out.append("</svg>")
     return "\n".join(out)
 
